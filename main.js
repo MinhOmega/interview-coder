@@ -16,7 +16,7 @@ const fs = require("fs");
 const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
-const Screenshots = require('electron-screenshots');
+const Screenshots = require("electron-screenshots");
 require("dotenv").config();
 
 // Check if running on macOS
@@ -694,31 +694,35 @@ async function captureScreenshot() {
     }
 
     let success = false;
-    let base64Image = '';
+    let base64Image = "";
 
     try {
       // Get all screen sources
-      const sources = await desktopCapturer.getSources({ 
-        types: ['screen'],
-        thumbnailSize: { 
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: {
           width: screen.getPrimaryDisplay().workAreaSize.width,
-          height: screen.getPrimaryDisplay().workAreaSize.height
-        }
+          height: screen.getPrimaryDisplay().workAreaSize.height,
+        },
       });
 
       // Get the primary display
       const primaryDisplay = screen.getPrimaryDisplay();
-      
+
       // Find the source that matches the primary display
-      const source = sources.find(s => {
-        const bounds = s.display?.bounds || s.bounds;
-        return bounds.x === 0 && bounds.y === 0 && 
-               bounds.width === primaryDisplay.size.width && 
-               bounds.height === primaryDisplay.size.height;
-      }) || sources[0];
+      const source =
+        sources.find((s) => {
+          const bounds = s.display?.bounds || s.bounds;
+          return (
+            bounds.x === 0 &&
+            bounds.y === 0 &&
+            bounds.width === primaryDisplay.size.width &&
+            bounds.height === primaryDisplay.size.height
+          );
+        }) || sources[0];
 
       if (!source) {
-        throw new Error('No screen source found');
+        throw new Error("No screen source found");
       }
 
       // Create a temporary hidden BrowserWindow to capture the screen
@@ -729,12 +733,12 @@ async function captureScreenshot() {
         webPreferences: {
           offscreen: true,
           nodeIntegration: true,
-          contextIsolation: false
-        }
+          contextIsolation: false,
+        },
       });
 
       // Load a minimal HTML file
-      await captureWin.loadURL('data:text/html,<html><body></body></html>');
+      await captureWin.loadURL("data:text/html,<html><body></body></html>");
 
       // Inject capture script
       await captureWin.webContents.executeJavaScript(`
@@ -781,29 +785,30 @@ async function captureScreenshot() {
       `);
 
       // Get the captured image
-      const imageData = await captureWin.webContents.executeJavaScript('document.querySelector("canvas").toDataURL("image/png")');
-      
+      const imageData = await captureWin.webContents.executeJavaScript(
+        'document.querySelector("canvas").toDataURL("image/png")',
+      );
+
       // Close the capture window
       captureWin.close();
 
       if (!imageData) {
-        throw new Error('Failed to capture screen');
+        throw new Error("Failed to capture screen");
       }
 
       // Save the image
-      const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
-      fs.writeFileSync(imagePath, base64Data, 'base64');
+      const base64Data = imageData.replace(/^data:image\/png;base64,/, "");
+      fs.writeFileSync(imagePath, base64Data, "base64");
       base64Image = imageData;
       success = true;
-
     } catch (captureError) {
       console.error("Desktop capturer failed:", captureError);
-      
+
       // Fallback to screenshot-desktop
       try {
         await screenshot({ filename: imagePath });
         const imageBuffer = fs.readFileSync(imagePath);
-        base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+        base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
         success = true;
       } catch (fallbackError) {
         console.error("Screenshot fallback failed:", fallbackError);
@@ -1253,7 +1258,7 @@ Format your response in clear, well-structured Markdown with proper code blocks 
         const stream = await openai.chat.completions.create({
           model: currentModel,
           messages: [{ role: "user", content: messages }],
-          max_tokens: 5000, // Increased max tokens for more detailed responses
+          max_tokens: 8000,
           stream: true,
         });
 
@@ -1269,13 +1274,15 @@ Format your response in clear, well-structured Markdown with proper code blocks 
         }
 
         mainWindow.webContents.send("stream-end");
-        return; // Early return as streaming is handled
+        // Hide instruction banner after streaming is complete
+        mainWindow.webContents.send("hide-instruction");
+        return;
       } else {
         // Non-streaming request
         const response = await openai.chat.completions.create({
           model: currentModel,
           messages: [{ role: "user", content: messages }],
-          max_tokens: 5000, // Increased max tokens for more detailed responses
+          max_tokens: 8000,
         });
 
         result = response.choices[0].message.content;
@@ -1301,22 +1308,24 @@ Format your response in clear, well-structured Markdown with proper code blocks 
         let accumulatedText = "";
 
         streamingResult.emitter.on("chunk", (chunk) => {
-          // Add the new chunk to our accumulated text
           accumulatedText += chunk;
-          // Send the full accumulated text for proper markdown rendering
           mainWindow.webContents.send("stream-update", accumulatedText);
         });
 
         streamingResult.emitter.on("complete", () => {
           mainWindow.webContents.send("stream-end");
+          // Hide instruction banner after streaming is complete
+          mainWindow.webContents.send("hide-instruction");
         });
 
         streamingResult.emitter.on("error", (error) => {
           mainWindow.webContents.send("error", error.message);
           mainWindow.webContents.send("stream-end");
+          // Hide instruction banner on error
+          mainWindow.webContents.send("hide-instruction");
         });
 
-        return; // Early return as streaming is handled
+        return;
       } else {
         result = await generateWithGemini(messages, currentModel);
         console.log("Successfully received response from Gemini");
@@ -1336,24 +1345,17 @@ Format your response in clear, well-structured Markdown with proper code blocks 
     mainWindow.webContents.send("hide-instruction");
   } catch (err) {
     console.error("Error in processScreenshots:", err);
+    console.error("Stack trace:", err.stack);
 
-    // Log stack trace
-    if (err.stack) {
-      console.error("Stack trace:", err.stack);
-    }
-
-    // Log additional error details if available
     if (err.response) {
       console.error("Response status:", err.response.status);
-      if (err.response.data) {
-        console.error("Response data:", JSON.stringify(err.response.data));
-      }
+      console.error("Response data:", JSON.stringify(err.response.data));
     }
 
     mainWindow.webContents.send("loading", false);
-    if (mainWindow.webContents) {
-      mainWindow.webContents.send("error", err.message);
-    }
+    mainWindow.webContents.send("error", err.message);
+    // Hide instruction banner on error
+    mainWindow.webContents.send("hide-instruction");
   }
 }
 
@@ -1386,8 +1388,8 @@ function createModelSelectionWindow() {
 function resetProcess() {
   screenshots = [];
   multiPageMode = false;
-  mainWindow.webContents.send('clear-result');
-  mainWindow.webContents.send('hide-content');
+  mainWindow.webContents.send("clear-result");
+  mainWindow.webContents.send("hide-content");
   updateInstruction(`Press ${modifierKey}+H to take a screenshot`);
 }
 
@@ -1436,24 +1438,24 @@ function createWindow() {
   // Initialize electron-screenshots
   screenshotInstance = new Screenshots({
     singleWindow: true,
-    lang: 'en',
+    lang: "en",
     // Customize the appearance
     styles: {
-      windowBackgroundColor: '#00000000',
+      windowBackgroundColor: "#00000000",
       mask: {
-        color: '#000000',
-        opacity: 0.6
+        color: "#000000",
+        opacity: 0.6,
       },
       toolbar: {
-        backgroundColor: '#2e2c29',
-        color: '#ffffff',
-        activeColor: '#2196f3'
-      }
-    }
+        backgroundColor: "#2e2c29",
+        color: "#ffffff",
+        activeColor: "#2196f3",
+      },
+    },
   });
 
   // Listen for screenshot complete event
-  screenshotInstance.on('ok', async (data) => {
+  screenshotInstance.on("ok", async (data) => {
     try {
       const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
       const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
@@ -1462,7 +1464,7 @@ function createWindow() {
       fs.writeFileSync(imagePath, data.buffer);
       
       // Convert to base64 for processing
-      const base64Image = `data:image/png;base64,${data.buffer.toString('base64')}`;
+      const base64Image = `data:image/png;base64,${data.buffer.toString("base64")}`;
       
       // Add to screenshots array and process
       screenshots.push(base64Image);
@@ -1480,14 +1482,16 @@ function createWindow() {
       // Process the screenshot
       await processScreenshots(true);
     } catch (error) {
-      console.error('Error handling screenshot:', error);
+      console.error("Error handling screenshot:", error);
       mainWindow.webContents.send("error", `Failed to process screenshot: ${error.message}`);
+      // Hide instruction banner on error
+      mainWindow.webContents.send("hide-instruction");
     }
   });
 
   // Listen for cancel event
-  screenshotInstance.on('cancel', () => {
-    console.log('Screenshot cancelled');
+  screenshotInstance.on("cancel", () => {
+    console.log("Screenshot cancelled");
   });
 
   // Detect screen capture/sharing
@@ -1927,10 +1931,22 @@ function toggleWindowVisibility(visible = null) {
     mainWindow.show();
     mainWindow.setOpacity(1.0);
     mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+    
+    // Show model selector window if it exists
+    if (modelListWindow) {
+      modelListWindow.show();
+      modelListWindow.setOpacity(1.0);
+    }
   } else {
     // Don't hide completely, but make nearly invisible and allow other apps to overlay
     mainWindow.setOpacity(0.0);
     mainWindow.setAlwaysOnTop(false);
+    
+    // Hide model selector window if it exists
+    if (modelListWindow) {
+      modelListWindow.setOpacity(0.0);
+      modelListWindow.setAlwaysOnTop(false);
+    }
   }
 
   console.log(`Window visibility set to: ${isWindowVisible}`);
