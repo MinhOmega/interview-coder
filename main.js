@@ -663,7 +663,13 @@ async function generateWithGemini(messages, model, streaming = false) {
 
 function updateInstruction(instruction) {
   if (mainWindow?.webContents) {
-    mainWindow.webContents.send("update-instruction", instruction);
+    if (!instruction || instruction.trim() === '') {
+      // If instruction is empty, hide the instruction banner
+      mainWindow.webContents.send("hide-instruction");
+    } else {
+      // Show the instruction with the provided text
+      mainWindow.webContents.send("update-instruction", instruction);
+    }
   }
 }
 
@@ -1102,17 +1108,34 @@ I need you to provide the best possible solution with excellent performance and 
 Guidelines:
 1. Start with a clear understanding of the problem before diving into code.
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
-3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
-4. Structure your code with clean architecture principles.
-5. Include robust error handling and edge case considerations.
-6. If multiple solutions exist, present the optimal approach and explain your decision.
+3. Structure your code with clean architecture principles.
+4. Include robust error handling and edge case considerations.
+5. If multiple solutions exist, present the optimal approach and explain your decision.
 
-Format your response in Markdown with well-organized sections:
-- Problem Analysis: Brief overview of what you understand the problem to be
-- Approach: Your strategy for solving it
-- Solution: Well-commented, complete implementation with clean syntax
-- Complexity Analysis: Time and space complexity breakdown
-- Optimizations: Any further improvements that could be made`;
+Your response MUST follow this exact structure with these three main sections:
+
+# Analyzing the Problem
+Provide a clear understanding of what the problem is asking, including:
+- The key requirements and constraints
+- Input/output specifications
+- Important edge cases to consider
+- Any implicit assumptions
+
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
+Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
     } else {
       promptText = `These ${screenshots.length} screenshots show a multi-part programming problem. 
 I need you to provide the best possible solution with excellent performance and readability.
@@ -1120,17 +1143,34 @@ I need you to provide the best possible solution with excellent performance and 
 Guidelines:
 1. Start with a clear understanding of the full problem scope across all screenshots.
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
-3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
-4. Structure your code with clean architecture principles.
-5. Include robust error handling and edge case considerations.
-6. Ensure your solution addresses all parts of the problem comprehensively.
+3. Structure your code with clean architecture principles.
+4. Include robust error handling and edge case considerations.
+5. Ensure your solution addresses all parts of the problem comprehensively.
 
-Format your response in Markdown with well-organized sections:
-- Problem Analysis: Brief overview of what you understand the problem to be
-- Approach: Your strategy for solving the multi-part problem
-- Solution: Well-commented, complete implementation with clean syntax
-- Complexity Analysis: Time and space complexity breakdown
-- Optimizations: Any further improvements that could be made`;
+Your response MUST follow this exact structure with these three main sections:
+
+# Analyzing the Problem
+Provide a clear understanding of what the multi-part problem is asking, including:
+- The key requirements and constraints from all screenshots
+- Input/output specifications
+- Important edge cases to consider
+- Any implicit assumptions
+
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving each part of the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation for each component
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
+Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
     }
 
     // Build message with text + each screenshot
@@ -1168,10 +1208,17 @@ Format your response in Markdown with well-organized sections:
         mainWindow.webContents.send("loading", false);
         mainWindow.webContents.send("stream-start");
 
+        // Accumulate text for better markdown rendering when streaming
+        let accumulatedText = "";
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
-            mainWindow.webContents.send("stream-chunk", content);
+            // Add to accumulated text for better markdown parsing
+            accumulatedText += content;
+
+            // Send the accumulated text for proper markdown rendering
+            mainWindow.webContents.send("stream-update", accumulatedText);
           }
         }
 
@@ -1239,8 +1286,8 @@ Format your response in Markdown with well-organized sections:
     mainWindow.webContents.send("analysis-result", result);
     console.log("Analysis complete and sent to renderer");
 
-    // Update instruction after processing
-    updateInstruction(getDefaultInstructions());
+    // Hide instructions after processing is complete
+    mainWindow.webContents.send("hide-instruction");
   } catch (err) {
     console.error("Error in processScreenshots:", err);
 
@@ -1286,8 +1333,8 @@ function createModelSelectionWindow() {
 
   // Register the Escape key shortcut to close the window
   const escapeShortcut = `Escape`;
-  const shortcutRet = modelListWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'Escape') {
+  const shortcutRet = modelListWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "Escape") {
       modelListWindow.close();
     }
   });
@@ -1336,7 +1383,7 @@ function createWindow() {
     titleBarOverlay: false,
     trafficLightPosition: { x: -999, y: -999 }, // Move traffic lights far off-screen
     fullscreenable: true,
-    skipTaskbar: true, 
+    skipTaskbar: true,
     autoHideMenuBar: true,
     hasShadow: true, // Add shadow for better visibility
     enableLargerThanScreen: false, // Prevent window from being larger than screen
@@ -1644,8 +1691,15 @@ function createWindow() {
   });
 
   // Setup IPC handlers for the new functions
-  ipcMain.on("toggle-visibility", (event, visible) => {
-    toggleWindowVisibility(visible);
+  ipcMain.on("toggle-visibility", () => {
+    toggleWindowVisibility();
+    // Send notification through the renderer
+    if (mainWindow?.webContents) {
+      mainWindow.webContents.send("notification", {
+        title: "Visibility",
+        body: mainWindow.isVisible() ? "Window visible" : "Window hidden",
+      });
+    }
   });
 
   ipcMain.on("move-window", (event, direction) => {
@@ -1711,6 +1765,151 @@ function createWindow() {
 
   ipcMain.on("open-settings", () => {
     createModelSelectionWindow();
+  });
+
+  // Set up IPC handlers for context-related actions
+  ipcMain.on("add-context-screenshot", async () => {
+    try {
+      if (screenshots.length === 0) {
+        mainWindow.webContents.send("warning", "No previous context found. Take a regular screenshot instead.");
+        return;
+      }
+      
+      // Set multi-page mode to true to keep context
+      multiPageMode = true;
+      
+      // Take a new screenshot and add to existing ones
+      updateInstruction("Taking screenshot to add to context...");
+      
+      // Capture the screenshot
+      const screenshotBase64 = await captureScreenshot();
+      screenshots.push(screenshotBase64);
+      
+      // Show instruction indicating multi-mode
+      updateInstruction(`Multi-mode: ${screenshots.length} screenshots. Ready to process.`);
+      
+      // Immediate process with context
+      processScreenshotsWithAI();
+    } catch (error) {
+      console.error("Error adding context screenshot:", error);
+      mainWindow.webContents.send("error", "Failed to add context screenshot: " + error.message);
+      updateInstruction(getDefaultInstructions());
+    }
+  });
+  
+  ipcMain.on("report-solution-error", async (event, errorDescription) => {
+    try {
+      if (screenshots.length === 0) {
+        mainWindow.webContents.send("warning", "No screenshots available to report errors for.");
+        return;
+      }
+      
+      // Set multi-page mode to true to keep context
+      multiPageMode = true;
+      
+      // Create a prompt explaining the error
+      const promptText = `The previous solution contains errors. Please fix the following issues described by the user:\n\n${errorDescription}\n\nPlease provide a corrected solution that addresses these issues.`;
+      
+      // Show instruction
+      updateInstruction("Processing error report...");
+      
+      // Add an error report as a text message
+      // Build message with text + each screenshot
+      const messages = [{ type: "text", text: promptText }];
+      
+      for (const img of screenshots) {
+        // Check if the image already has the data URL prefix or not
+        const imageData = img.startsWith("data:image/") ? img : `data:image/png;base64,${img}`;
+        messages.push({
+          type: "image_url",
+          image_url: { url: imageData },
+        });
+      }
+      
+      // Process with streaming
+      mainWindow.webContents.send("loading", true);
+      
+      let result;
+      
+      if (aiProvider === "openai") {
+        if (!openai) {
+          throw new Error("OpenAI client is not initialized. Please check your API key.");
+        }
+
+        console.log("Using OpenAI for error report with model:", currentModel);
+
+        // Make the streaming request using OpenAI
+        const stream = await openai.chat.completions.create({
+          model: currentModel,
+          messages: [{ role: "user", content: messages }],
+          max_tokens: 5000,
+          stream: true,
+        });
+
+        // Start streaming to the renderer
+        mainWindow.webContents.send("loading", false);
+        mainWindow.webContents.send("stream-start");
+
+        // Accumulate text for better markdown rendering when streaming
+        let accumulatedText = "";
+
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            // Add to accumulated text for better markdown parsing
+            accumulatedText += content;
+
+            // Send the accumulated text for proper markdown rendering
+            mainWindow.webContents.send("stream-update", accumulatedText);
+          }
+        }
+
+        mainWindow.webContents.send("stream-end");
+      } else if (aiProvider === "ollama") {
+        console.log("Using Ollama for error report with model:", currentModel);
+        result = await generateWithOllama(messages, currentModel);
+        
+        // Hide loading state
+        mainWindow.webContents.send("loading", false);
+        
+        // Send the text to the renderer
+        mainWindow.webContents.send("analysis-result", result);
+      } else if (aiProvider === "gemini") {
+        console.log("Using Gemini for error report with model:", currentModel);
+
+        const streamingResult = await generateWithGemini(messages, currentModel, true);
+
+        // Start streaming to the renderer
+        mainWindow.webContents.send("loading", false);
+        mainWindow.webContents.send("stream-start");
+
+        // For Gemini, we need to handle streaming differently
+        let accumulatedText = "";
+
+        streamingResult.emitter.on("chunk", (chunk) => {
+          // Add the new chunk to our accumulated text
+          accumulatedText += chunk;
+          // Send the full accumulated text for proper markdown rendering
+          mainWindow.webContents.send("stream-update", accumulatedText);
+        });
+
+        streamingResult.emitter.on("complete", () => {
+          mainWindow.webContents.send("stream-end");
+        });
+
+        streamingResult.emitter.on("error", (error) => {
+          mainWindow.webContents.send("error", error.message);
+          mainWindow.webContents.send("stream-end");
+        });
+      } else {
+        throw new Error(`Unknown AI provider: ${aiProvider}`);
+      }
+    } catch (error) {
+      console.error("Error reporting solution error:", error);
+      mainWindow.webContents.send("error", "Failed to process error report: " + error.message);
+      mainWindow.webContents.send("loading", false);
+      updateInstruction(getDefaultInstructions());
+    }
   });
 
   // Send initial status to renderer
@@ -1804,18 +2003,20 @@ function getDefaultInstructions() {
 
 // Toggle window visibility
 function toggleWindowVisibility(visible = null) {
-  // If a value is provided, use it, otherwise toggle
-  isWindowVisible = visible !== null ? visible : !isWindowVisible;
+  // Set visibility if specified, otherwise toggle
+  const newVisibility = visible !== null ? visible : !mainWindow.isVisible();
+  console.log(`Window visibility set to ${newVisibility}`);
 
-  if (isWindowVisible) {
+  if (newVisibility) {
     mainWindow.show();
-    mainWindow.setOpacity(1.0);
   } else {
-    // Don't hide completely, but make nearly invisible
-    mainWindow.setOpacity(0.05);
+    mainWindow.hide();
   }
 
-  console.log(`Window visibility set to: ${isWindowVisible}`);
+  // Also send to renderer to update UI state if showing
+  if (newVisibility && mainWindow?.webContents) {
+    mainWindow.webContents.send("update-visibility", newVisibility);
+  }
 }
 
 // Move window using keyboard shortcuts
