@@ -94,7 +94,7 @@ If you encounter connection issues with Ollama:
     - Command+R: Reset the current process, clearing all captured screenshots and any displayed results.
     - Command+M: Open the model selector to switch between OpenAI, Gemini, and Ollama models.
     - Command+Q: Quit the application.
-    - Command+B: Toggle window visibility.
+    - Command+B: Toggle visibility of all application windows (both main window and settings).
     - Command+Arrow keys: Move the window in the specified direction.
 
     On Windows/Linux:
@@ -105,7 +105,7 @@ If you encounter connection issues with Ollama:
     - Ctrl+R: Reset the current process, clearing all captured screenshots and any displayed results.
     - Ctrl+M: Open the model selector to switch between OpenAI, Gemini, and Ollama models.
     - Ctrl+Q: Quit the application.
-    - Ctrl+B: Toggle window visibility.
+    - Ctrl+B: Toggle visibility of all application windows (both main window and settings).
     - Ctrl+Arrow keys: Move the window in the specified direction.
 
 ## Supported Models

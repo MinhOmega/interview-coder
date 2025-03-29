@@ -651,6 +651,34 @@
         window.close();
       }
     });
+
+    // Register for keyboard events to handle shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Allow event to propagate to text fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Don't process if some modifier keys are pressed (to avoid conflicts)
+      if (e.altKey) return;
+
+      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
+
+      // If Ctrl/Cmd key is pressed
+      if (ctrlOrCmd) {
+        switch (e.key) {
+          case 'b': // Toggle visibility
+            ipcRenderer.send('toggle-visibility');
+            e.preventDefault();
+            break;
+        }
+      }
+    });
+
+    // Listen for visibility updates from main process
+    ipcRenderer.on('update-visibility', (event, isVisible) => {
+      document.body.style.opacity = isVisible ? '1' : '0';
+    });
   </script>
 </body>
 
