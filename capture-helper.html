@@ -3,13 +3,263 @@
 <head>
   <meta charset="utf-8"/>
   <title>Capture Helper</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      cursor: crosshair;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    
+    #selection-area {
+      position: absolute;
+      border: 2px solid #1e90ff;
+      background-color: rgba(30, 144, 255, 0.2);
+      pointer-events: none;
+      display: none;
+      z-index: 10;
+    }
+    
+    #instructions {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      border-radius: 4px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      z-index: 20;
+      text-align: center;
+    }
+    
+    #buttons {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 20;
+    }
+    
+    button {
+      padding: 8px 16px;
+      margin-left: 10px;
+      background-color: #1e90ff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background-color: #0c7cd5;
+    }
+    
+    #cancel-btn {
+      background-color: #e74c3c;
+    }
+    
+    #cancel-btn:hover {
+      background-color: #c0392b;
+    }
+    
+    #notification {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      border-radius: 4px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    #notification.visible {
+      opacity: 1;
+    }
+  </style>
 </head>
 <body>
+  <div id="selection-area"></div>
+  <div id="instructions">Click and drag to select an area for screenshot</div>
+  <div id="buttons">
+    <button id="capture-btn" style="display: none;">Capture</button>
+    <button id="cancel-btn">Cancel</button>
+  </div>
+  <div id="notification"></div>
+  
   <script>
-    const { ipcRenderer, desktopCapturer } = require('electron');
+    const { ipcRenderer } = require('electron');
     const fs = require('fs');
     
-    // Listen for the capture-screen message
+    // Area selection variables
+    let isSelecting = false;
+    let startX = 0, startY = 0;
+    let selectionArea = document.getElementById('selection-area');
+    let captureBtn = document.getElementById('capture-btn');
+    let cancelBtn = document.getElementById('cancel-btn');
+    let notification = document.getElementById('notification');
+    
+    // Mouse events for area selection
+    document.addEventListener('mousedown', (e) => {
+      isSelecting = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      selectionArea.style.left = startX + 'px';
+      selectionArea.style.top = startY + 'px';
+      selectionArea.style.width = '0px';
+      selectionArea.style.height = '0px';
+      selectionArea.style.display = 'block';
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isSelecting) return;
+      
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+      
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+      
+      selectionArea.style.left = (currentX > startX ? startX : currentX) + 'px';
+      selectionArea.style.top = (currentY > startY ? startY : currentY) + 'px';
+      selectionArea.style.width = width + 'px';
+      selectionArea.style.height = height + 'px';
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (!isSelecting) return;
+      isSelecting = false;
+      
+      const width = parseInt(selectionArea.style.width);
+      const height = parseInt(selectionArea.style.height);
+      
+      if (width > 10 && height > 10) {
+        captureBtn.style.display = 'inline-block';
+      } else if (width > 0 && height > 0) {
+        showNotification("Selection area too small. Please select a larger area.");
+        selectionArea.style.display = 'none';
+      }
+    });
+    
+    // Cancel button event
+    cancelBtn.addEventListener('click', () => {
+      ipcRenderer.send('area-selection-cancelled');
+    });
+    
+    // Capture button event
+    captureBtn.addEventListener('click', async () => {
+      try {
+        // Get selection dimensions
+        const x = parseInt(selectionArea.style.left);
+        const y = parseInt(selectionArea.style.top);
+        const width = parseInt(selectionArea.style.width);
+        const height = parseInt(selectionArea.style.height);
+        
+        showNotification("Capturing selection...");
+        
+        // Use the HTML2Canvas library to capture the area
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Create a context to draw the screenshot
+        const context = canvas.getContext('2d');
+        
+        // Get screenshot of entire screen
+        try {
+          // Try to capture directly using html2canvas
+          // In most environments, this will only capture the current browser window
+          context.drawWindow(window, x, y, width, height, "rgb(255,255,255)");
+          
+          // Get the image data
+          const imageData = canvas.toDataURL('image/png');
+          
+          // Send the selected area coordinates and image data back to main process
+          ipcRenderer.send('area-selected', { x, y, width, height, imageData });
+        } catch (err) {
+          console.error("Error capturing with drawWindow:", err);
+          
+          // Send just the coordinates without image data
+          // This will make the main process use the fallback full screenshot method
+          ipcRenderer.send('area-selected', { x, y, width, height });
+        }
+      } catch (err) {
+        console.error("Error in capture button handler:", err);
+        showNotification("Error capturing selection: " + err.message);
+      }
+    });
+    
+    // Notification function
+    function showNotification(message) {
+      notification.textContent = message;
+      notification.classList.add('visible');
+      
+      setTimeout(() => {
+        notification.classList.remove('visible');
+      }, 3000);
+    }
+    
+    // Helper function to capture from a video element to a canvas
+    async function captureVideoToCanvas(video, x, y, width, height) {
+      // Create a canvas to capture the area
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      
+      // Draw the selected area to the canvas
+      ctx.drawImage(
+        video, 
+        x, y, width, height, // Source rectangle
+        0, 0, width, height  // Destination rectangle
+      );
+      
+      return canvas;
+    }
+    
+    // Helper function to save canvas to file and return base64
+    function saveCanvasToFile(canvas, imagePath) {
+      // Convert canvas to PNG
+      const dataUrl = canvas.toDataURL('image/png');
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      
+      // Save the image
+      fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+      
+      return base64Data;
+    }
+    
+    // Helper function to get video stream
+    async function getVideoStream(sourceId) {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId,
+            minWidth: 1280,
+            maxWidth: 8000,
+            minHeight: 720,
+            maxHeight: 8000
+          }
+        }
+      });
+    }
+    
+    // Listen for the area capture request
     ipcRenderer.on('capture-screen', async (event, data) => {
       try {
         const { sourceId, rect, imagePath } = data;
@@ -23,19 +273,7 @@
         
         try {
           // Get the media stream
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-              mandatory: {
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: sourceId,
-                minWidth: 1280,
-                maxWidth: 8000,
-                minHeight: 720,
-                maxHeight: 8000
-              }
-            }
-          });
+          const stream = await getVideoStream(sourceId);
           
           // Set up video
           video.srcObject = stream;
@@ -43,36 +281,30 @@
             // Start playing the video
             video.play();
             
-            // Create a canvas to capture the selected area
-            const canvas = document.createElement('canvas');
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            
-            const ctx = canvas.getContext('2d');
-            
-            // Draw the selected area to the canvas
-            // Only draw once the video is playing
+            // Wait a moment for the video to start playing
             setTimeout(() => {
               try {
-                ctx.drawImage(
+                const canvas = captureVideoToCanvas(
                   video, 
-                  rect.x, rect.y, rect.width, rect.height, // Source rectangle
-                  0, 0, rect.width, rect.height // Destination rectangle
+                  rect.x, rect.y, rect.width, rect.height
                 );
                 
-                // Convert canvas to PNG
-                const dataUrl = canvas.toDataURL('image/png');
-                const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-                
-                // Save the image
-                fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+                // Save the canvas to a file
+                const base64Data = saveCanvasToFile(canvas, imagePath);
                 
                 // Clean up
                 stream.getTracks().forEach(track => track.stop());
                 video.remove();
                 
+                // Log success
+                console.log(`Area screenshot saved successfully: ${imagePath}`);
+                
                 // Notify main process that the capture is complete
-                ipcRenderer.send('area-captured', { success: true });
+                ipcRenderer.send('area-captured', { 
+                  success: true,
+                  path: imagePath,
+                  base64Image: base64Data
+                });
               } catch (err) {
                 ipcRenderer.send('area-captured', { 
                   success: false, 
@@ -92,6 +324,88 @@
           success: false, 
           error: `Capture process error: ${err.message}` 
         });
+      }
+    });
+    
+    // Listen for the full screen capture request
+    ipcRenderer.on('capture-full-screen', async (event, data) => {
+      try {
+        const { sourceId, imagePath } = data;
+        
+        // Create a video element to capture the screen
+        const video = document.createElement('video');
+        video.style.cssText = 'position:absolute; top:-10000px; left:-10000px;';
+        
+        // Add to DOM temporarily
+        document.body.appendChild(video);
+        
+        try {
+          // Get the media stream
+          const stream = await getVideoStream(sourceId);
+          
+          // Set up video
+          video.srcObject = stream;
+          video.onloadedmetadata = async () => {
+            // Start playing the video
+            video.play();
+            
+            // Wait a moment for the video to start playing
+            setTimeout(() => {
+              try {
+                // For full screen, we need to capture the entire video
+                const canvas = document.createElement('canvas');
+                
+                // Set canvas dimensions to match video dimensions
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Save the canvas to a file
+                const base64Data = saveCanvasToFile(canvas, imagePath);
+                
+                // Clean up
+                stream.getTracks().forEach(track => track.stop());
+                video.remove();
+                
+                // Log success
+                console.log(`Full screen screenshot saved successfully: ${imagePath}`);
+                
+                // Notify main process that the capture is complete
+                ipcRenderer.send('full-screen-captured', { 
+                  success: true,
+                  path: imagePath,
+                  base64Image: base64Data
+                });
+              } catch (err) {
+                ipcRenderer.send('full-screen-captured', { 
+                  success: false, 
+                  error: `Error capturing full screen: ${err.message}` 
+                });
+              }
+            }, 300); // Give the video a moment to start playing
+          };
+        } catch (err) {
+          ipcRenderer.send('full-screen-captured', { 
+            success: false, 
+            error: `Error accessing display media: ${err.message}` 
+          });
+        }
+      } catch (err) {
+        ipcRenderer.send('full-screen-captured', { 
+          success: false, 
+          error: `Full screen capture process error: ${err.message}` 
+        });
+      }
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        ipcRenderer.send('area-selection-cancelled');
+      } else if (e.key === 'Enter' && captureBtn.style.display !== 'none') {
+        captureBtn.click();
       }
     });
   </script>

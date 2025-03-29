@@ -1,120 +1,98 @@
-# Interview Coder
+# OA Coder
 
-Interview Coder is an Electron application that captures screenshots and leverages AI APIs to analyze them. It can solve questions, generate code, or provide detailed answers based on screenshots. The app supports both single screenshot processing and multi-page mode for capturing multiple images before analysis.
+OA Coder is an AI-powered coding assistant that analyzes screenshots of code, problem statements, and documentation to provide explanations, solutions, and insights.
 
 ## Features
 
-- **Screenshot Capture:** Use global keyboard shortcuts to capture the screen.
-- **AI Integration:** Send captured screenshots to OpenAI or Ollama for automated analysis.
-- **Multi-Page Mode:** Combine multiple screenshots for questions spanning several pages.
-- **Customizable UI:** Transparent, always-on-top window with an instruction banner and markdown-rendered responses.
-- **Global Shortcuts:** Easily control the application using keyboard shortcuts.
-- **Platform-Aware:** Automatically uses Command key on macOS and Control key on Windows/Linux.
-- **Local AI Options:** Support for local Ollama models, including multimodal vision models.
-
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) (v14 or later recommended)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- An OpenAI API key (if using OpenAI) OR
-- [Ollama](https://ollama.ai/) installed and running locally (if using local models)
+- Capture full-screen or area screenshots
+- Multi-screenshot mode for analyzing multiple pages
+- AI-powered analysis of code and text in screenshots
+- Support for multiple AI providers:
+  - OpenAI (GPT-4 Vision)
+  - Google Gemini Pro Vision
+  - Local Ollama models with vision capabilities
 
 ## Installation
 
-1. **Clone the repository:**
+### Prerequisites
 
+- Node.js (v18 or higher)
+- npm (v8 or higher)
+
+### Setup
+
+1. Clone this repository
    ```
-   git clone https://github.com/archangel0x01/oa-coder.git
+   git clone https://github.com/yourusername/oa-coder.git
    cd oa-coder
    ```
 
-2. **Install the dependencies:**
+2. Install dependencies
    ```
    npm install
    ```
 
-3. **Configure the application:**
-   Create a `.env` file in the project root with your settings. For example:
-    ```
-    OPENAI_API_KEY=YOUR_OPENAI_API_KEY
-    OPENAI_MODEL=gpt-4o-mini
-    AI_PROVIDER=openai
-    OLLAMA_BASE_URL=http://127.0.0.1:11434
-    ```
-  - Note: If the `OPENAI_MODEL` value is omitted, the application defaults to "gpt-4o-mini".
-  - `AI_PROVIDER` can be set to either `openai` or `ollama`. 
-  - Always use `127.0.0.1` instead of `localhost` for Ollama to avoid IPv6 connection issues.
-  - If using Ollama, make sure you have it installed and running with vision-capable models.
-
-## Using with Ollama
-
-To use Interview Coder with Ollama:
-
-1. Install Ollama from https://ollama.ai/
-2. Run Ollama
-3. Pull a vision-capable model such as `deepseek-r1:14b` by running:
+3. Build the application
    ```
-   ollama pull deepseek-r1:14b
+   npm run build
    ```
-4. Start Interview Coder
-5. Press `Command+Shift+M` (Mac) or `Ctrl+Shift+M` (Windows/Linux) to open the model selector
-6. Select "Ollama" as your AI provider and choose your model from the dropdown
-7. Click "Save Settings"
 
-### Troubleshooting Ollama Connection
+4. Start the application
+   ```
+   npm start
+   ```
 
-If you encounter connection issues with Ollama:
+### Development
 
-1. Make sure Ollama is running by checking its status in your system tray or task manager
-2. Verify that you're using `http://127.0.0.1:11434` instead of `localhost` in the Ollama URL settings
-3. Use the "Test Connection" button in the model selector to check if Interview Coder can connect to Ollama
-4. Check that your firewall is not blocking connections to port 11434
-5. If you've configured Ollama to use a different port or host, update the URL accordingly
+For development with hot-reloading:
+```
+npm run dev
+```
 
 ## Usage
 
-1. **Start the Application:**
-    Run the following command to launch Interview Coder:
-    ```
-    npm start
-    ```
+### Keyboard Shortcuts
 
-2. **Global Keyboard Shortcuts:**
+- **Cmd+Shift+S** (Mac) / **Ctrl+Shift+S** (Windows/Linux): Capture full screen
+- **Cmd+Shift+D** (Mac) / **Ctrl+Shift+D** (Windows/Linux): Capture selected area
+- **Cmd+Shift+A** (Mac) / **Ctrl+Shift+A** (Windows/Linux): Toggle multi-screenshot mode
+- **Cmd+Shift+M** (Mac) / **Ctrl+Shift+M** (Windows/Linux): Open model settings
+- **Cmd+Shift+R** (Mac) / **Ctrl+Shift+R** (Windows/Linux): Repeat last analysis
+- **Cmd+Shift+Q** (Mac) / **Ctrl+Shift+Q** (Windows/Linux): Quit application
 
-    On macOS:
-    - Command+Shift+S: Capture a screenshot and process it immediately. In multi-page mode, this shortcut finalizes the session and sends all captured screenshots for processing.
-    - Command+Shift+A: Capture an additional screenshot in multi-page mode. The instruction banner will remind you of the mode and available shortcuts.
-    - Command+Shift+R: Reset the current process, clearing all captured screenshots and any displayed results.
-    - Command+Shift+M: Open the model selector to switch between OpenAI and Ollama models.
-    - Command+Shift+Q: Close the running process.
+### AI Provider Configuration
 
-    On Windows/Linux:
-    - Ctrl+Shift+S: Capture a screenshot and process it immediately. In multi-page mode, this shortcut finalizes the session and sends all captured screenshots for processing.
-    - Ctrl+Shift+A: Capture an additional screenshot in multi-page mode. The instruction banner will remind you of the mode and available shortcuts.
-    - Ctrl+Shift+R: Reset the current process, clearing all captured screenshots and any displayed results.
-    - Ctrl+Shift+M: Open the model selector to switch between OpenAI and Ollama models.
-    - Ctrl+Shift+Q: Close the running process.
+The first time you run the application, you'll need to configure an AI provider:
 
-## Supported Models
+1. Select your preferred AI provider (OpenAI, Gemini, or Ollama)
+2. Enter the required API keys or URLs
+3. Select the appropriate model
 
-### OpenAI Models
-- gpt-4o-mini
-- gpt-4o
-- gpt-4-vision-preview
-- gpt-4-turbo
+#### For Ollama
 
-### Ollama Models
-Any Ollama model that supports vision capabilities, including:
-- llava
-- llava-llama3
-- llava:13b
-- moondream
-- bakllava
-- deepseek-r1:14b (recommended)
+To use local Ollama models:
+1. Install Ollama from [ollama.ai](https://ollama.ai)
+2. Pull a model with vision capabilities:
+   ```
+   ollama pull llava
+   ```
+3. Run Ollama server
+4. In OA Coder, select Ollama as provider and enter the URL (default: http://localhost:11434)
 
-## Status
+## Building for Distribution
 
-This program is still under development. Some features may not be fully implemented, and there might be bugs or incomplete functionality. Your feedback and contributions are welcome as we work towards a more stable release.
+Build for all platforms:
+```
+npm run build:all
+```
 
+Platform-specific builds:
+```
+npm run build:mac
+npm run build:win
+npm run build:linux
+```
 
-**Personal Thoughts**: Inspired by interviewcoder.co but didn't like the idea of gatekeeping **cheating** softwares behind paywalls. Like you're literally cheating wtf man? And this might help incompetent software engineers join the company and eat it from the inside forcing companies to realise that Leetcode isn't the only way people should get hired and there are other alternative ways to assess a candidate's abilities.
+## License
+
+MIT

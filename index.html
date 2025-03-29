@@ -168,6 +168,69 @@
       border-radius: 4px;
       font-size: 12px;
       user-select: none;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      z-index: 8000;
+    }
+    
+    .screenshot-notification {
+      position: fixed;
+      bottom: 40px;
+      right: 10px;
+      background: rgba(0, 150, 0, 0.85);
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 4px;
+      font-size: 13px;
+      z-index: 9000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      max-width: 400px;
+    }
+    
+    .screenshot-notification.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .screenshot-notification .file-path {
+      font-size: 11px;
+      opacity: 0.8;
+      word-break: break-all;
+      margin-top: 5px;
+    }
+    
+    #notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 4px;
+      font-size: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      max-width: 400px;
+      word-break: break-word;
+    }
+    
+    #notification.warning {
+      background-color: #FF9800;
+    }
+    
+    #notification.error {
+      background-color: #F44336;
+    }
+    
+    #notification.visible {
+      opacity: 1;
     }
   </style>
 </head>
@@ -184,6 +247,8 @@
   </div>
   
   <div id="model-badge" class="model-badge"></div>
+
+  <div id="notification"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
@@ -224,7 +289,16 @@
     const updateModelDisplay = async () => {
       try {
         const settings = await ipcRenderer.invoke('get-current-settings');
-        const provider = settings.aiProvider === 'openai' ? 'OpenAI' : 'Ollama';
+        let provider;
+        
+        if (settings.aiProvider === 'openai') {
+          provider = 'OpenAI';
+        } else if (settings.aiProvider === 'gemini') {
+          provider = 'Gemini';
+        } else {
+          provider = 'Ollama';
+        }
+        
         modelBadge.textContent = `${provider}: ${settings.currentModel}`;
       } catch (error) {
         console.error('Error getting current model:', error);
@@ -341,6 +415,36 @@
       
       'model-changed': () => {
         updateModelDisplay();
+      },
+      
+      'screenshot-saved': (event, data) => {
+        // Create a notification element
+        const notification = document.createElement('div');
+        notification.className = 'screenshot-notification';
+        
+        let message = `<strong>${data.isArea ? 'Area Screenshot' : 'Screenshot'} Saved</strong>`;
+        if (data.dimensions) {
+          message += ` (${data.dimensions})`;
+        }
+        message += `<div class="file-path">${data.path}</div>`;
+        
+        notification.innerHTML = message;
+        document.body.appendChild(notification);
+        
+        // Show the notification with animation
+        setTimeout(() => {
+          notification.classList.add('visible');
+        }, 100);
+        
+        // Hide and remove after 5 seconds
+        setTimeout(() => {
+          notification.classList.remove('visible');
+          setTimeout(() => {
+            if (notification.parentNode) {
+              document.body.removeChild(notification);
+            }
+          }, 300); // Wait for transition to finish
+        }, 5000);
       }
     };
     
@@ -355,6 +459,40 @@
     });
     
     updateBanner(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models | ${modifierKey}+Shift+Q: Close`);
+    
+    function showNotification(message, type = 'success') {
+      const notification = document.getElementById('notification');
+      
+      // Reset any existing classes
+      notification.classList.remove('success', 'warning', 'error', 'visible');
+      
+      // Set the message and type
+      notification.textContent = message;
+      notification.classList.add(type);
+      notification.classList.add('visible');
+      
+      // Hide after 5 seconds (for success/warning) or 8 seconds (for errors)
+      const timeout = type === 'error' ? 8000 : 5000;
+      setTimeout(() => {
+        notification.classList.remove('visible');
+      }, timeout);
+    }
+    
+    // Event listeners for notification types
+    ipcRenderer.on("screenshot-saved", (event, data) => {
+      const { path, isArea, dimensions } = data;
+      const typeText = isArea ? "Area screenshot" : "Full screenshot";
+      const dimensionsText = dimensions ? ` (${dimensions.width}x${dimensions.height})` : '';
+      showNotification(`${typeText}${dimensionsText} saved: ${path}`);
+    });
+    
+    ipcRenderer.on("warning", (event, message) => {
+      showNotification(message, 'warning');
+    });
+    
+    ipcRenderer.on("error", (event, message) => {
+      showNotification(message, 'error');
+    });
   </script>
 </body>
 </html>

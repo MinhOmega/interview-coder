@@ -12,6 +12,7 @@
       user-select: none;
       cursor: crosshair;
       overflow: hidden;
+      font-family: Arial, sans-serif;
     }
     
     #overlay {
@@ -20,16 +21,63 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.2);
       backdrop-filter: blur(1px);
     }
     
     #selection {
       position: absolute;
-      border: 2px dashed #fff;
-      background: rgba(0, 150, 255, 0.2);
+      border: 2px solid #1e90ff;
+      background: rgba(30, 144, 255, 0.1);
       pointer-events: none;
       z-index: 10;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.3), 0 0 10px rgba(0,0,0,0.5);
+    }
+    
+    #guides {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      display: none;
+    }
+    
+    #horizontal-guide, #vertical-guide {
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.5);
+      z-index: 5;
+    }
+    
+    #horizontal-guide {
+      height: 1px;
+      width: 100%;
+    }
+    
+    #vertical-guide {
+      width: 1px;
+      height: 100%;
+    }
+    
+    #magnifier {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      z-index: 20;
+      pointer-events: none;
+      display: none;
+    }
+    
+    #magnifier-content {
+      position: absolute;
+      transform-origin: center;
+      transform: scale(3);
     }
     
     #info {
@@ -41,10 +89,21 @@
       color: white;
       padding: 8px 16px;
       border-radius: 4px;
-      font-family: Arial, sans-serif;
       font-size: 14px;
       z-index: 100;
       pointer-events: none;
+    }
+    
+    #dimensions {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 15;
+      pointer-events: none;
+      display: none;
     }
     
     #buttons {
@@ -64,6 +123,12 @@
       cursor: pointer;
       font-family: Arial, sans-serif;
       font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
     
     #capture-btn {
@@ -75,11 +140,71 @@
       background-color: #f44336;
       color: white;
     }
+    
+    .position-indicator {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 15;
+      pointer-events: none;
+      display: none;
+    }
+    
+    .selection-corner {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: white;
+      border: 1px solid #1e90ff;
+      z-index: 15;
+    }
+    
+    .corner-tl { top: -5px; left: -5px; cursor: nwse-resize; }
+    .corner-tr { top: -5px; right: -5px; cursor: nesw-resize; }
+    .corner-bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+    .corner-br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+    
+    .selection-edge {
+      position: absolute;
+      background: transparent;
+      z-index: 12;
+    }
+    
+    .edge-top, .edge-bottom { height: 8px; width: calc(100% - 10px); left: 5px; }
+    .edge-left, .edge-right { width: 8px; height: calc(100% - 10px); top: 5px; }
+    
+    .edge-top { top: -5px; cursor: ns-resize; }
+    .edge-right { right: -5px; cursor: ew-resize; }
+    .edge-bottom { bottom: -5px; cursor: ns-resize; }
+    .edge-left { left: -5px; cursor: ew-resize; }
   </style>
 </head>
 <body>
   <div id="overlay"></div>
-  <div id="selection" style="display: none;"></div>
+  <div id="guides">
+    <div id="horizontal-guide"></div>
+    <div id="vertical-guide"></div>
+  </div>
+  <div id="selection" style="display: none;">
+    <div class="selection-corner corner-tl"></div>
+    <div class="selection-corner corner-tr"></div>
+    <div class="selection-corner corner-bl"></div>
+    <div class="selection-corner corner-br"></div>
+    
+    <div class="selection-edge edge-top"></div>
+    <div class="selection-edge edge-right"></div>
+    <div class="selection-edge edge-bottom"></div>
+    <div class="selection-edge edge-left"></div>
+  </div>
+  <div id="dimensions"></div>
+  <div id="magnifier">
+    <div id="magnifier-content"></div>
+  </div>
+  <div id="position-x" class="position-indicator"></div>
+  <div id="position-y" class="position-indicator"></div>
   <div id="info">Click and drag to select an area</div>
   <div id="buttons">
     <button id="capture-btn">Capture Area</button>
@@ -91,32 +216,105 @@
     
     const overlay = document.getElementById('overlay');
     const selection = document.getElementById('selection');
+    const guides = document.getElementById('guides');
+    const horizontalGuide = document.getElementById('horizontal-guide');
+    const verticalGuide = document.getElementById('vertical-guide');
+    const magnifier = document.getElementById('magnifier');
+    const magnifierContent = document.getElementById('magnifier-content');
     const info = document.getElementById('info');
+    const dimensionsBox = document.getElementById('dimensions');
     const buttons = document.getElementById('buttons');
     const captureBtn = document.getElementById('capture-btn');
     const cancelBtn = document.getElementById('cancel-btn');
+    const positionX = document.getElementById('position-x');
+    const positionY = document.getElementById('position-y');
+    
+    // Get corners and edges for resizing
+    const corners = {
+      tl: document.querySelector('.corner-tl'),
+      tr: document.querySelector('.corner-tr'),
+      bl: document.querySelector('.corner-bl'),
+      br: document.querySelector('.corner-br')
+    };
+    
+    const edges = {
+      top: document.querySelector('.edge-top'),
+      right: document.querySelector('.edge-right'),
+      bottom: document.querySelector('.edge-bottom'),
+      left: document.querySelector('.edge-left')
+    };
     
     let startX, startY;
     let isSelecting = false;
+    let isResizing = false;
+    let resizeEdge = null;
+    let resizeCorner = null;
     let selectedRect = null;
+    let selectionBox = { x: 0, y: 0, width: 0, height: 0 };
     
-    // Listen for mouse down to start selection
-    overlay.addEventListener('mousedown', (e) => {
-      isSelecting = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      
-      selection.style.left = startX + 'px';
-      selection.style.top = startY + 'px';
-      selection.style.width = '0px';
-      selection.style.height = '0px';
-      selection.style.display = 'block';
-      
-      buttons.style.display = 'none';
-    });
+    function updateGuidesPosition(x, y) {
+      horizontalGuide.style.top = `${y}px`;
+      verticalGuide.style.left = `${x}px`;
+    }
     
-    // Listen for mouse move to update selection
-    overlay.addEventListener('mousemove', (e) => {
+    function updateMagnifier(x, y) {
+      // Position magnifier slightly above cursor
+      const magX = x - 60;
+      const magY = y - 150;
+      
+      magnifier.style.left = `${magX}px`;
+      magnifier.style.top = `${magY}px`;
+      
+      // Position content inside magnifier to create magnifying effect
+      magnifierContent.style.left = `${-3 * (x - 60) + 60}px`;
+      magnifierContent.style.top = `${-3 * (y - 60) + 60}px`;
+    }
+    
+    function showPositionInfo(x, y) {
+      positionX.style.display = 'block';
+      positionY.style.display = 'block';
+      
+      positionX.textContent = `X: ${Math.round(x)}`;
+      positionY.textContent = `Y: ${Math.round(y)}`;
+      
+      positionX.style.top = `${y + 15}px`;
+      positionX.style.left = `${x + 10}px`;
+      
+      positionY.style.top = `${y - 25}px`;
+      positionY.style.left = `${x - 40}px`;
+    }
+    
+    function updateSelectionDimensions() {
+      const rect = selection.getBoundingClientRect();
+      dimensionsBox.style.display = 'block';
+      dimensionsBox.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
+      
+      // Position the dimensions box at the center bottom of selection
+      dimensionsBox.style.left = `${rect.left + rect.width / 2 - dimensionsBox.offsetWidth / 2}px`;
+      dimensionsBox.style.top = `${rect.bottom + 5}px`;
+    }
+    
+    function updateSelectionBox(left, top, width, height) {
+      // Update internal state
+      selectionBox = {
+        x: left,
+        y: top,
+        width: width,
+        height: height
+      };
+      
+      // Update DOM
+      selection.style.left = `${left}px`;
+      selection.style.top = `${top}px`;
+      selection.style.width = `${width}px`;
+      selection.style.height = `${height}px`;
+      
+      // Update dimensions display
+      updateSelectionDimensions();
+    }
+    
+    // Function to handle mouse movement during selection
+    function handleDragSelection(e) {
       if (!isSelecting) return;
       
       const currentX = e.clientX;
@@ -128,37 +326,178 @@
       const left = Math.min(startX, currentX);
       const top = Math.min(startY, currentY);
       
-      // Update the selection element
-      selection.style.left = left + 'px';
-      selection.style.top = top + 'px';
-      selection.style.width = width + 'px';
-      selection.style.height = height + 'px';
+      // Update the selection
+      updateSelectionBox(left, top, width, height);
       
-      // Update info text
-      info.textContent = `Selection: ${width}px × ${height}px`;
+      // Update guides
+      updateGuidesPosition(currentX, currentY);
+      
+      // Update magnifier
+      updateMagnifier(currentX, currentY);
+      
+      // Update position indicators
+      showPositionInfo(currentX, currentY);
+    }
+    
+    // Function to handle mouse movement during resizing
+    function handleResize(e) {
+      if (!isResizing) return;
+      
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+      
+      let newLeft = selectionBox.x;
+      let newTop = selectionBox.y;
+      let newWidth = selectionBox.width;
+      let newHeight = selectionBox.height;
+      
+      if (resizeCorner) {
+        // Corner resizing
+        switch (resizeCorner) {
+          case 'tl': // Top-left
+            newLeft = Math.min(currentX, selectionBox.x + selectionBox.width);
+            newTop = Math.min(currentY, selectionBox.y + selectionBox.height);
+            newWidth = selectionBox.x + selectionBox.width - newLeft;
+            newHeight = selectionBox.y + selectionBox.height - newTop;
+            break;
+          case 'tr': // Top-right
+            newTop = Math.min(currentY, selectionBox.y + selectionBox.height);
+            newWidth = Math.max(0, currentX - selectionBox.x);
+            newHeight = selectionBox.y + selectionBox.height - newTop;
+            break;
+          case 'bl': // Bottom-left
+            newLeft = Math.min(currentX, selectionBox.x + selectionBox.width);
+            newWidth = selectionBox.x + selectionBox.width - newLeft;
+            newHeight = Math.max(0, currentY - selectionBox.y);
+            break;
+          case 'br': // Bottom-right
+            newWidth = Math.max(0, currentX - selectionBox.x);
+            newHeight = Math.max(0, currentY - selectionBox.y);
+            break;
+        }
+      } else if (resizeEdge) {
+        // Edge resizing
+        switch (resizeEdge) {
+          case 'top':
+            newTop = Math.min(currentY, selectionBox.y + selectionBox.height);
+            newHeight = selectionBox.y + selectionBox.height - newTop;
+            break;
+          case 'right':
+            newWidth = Math.max(0, currentX - selectionBox.x);
+            break;
+          case 'bottom':
+            newHeight = Math.max(0, currentY - selectionBox.y);
+            break;
+          case 'left':
+            newLeft = Math.min(currentX, selectionBox.x + selectionBox.width);
+            newWidth = selectionBox.x + selectionBox.width - newLeft;
+            break;
+        }
+      }
+      
+      // Update selection with new dimensions
+      if (newWidth > 10 && newHeight > 10) {
+        updateSelectionBox(newLeft, newTop, newWidth, newHeight);
+      }
+      
+      // Update guides
+      updateGuidesPosition(currentX, currentY);
+    }
+    
+    // Listen for mouse movement
+    document.addEventListener('mousemove', (e) => {
+      if (isSelecting) {
+        handleDragSelection(e);
+      } else if (isResizing) {
+        handleResize(e);
+      } else {
+        // Just update guides when moving around
+        updateGuidesPosition(e.clientX, e.clientY);
+      }
     });
     
-    // Listen for mouse up to finish selection
-    overlay.addEventListener('mouseup', (e) => {
-      if (!isSelecting) return;
-      isSelecting = false;
+    // Listen for mouse down to start selection
+    overlay.addEventListener('mousedown', (e) => {
+      // Ignore if clicking on elements other than overlay
+      if (e.target !== overlay) return;
       
-      // Store the selected rectangle
-      const rect = selection.getBoundingClientRect();
-      if (rect.width > 10 && rect.height > 10) {
-        selectedRect = {
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height
-        };
+      isSelecting = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      // Initialize selection position and size
+      selection.style.left = startX + 'px';
+      selection.style.top = startY + 'px';
+      selection.style.width = '0px';
+      selection.style.height = '0px';
+      selection.style.display = 'block';
+      
+      // Show guides during selection
+      guides.style.display = 'block';
+      magnifier.style.display = 'block';
+      
+      // Update guides and magnifier
+      updateGuidesPosition(e.clientX, e.clientY);
+      updateMagnifier(e.clientX, e.clientY);
+      
+      // Hide buttons during new selection
+      buttons.style.display = 'none';
+    });
+    
+    // Set up resize handlers for corners
+    Object.keys(corners).forEach(key => {
+      corners[key].addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        isResizing = true;
+        resizeCorner = key;
+        resizeEdge = null;
+      });
+    });
+    
+    // Set up resize handlers for edges
+    Object.keys(edges).forEach(key => {
+      edges[key].addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        isResizing = true;
+        resizeEdge = key;
+        resizeCorner = null;
+      });
+    });
+    
+    // Listen for mouse up to finish selection or resizing
+    document.addEventListener('mouseup', (e) => {
+      if (isSelecting || isResizing) {
+        isSelecting = false;
+        isResizing = false;
+        resizeCorner = null;
+        resizeEdge = null;
         
-        buttons.style.display = 'block';
-        info.textContent = `Selection: ${Math.round(rect.width)}px × ${Math.round(rect.height)}px | Click Capture Area to proceed`;
-      } else {
-        // Reset if selection is too small
-        selection.style.display = 'none';
-        info.textContent = 'Click and drag to select an area';
+        // Hide guides and magnifier
+        guides.style.display = 'none';
+        magnifier.style.display = 'none';
+        positionX.style.display = 'none';
+        positionY.style.display = 'none';
+        
+        // Get final selection
+        const rect = selection.getBoundingClientRect();
+        if (rect.width > 10 && rect.height > 10) {
+          selectedRect = {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height
+          };
+          
+          // Show dimensions and buttons
+          buttons.style.display = 'block';
+          dimensionsBox.style.display = 'block';
+          info.textContent = `Selection: ${Math.round(rect.width)}px × ${Math.round(rect.height)}px | Click Capture Area to proceed`;
+        } else if (!selectedRect) {
+          // Reset if selection is too small and we don't have a previous selection
+          selection.style.display = 'none';
+          dimensionsBox.style.display = 'none';
+          info.textContent = 'Click and drag to select an area';
+        }
       }
     });
     
@@ -178,6 +517,11 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         ipcRenderer.send('area-cancelled');
+      }
+      
+      // Allow Enter key to capture
+      if (e.key === 'Enter' && selectedRect) {
+        ipcRenderer.send('area-selected', selectedRect);
       }
     });
   </script>

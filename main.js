@@ -514,12 +514,9 @@ async function generateWithGemini(messages, model, streaming = false) {
 
     console.log(`Generating with Gemini using model: ${model}`);
 
-    // Get the gemini model
+    // Get the Gemini model
     const geminiModel = geminiAI.getGenerativeModel({ model: model });
 
-    // Process the messages to format them for Gemini
-    const geminiMessages = [];
-    
     // Format as Gemini content parts
     const contentParts = [];
     
@@ -539,11 +536,28 @@ async function generateWithGemini(messages, model, streaming = false) {
       }
     }
     
+    // Create the content message format required by Gemini
+    const geminiContent = { 
+      parts: contentParts,
+      role: "user"
+    };
+    
+    // Generate configuration including safety settings
+    const genConfig = { 
+      temperature: 0.4,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192,
+    };
+    
     // If streaming is requested, use the streaming API
     if (streaming) {
       console.log("Using streaming API with Gemini");
       
-      const streamingResponse = await geminiModel.generateContentStream({ contents: [{ parts: contentParts }] });
+      const streamingResponse = await geminiModel.generateContentStream({
+        contents: [geminiContent],
+        generationConfig: genConfig
+      });
       
       // Set up stream handling
       let fullResponse = "";
@@ -565,6 +579,7 @@ async function generateWithGemini(messages, model, streaming = false) {
           // Emit completion event
           emitter.emit('complete', fullResponse);
         } catch (error) {
+          console.error("Error in Gemini stream processing:", error);
           emitter.emit('error', error);
         }
       })();
@@ -576,11 +591,18 @@ async function generateWithGemini(messages, model, streaming = false) {
       };
     } else {
       // Standard non-streaming response
-      const response = await geminiModel.generateContent({ contents: [{ parts: contentParts }] });
+      const response = await geminiModel.generateContent({
+        contents: [geminiContent],
+        generationConfig: genConfig
+      });
+      
       return response.response.text();
     }
   } catch (error) {
     console.error("Error generating with Gemini:", error.message);
+    if (error.stack) {
+      console.error("Stack trace:", error.stack);
+    }
     throw error;
   }
 }
@@ -597,120 +619,213 @@ function hideInstruction() {
   }
 }
 
+/**
+ * Captures a screenshot of a selected area
+ */
 async function captureAreaScreenshot() {
+  // Hide the main window
+  mainWindow.hide();
+  console.log("Waiting for window to hide...");
+  
+  await new Promise(resolve => setTimeout(resolve, 300)); // Wait for window to hide
+
   try {
-    hideInstruction();
-    
-    // Create a new window for area selection
-    const selectWindow = new BrowserWindow({
+    console.log("Preparing to capture area...");
+    // Create a window for the screenshot area selection
+    let captureWindow = new BrowserWindow({
       width: 800,
       height: 600,
       frame: false,
+      fullscreen: process.platform !== "darwin", // For macOS, don't use fullscreen to avoid animation
       transparent: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
       },
-      fullscreen: true,
     });
-    
-    // Load a selection interface
-    selectWindow.loadFile('area-selector.html');
-    
-    // Handle area selection from renderer
+
+    // Load the capture-helper.html from the file system
+    await captureWindow.loadFile("capture-helper.html");
+
     return new Promise((resolve, reject) => {
-      ipcMain.once('area-selected', async (event, rect) => {
+      ipcMain.once("area-selected", async (event, { x, y, width, height, imageData }) => {
+        console.log("Area selected:", x, y, width, height);
+        
         try {
-          selectWindow.hide();
-          
-          // Wait a moment for the window to be hidden
-          await new Promise(res => setTimeout(res, 200));
-          
-          // Capture the screen and crop it to the selected area
-          const sources = await desktopCapturer.getSources({ types: ['screen'] });
-          const source = sources[0]; // Typically the primary display
-          
-          if (!source) {
-            reject(new Error("No screen source found"));
+          if (width < 10 || height < 10) {
+            captureWindow.close();
+            mainWindow.show();
+            reject(new Error("Selected area is too small"));
+            return;
+          }
+
+          // If we received image data directly from the renderer
+          if (imageData) {
+            console.log("Using image data from renderer");
+            captureWindow.close();
+            mainWindow.show();
+            
+            // We have the image data directly, no need to read from file
+            const dimensions = { width, height };
+            
+            // Generate a filename for the screenshot based on the current time
+            const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+            const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+            
+            // Save the image data to file
+            try {
+              const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), "base64");
+              fs.writeFileSync(imagePath, buffer);
+              
+              // Emit event to show notification for saved screenshot
+              mainWindow.webContents.send("screenshot-saved", {
+                path: imagePath,
+                isArea: true,
+                dimensions
+              });
+              
+              console.log(`Area screenshot saved to ${imagePath}`);
+              resolve(imageData);
+            } catch (error) {
+              console.error("Error saving area screenshot:", error);
+              reject(error);
+            }
             return;
           }
           
-          const timestamp = Date.now();
-          const imagePath = path.join(app.getPath("pictures"), `area_screenshot_${timestamp}.png`);
+          // Fallback to full screen capture if we don't have image data
+          console.log("No image data from renderer, using fallback method");
+          captureWindow.close();
+          mainWindow.show();
           
-          // Create temporary window to capture the screen
-          const captureWindow = new BrowserWindow({
-            width: 1,
-            height: 1,
-            show: false,
-            webPreferences: {
-              nodeIntegration: true,
-              contextIsolation: false,
-            }
-          });
-          
-          captureWindow.loadFile('capture-helper.html');
-          
-          captureWindow.webContents.once('did-finish-load', () => {
-            captureWindow.webContents.send('capture-screen', {
-              sourceId: source.id,
-              rect: rect,
-              imagePath: imagePath
-            });
-          });
-          
-          ipcMain.once('area-captured', (event, result) => {
-            if (result.success) {
-              const imageBuffer = fs.readFileSync(imagePath);
-              const base64Image = imageBuffer.toString("base64");
-              resolve(base64Image);
-            } else {
-              reject(new Error(result.error || "Failed to capture area"));
-            }
-            captureWindow.close();
-            selectWindow.close();
-          });
-        } catch (err) {
-          reject(err);
-          if (selectWindow) selectWindow.close();
+          try {
+            const fullScreenshot = await captureScreenshot();
+            mainWindow.webContents.send("warning", "Using full screenshot instead of area screenshot");
+            resolve(fullScreenshot);
+          } catch (fallbackError) {
+            console.error("Fallback screenshot failed:", fallbackError);
+            reject(new Error("Failed to capture fallback screenshot: " + fallbackError.message));
+          }
+        } catch (error) {
+          console.error("Error during area selection processing:", error);
+          captureWindow.close();
+          mainWindow.show();
+          reject(error);
         }
       });
-      
-      ipcMain.once('area-cancelled', () => {
-        selectWindow.close();
+
+      ipcMain.once("area-selection-cancelled", () => {
+        console.log("Area selection cancelled by user");
+        captureWindow.close();
+        mainWindow.show();
         reject(new Error("Area selection cancelled"));
       });
+
+      captureWindow.on("closed", () => {
+        // If the window is closed without selecting an area, show the main window again
+        if (mainWindow && !mainWindow.isVisible()) {
+          mainWindow.show();
+          reject(new Error("Area selection window was closed"));
+        }
+      });
     });
-  } catch (err) {
-    mainWindow.show();
-    if (mainWindow.webContents) {
-      mainWindow.webContents.send("error", err.message);
+  } catch (error) {
+    console.error("Error in captureAreaScreenshot:", error);
+    // Make sure main window is shown again
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
     }
-    throw err;
+    throw error;
   }
 }
 
+/**
+ * Capture a screenshot of the entire screen
+ */
 async function captureScreenshot() {
   try {
-    hideInstruction();
-    mainWindow.hide();
-    await new Promise((res) => setTimeout(res, 200));
-
-    const timestamp = Date.now();
-    const imagePath = path.join(app.getPath("pictures"), `screenshot_${timestamp}.png`);
-    await screenshot({ filename: imagePath });
-
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = imageBuffer.toString("base64");
-
-    mainWindow.show();
-    return base64Image;
-  } catch (err) {
-    mainWindow.show();
-    if (mainWindow.webContents) {
-      mainWindow.webContents.send("error", err.message);
+    console.log("Capturing full screen screenshot...");
+    
+    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+    const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+    
+    // Hide the main window temporarily for capturing
+    const wasVisible = mainWindow.isVisible();
+    if (wasVisible) {
+      mainWindow.hide();
+      // Wait a bit for the window to hide
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
-    throw err;
+    
+    try {
+      // Capture using screenshot-desktop
+      await screenshot({ filename: imagePath });
+      
+      // Show the main window again
+      if (wasVisible) {
+        mainWindow.show();
+      }
+      
+      // Verify the screenshot was taken
+      if (!fs.existsSync(imagePath)) {
+        throw new Error("Screenshot file was not created");
+      }
+      
+      const stats = fs.statSync(imagePath);
+      if (stats.size < 1000) {
+        throw new Error("Screenshot file is too small, likely empty");
+      }
+      
+      // Read the image and convert to base64
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      
+      // Get image dimensions
+      const dimensions = { width: 0, height: 0 };
+      try {
+        const sizeOf = require('image-size');
+        const imageDimensions = sizeOf(imagePath);
+        dimensions.width = imageDimensions.width;
+        dimensions.height = imageDimensions.height;
+      } catch (dimError) {
+        console.error("Error getting image dimensions:", dimError);
+        // Continue without dimensions if there's an error
+      }
+      
+      // Notify about saved screenshot
+      mainWindow.webContents.send("screenshot-saved", {
+        path: imagePath,
+        isArea: false,
+        dimensions: dimensions
+      });
+      
+      console.log(`Full screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
+      return base64Image;
+      
+    } catch (error) {
+      console.error("Error capturing screenshot:", error);
+      
+      // Show the main window again if it was hidden
+      if (wasVisible && !mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+      
+      // Attempt fallback with alternative method if available
+      try {
+        console.log("Attempting fallback screenshot method...");
+        
+        // Try a different approach using robotjs if available
+        // or any other alternative method you might implement
+        
+        throw new Error("No fallback method available");
+      } catch (fallbackError) {
+        console.error("Fallback screenshot method failed:", fallbackError);
+        throw error; // Throw the original error
+      }
+    }
+  } catch (error) {
+    console.error("Screenshot capture failed:", error);
+    throw error;
   }
 }
 
@@ -748,8 +863,24 @@ async function processScreenshots(useStreaming = false) {
       }
     }
 
+    // Create a better prompt based on the number of screenshots
+    let promptText = "";
+    if (screenshots.length === 1) {
+      promptText = `The screenshot shows a programming problem or question. 
+Please analyze it carefully and provide a detailed solution with explanation. 
+If there's code involved, provide the complete implementation with clear comments. 
+If it's a theoretical question, provide a comprehensive answer.
+Please highlight any key concepts or algorithms used in the solution.`;
+    } else {
+      promptText = `These ${screenshots.length} screenshots show a multi-part programming problem or question. 
+Please analyze all parts carefully and provide a complete solution that addresses all aspects.
+If there's code involved, provide the full implementation with clear comments.
+Break down your response into sections if needed to address each part of the problem.
+Please highlight any key concepts or algorithms used in the solution.`;
+    }
+
     // Build message with text + each screenshot
-    const messages = [{ type: "text", text: "Can you solve the question for me and give the final answer/code?" }];
+    const messages = [{ type: "text", text: promptText }];
     console.log(`Processing ${screenshots.length} screenshots`);
     
     for (const img of screenshots) {
@@ -927,23 +1058,66 @@ function createWindow() {
   // Single or final screenshot shortcut
   globalShortcut.register(`${modifierKey}+Shift+S`, async () => {
     try {
-      const img = await captureScreenshot();
-      screenshots.push(img);
-      await processScreenshots(true); // Use streaming by default
+      updateInstruction("Taking full screen screenshot...");
+      
+      try {
+        const img = await captureScreenshot();
+        
+        // Verify the screenshot captured something
+        if (!img || img.length < 1000) {
+          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
+          updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+          return;
+        }
+        
+        screenshots.push(img);
+        updateInstruction("Processing screenshot with AI...");
+        await processScreenshots(true); // Use streaming by default
+      } catch (screenshotError) {
+        console.error(`Screenshot capture error:`, screenshotError);
+        mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
+        updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+      }
     } catch (error) {
       console.error(`${modifierKey}+Shift+S error:`, error);
+      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      updateInstruction(
+        `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
+      );
     }
   });
   
   // Area screenshot shortcut
   globalShortcut.register(`${modifierKey}+Shift+D`, async () => {
     try {
-      updateInstruction("Select an area to screenshot");
-      const img = await captureAreaScreenshot();
-      screenshots.push(img);
-      await processScreenshots(true); // Use streaming by default
+      updateInstruction("Select an area to screenshot...");
+      
+      try {
+        const img = await captureAreaScreenshot();
+        
+        // Verify the screenshot captured something
+        if (!img || img.length < 1000) {
+          mainWindow.webContents.send("warning", "Area screenshot appears to be empty or invalid. Please try again.");
+          updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+          return;
+        }
+        
+        screenshots.push(img);
+        updateInstruction("Processing area screenshot with AI...");
+        await processScreenshots(true); // Use streaming by default
+      } catch (screenshotError) {
+        if (screenshotError.message === "Area selection cancelled") {
+          // User cancelled the selection, no need to show an error
+          console.log("Area selection was cancelled by user");
+        } else {
+          console.error(`Area screenshot error:`, screenshotError);
+          mainWindow.webContents.send("error", `Failed to capture area screenshot: ${screenshotError.message}`);
+        }
+        updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+      }
     } catch (error) {
       console.error(`${modifierKey}+Shift+D error:`, error);
+      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
       updateInstruction(
         `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
       );
@@ -957,11 +1131,27 @@ function createWindow() {
         multiPageMode = true;
         updateInstruction(`Multi-mode: ${modifierKey}+Shift+A to add, ${modifierKey}+Shift+S to finalize`);
       }
-      const img = await captureScreenshot();
-      screenshots.push(img);
-      updateInstruction(`Multi-mode: ${modifierKey}+Shift+A to add, ${modifierKey}+Shift+S to finalize`);
+      updateInstruction("Taking screenshot for multi-mode...");
+      
+      try {
+        const img = await captureScreenshot();
+        
+        // Verify the screenshot captured something
+        if (!img || img.length < 1000) {
+          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
+          return;
+        }
+        
+        screenshots.push(img);
+        updateInstruction(`Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+Shift+A to add more, ${modifierKey}+Shift+S to finalize`);
+      } catch (screenshotError) {
+        console.error(`Screenshot error in multi-mode:`, screenshotError);
+        mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
+        updateInstruction(`Multi-mode: ${modifierKey}+Shift+A to add, ${modifierKey}+Shift+S to finalize`);
+      }
     } catch (error) {
       console.error(`${modifierKey}+Shift+A error:`, error);
+      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
     }
   });
 
@@ -1024,6 +1214,57 @@ function createWindow() {
       `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
     );
   }, 1000);
+
+  // Add compatibility handling for both area-selector.html and capture-helper.html
+  ipcMain.on('area-cancelled', () => {
+    console.log('Received deprecated area-cancelled event - for backward compatibility');
+    mainWindow.show();
+  });
+
+  ipcMain.on('area-selected', async (event, rect) => {
+    console.log('Received deprecated area-selected event - for backward compatibility');
+    try {
+      // Handle the old format from area-selector.html
+      const timestamp = Date.now();
+      const fileName = `area_screenshot_${timestamp}.png`;
+      const picturesDir = app.getPath("pictures");
+      const imagePath = path.join(picturesDir, fileName);
+      
+      try {
+        // Take a full screenshot with screenshot-desktop
+        await screenshot({ filename: imagePath });
+        
+        // Read the image file to base64
+        const imageBuffer = fs.readFileSync(imagePath);
+        const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+        
+        // Notify user about saved screenshot
+        mainWindow.webContents.send("screenshot-saved", {
+          path: imagePath,
+          fileName: fileName,
+          isArea: true,
+          dimensions: { width: Math.round(rect.width), height: Math.round(rect.height) }
+        });
+        
+        mainWindow.webContents.send("warning", "Using full screenshot instead of area selection");
+        
+        console.log(`Fallback screenshot saved to: ${imagePath}`);
+        
+        // Process with AI
+        updateInstruction("Processing area screenshot with AI...");
+        screenshots.push(base64Image);
+        await processScreenshots(true);
+      } catch (err) {
+        console.error("Error handling backward compatibility screenshot:", err);
+        mainWindow.webContents.send("error", `Failed to capture area: ${err.message}`);
+        updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+      }
+    } catch (err) {
+      console.error("Error in backward compatibility area-selected handler:", err);
+      mainWindow.webContents.send("error", `Failed to process area selection: ${err.message}`);
+      updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+    }
+  });
 }
 
 app.whenReady().then(createWindow);
