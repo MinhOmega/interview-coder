@@ -1277,7 +1277,7 @@ Format your response in clear, well-structured Markdown with proper code blocks 
     mainWindow.webContents.send("analysis-result", result);
     console.log("Analysis complete and sent to renderer");
 
-    // Update instruction after processing
+    // Hide instruction banner when done
     mainWindow.webContents.send("hide-instruction");
   } catch (err) {
     console.error("Error in processScreenshots:", err);
@@ -1331,8 +1331,9 @@ function createModelSelectionWindow() {
 function resetProcess() {
   screenshots = [];
   multiPageMode = false;
-  mainWindow.webContents.send("clear-result");
-  updateInstruction(getDefaultInstructions());
+  mainWindow.webContents.send('clear-result');
+  mainWindow.webContents.send('hide-content');
+  updateInstruction(`Press ${modifierKey}+H to take a screenshot`);
 }
 
 function createWindow() {
@@ -1840,9 +1841,11 @@ function toggleWindowVisibility(visible = null) {
   if (isWindowVisible) {
     mainWindow.show();
     mainWindow.setOpacity(1.0);
+    mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
   } else {
-    // Don't hide completely, but make nearly invisible
+    // Don't hide completely, but make nearly invisible and allow other apps to overlay
     mainWindow.setOpacity(0.0);
+    mainWindow.setAlwaysOnTop(false);
   }
 
   console.log(`Window visibility set to: ${isWindowVisible}`);
