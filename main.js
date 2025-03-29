@@ -16,6 +16,7 @@ const fs = require("fs");
 const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
+const Screenshots = require("electron-screenshots");
 require("dotenv").config();
 
 // Check if running on macOS
@@ -41,6 +42,9 @@ let geminiAI;
 let aiProvider = process.env.AI_PROVIDER || "openai"; // Default to OpenAI
 let currentModel =
   aiProvider === "openai" ? DEFAULT_MODEL : aiProvider === "gemini" ? DEFAULT_GEMINI_MODEL : DEFAULT_OLLAMA_MODEL;
+
+// Initialize electron-screenshots
+let screenshotInstance;
 
 try {
   // Get API key from .env file
@@ -662,7 +666,11 @@ async function generateWithGemini(messages, model, streaming = false) {
 }
 
 function updateInstruction(instruction) {
-  if (mainWindow?.webContents) {
+  if (!instruction || instruction.trim() === "") {
+    // If instruction is empty, hide the instruction banner
+    mainWindow.webContents.send("hide-instruction");
+  } else {
+    // Show the instruction with the provided text
     mainWindow.webContents.send("update-instruction", instruction);
   }
 }
@@ -686,65 +694,126 @@ async function captureScreenshot() {
     }
 
     let success = false;
+    let base64Image = "";
 
-    // Use platform-specific approach for best results
-    if (process.platform === "darwin") {
-      // On macOS, use the native screencapture command which works reliably
-      try {
-        console.log("Using native macOS screencapture command");
-        await new Promise((resolve, reject) => {
-          const { exec } = require("child_process");
-          // -x suppresses the sound, -D captures a specific display (default is main display)
-          // -c copies to clipboard as well
-          exec(`screencapture -x "${imagePath}"`, (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              success = true;
-              resolve();
-            }
-          });
-        });
-      } catch (macOSError) {
-        console.error("macOS screencapture failed:", macOSError);
-        // Fall back to screenshot-desktop
-        await screenshot({ filename: imagePath });
+    try {
+      // Get all screen sources
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: {
+          width: screen.getPrimaryDisplay().workAreaSize.width,
+          height: screen.getPrimaryDisplay().workAreaSize.height,
+        },
+      });
+
+      // Get the primary display
+      const primaryDisplay = screen.getPrimaryDisplay();
+
+      // Find the source that matches the primary display
+      const source =
+        sources.find((s) => {
+          const bounds = s.display?.bounds || s.bounds;
+          return (
+            bounds.x === 0 &&
+            bounds.y === 0 &&
+            bounds.width === primaryDisplay.size.width &&
+            bounds.height === primaryDisplay.size.height
+          );
+        }) || sources[0];
+
+      if (!source) {
+        throw new Error("No screen source found");
       }
-    } else if (process.platform === "win32") {
-      try {
-        console.log("Using native Windows screenshot method");
-        // Try to use PowerShell to capture the screen on Windows
-        await new Promise((resolve, reject) => {
-          const { exec } = require("child_process");
-          const psScript = `
-            Add-Type -AssemblyName System.Windows.Forms
-            Add-Type -AssemblyName System.Drawing
-            $screen = [System.Windows.Forms.Screen]::PrimaryScreen
-            $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-            $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
-            $bitmap.Save("${imagePath.replace(/\\/g, "\\\\")}")
-            $graphics.Dispose()
-            $bitmap.Dispose()
-          `;
-          exec(`powershell -command "${psScript}"`, (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              success = true;
-              resolve();
-            }
-          });
+
+      // Create a temporary hidden BrowserWindow to capture the screen
+      const captureWin = new BrowserWindow({
+        width: primaryDisplay.size.width,
+        height: primaryDisplay.size.height,
+        show: false,
+        webPreferences: {
+          offscreen: true,
+          nodeIntegration: true,
+          contextIsolation: false,
+        },
+      });
+
+      // Load a minimal HTML file
+      await captureWin.loadURL("data:text/html,<html><body></body></html>");
+
+      // Inject capture script
+      await captureWin.webContents.executeJavaScript(`
+        new Promise(async (resolve) => {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: '${source.id}',
+                  minWidth: ${primaryDisplay.size.width},
+                  maxWidth: ${primaryDisplay.size.width},
+                  minHeight: ${primaryDisplay.size.height},
+                  maxHeight: ${primaryDisplay.size.height}
+                }
+              }
+            });
+
+            const video = document.createElement('video');
+            video.style.cssText = 'position: absolute; top: -10000px; left: -10000px;';
+            video.srcObject = stream;
+
+            video.onloadedmetadata = () => {
+              video.play();
+              const canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0);
+              
+              const imageData = canvas.toDataURL('image/png');
+              video.remove();
+              stream.getTracks()[0].stop();
+              resolve(imageData);
+            };
+
+            document.body.appendChild(video);
+          } catch (err) {
+            resolve(null);
+            console.error('Capture error:', err);
+          }
         });
-      } catch (windowsError) {
-        console.error("Windows PowerShell screenshot failed:", windowsError);
-        // Fall back to screenshot-desktop
-        await screenshot({ filename: imagePath });
+      `);
+
+      // Get the captured image
+      const imageData = await captureWin.webContents.executeJavaScript(
+        'document.querySelector("canvas").toDataURL("image/png")',
+      );
+
+      // Close the capture window
+      captureWin.close();
+
+      if (!imageData) {
+        throw new Error("Failed to capture screen");
       }
-    } else {
-      // For Linux and other platforms
-      await screenshot({ filename: imagePath });
+
+      // Save the image
+      const base64Data = imageData.replace(/^data:image\/png;base64,/, "");
+      fs.writeFileSync(imagePath, base64Data, "base64");
+      base64Image = imageData;
       success = true;
+    } catch (captureError) {
+      console.error("Desktop capturer failed:", captureError);
+
+      // Fallback to screenshot-desktop
+      try {
+        await screenshot({ filename: imagePath });
+        const imageBuffer = fs.readFileSync(imagePath);
+        base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+        success = true;
+      } catch (fallbackError) {
+        console.error("Screenshot fallback failed:", fallbackError);
+        throw fallbackError;
+      }
     }
 
     // Show the main window again
@@ -762,10 +831,6 @@ async function captureScreenshot() {
       throw new Error("Screenshot file is too small, likely empty");
     }
 
-    // Read the image and convert to base64
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-
     // Get image dimensions
     const dimensions = { width: 0, height: 0 };
     try {
@@ -775,7 +840,6 @@ async function captureScreenshot() {
       dimensions.height = imageDimensions.height;
     } catch (dimError) {
       console.error("Error getting image dimensions:", dimError);
-      // Continue without dimensions if there's an error
     }
 
     // Notify about saved screenshot
@@ -1102,17 +1166,34 @@ I need you to provide the best possible solution with excellent performance and 
 Guidelines:
 1. Start with a clear understanding of the problem before diving into code.
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
-3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
-4. Structure your code with clean architecture principles.
-5. Include robust error handling and edge case considerations.
-6. If multiple solutions exist, present the optimal approach and explain your decision.
+3. Structure your code with clean architecture principles.
+4. Include robust error handling and edge case considerations.
+5. If multiple solutions exist, present the optimal approach and explain your decision.
 
-Format your response in Markdown with well-organized sections:
-- Problem Analysis: Brief overview of what you understand the problem to be
-- Approach: Your strategy for solving it
-- Solution: Well-commented, complete implementation with clean syntax
-- Complexity Analysis: Time and space complexity breakdown
-- Optimizations: Any further improvements that could be made`;
+Your response MUST follow this exact structure with these three main sections:
+
+# Analyzing the Problem
+Provide a clear understanding of what the problem is asking, including:
+- The key requirements and constraints
+- Input/output specifications
+- Important edge cases to consider
+- Any implicit assumptions
+
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
+Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
     } else {
       promptText = `These ${screenshots.length} screenshots show a multi-part programming problem. 
 I need you to provide the best possible solution with excellent performance and readability.
@@ -1120,17 +1201,34 @@ I need you to provide the best possible solution with excellent performance and 
 Guidelines:
 1. Start with a clear understanding of the full problem scope across all screenshots.
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
-3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
-4. Structure your code with clean architecture principles.
-5. Include robust error handling and edge case considerations.
-6. Ensure your solution addresses all parts of the problem comprehensively.
+3. Structure your code with clean architecture principles.
+4. Include robust error handling and edge case considerations.
+5. If multiple solutions exist, present the optimal approach and explain your decision.
 
-Format your response in Markdown with well-organized sections:
-- Problem Analysis: Brief overview of what you understand the problem to be
-- Approach: Your strategy for solving the multi-part problem
-- Solution: Well-commented, complete implementation with clean syntax
-- Complexity Analysis: Time and space complexity breakdown
-- Optimizations: Any further improvements that could be made`;
+Your response MUST follow this exact structure with these three main sections:
+
+# Analyzing the Problem
+Provide a clear understanding of what the problem is asking, including:
+- The key requirements and constraints
+- Input/output specifications
+- Important edge cases to consider
+- Any implicit assumptions
+
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
+Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
     }
 
     // Build message with text + each screenshot
@@ -1160,7 +1258,7 @@ Format your response in Markdown with well-organized sections:
         const stream = await openai.chat.completions.create({
           model: currentModel,
           messages: [{ role: "user", content: messages }],
-          max_tokens: 5000, // Increased max tokens for more detailed responses
+          max_tokens: 8000,
           stream: true,
         });
 
@@ -1176,13 +1274,15 @@ Format your response in Markdown with well-organized sections:
         }
 
         mainWindow.webContents.send("stream-end");
-        return; // Early return as streaming is handled
+        // Hide instruction banner after streaming is complete
+        mainWindow.webContents.send("hide-instruction");
+        return;
       } else {
         // Non-streaming request
         const response = await openai.chat.completions.create({
           model: currentModel,
           messages: [{ role: "user", content: messages }],
-          max_tokens: 5000, // Increased max tokens for more detailed responses
+          max_tokens: 8000,
         });
 
         result = response.choices[0].message.content;
@@ -1208,22 +1308,24 @@ Format your response in Markdown with well-organized sections:
         let accumulatedText = "";
 
         streamingResult.emitter.on("chunk", (chunk) => {
-          // Add the new chunk to our accumulated text
           accumulatedText += chunk;
-          // Send the full accumulated text for proper markdown rendering
           mainWindow.webContents.send("stream-update", accumulatedText);
         });
 
         streamingResult.emitter.on("complete", () => {
           mainWindow.webContents.send("stream-end");
+          // Hide instruction banner after streaming is complete
+          mainWindow.webContents.send("hide-instruction");
         });
 
         streamingResult.emitter.on("error", (error) => {
           mainWindow.webContents.send("error", error.message);
           mainWindow.webContents.send("stream-end");
+          // Hide instruction banner on error
+          mainWindow.webContents.send("hide-instruction");
         });
 
-        return; // Early return as streaming is handled
+        return;
       } else {
         result = await generateWithGemini(messages, currentModel);
         console.log("Successfully received response from Gemini");
@@ -1239,28 +1341,21 @@ Format your response in Markdown with well-organized sections:
     mainWindow.webContents.send("analysis-result", result);
     console.log("Analysis complete and sent to renderer");
 
-    // Update instruction after processing
-    updateInstruction(getDefaultInstructions());
+    // Hide instruction banner when done
+    mainWindow.webContents.send("hide-instruction");
   } catch (err) {
     console.error("Error in processScreenshots:", err);
+    console.error("Stack trace:", err.stack);
 
-    // Log stack trace
-    if (err.stack) {
-      console.error("Stack trace:", err.stack);
-    }
-
-    // Log additional error details if available
     if (err.response) {
       console.error("Response status:", err.response.status);
-      if (err.response.data) {
-        console.error("Response data:", JSON.stringify(err.response.data));
-      }
+      console.error("Response data:", JSON.stringify(err.response.data));
     }
 
     mainWindow.webContents.send("loading", false);
-    if (mainWindow.webContents) {
-      mainWindow.webContents.send("error", err.message);
-    }
+    mainWindow.webContents.send("error", err.message);
+    // Hide instruction banner on error
+    mainWindow.webContents.send("hide-instruction");
   }
 }
 
@@ -1284,14 +1379,6 @@ function createModelSelectionWindow() {
 
   modelListWindow.loadFile("model-selector.html");
 
-  // Register the Escape key shortcut to close the window
-  const escapeShortcut = `Escape`;
-  const shortcutRet = modelListWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'Escape') {
-      modelListWindow.close();
-    }
-  });
-
   modelListWindow.on("closed", () => {
     modelListWindow = null;
   });
@@ -1302,7 +1389,8 @@ function resetProcess() {
   screenshots = [];
   multiPageMode = false;
   mainWindow.webContents.send("clear-result");
-  updateInstruction(getDefaultInstructions());
+  mainWindow.webContents.send("hide-content");
+  updateInstruction(`Press ${modifierKey}+H to take a screenshot`);
 }
 
 function createWindow() {
@@ -1336,7 +1424,7 @@ function createWindow() {
     titleBarOverlay: false,
     trafficLightPosition: { x: -999, y: -999 }, // Move traffic lights far off-screen
     fullscreenable: true,
-    skipTaskbar: true, 
+    skipTaskbar: true,
     autoHideMenuBar: true,
     hasShadow: true, // Add shadow for better visibility
     enableLargerThanScreen: false, // Prevent window from being larger than screen
@@ -1346,6 +1434,65 @@ function createWindow() {
   mainWindow.setContentProtection(true);
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+
+  // Initialize electron-screenshots
+  screenshotInstance = new Screenshots({
+    singleWindow: true,
+    lang: "en",
+    // Customize the appearance
+    styles: {
+      windowBackgroundColor: "#00000000",
+      mask: {
+        color: "#000000",
+        opacity: 0.6,
+      },
+      toolbar: {
+        backgroundColor: "#2e2c29",
+        color: "#ffffff",
+        activeColor: "#2196f3",
+      },
+    },
+  });
+
+  // Listen for screenshot complete event
+  screenshotInstance.on("ok", async (data) => {
+    try {
+      const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+      const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+      
+      // Save the image
+      fs.writeFileSync(imagePath, data.buffer);
+      
+      // Convert to base64 for processing
+      const base64Image = `data:image/png;base64,${data.buffer.toString("base64")}`;
+      
+      // Add to screenshots array and process
+      screenshots.push(base64Image);
+      
+      // Get dimensions
+      const dimensions = { width: data.bounds.width, height: data.bounds.height };
+      
+      // Notify about saved screenshot
+      mainWindow.webContents.send("screenshot-saved", {
+        path: imagePath,
+        isArea: true,
+        dimensions: dimensions,
+      });
+      
+      // Process the screenshot
+      await processScreenshots(true);
+    } catch (error) {
+      console.error("Error handling screenshot:", error);
+      mainWindow.webContents.send("error", `Failed to process screenshot: ${error.message}`);
+      // Hide instruction banner on error
+      mainWindow.webContents.send("hide-instruction");
+    }
+  });
+
+  // Listen for cancel event
+  screenshotInstance.on("cancel", () => {
+    console.log("Screenshot cancelled");
+  });
 
   // Detect screen capture/sharing
   if (process.platform === "darwin") {
@@ -1458,20 +1605,20 @@ function createWindow() {
       updateInstruction("Taking screenshot...");
 
       try {
-        // On Mac, use window-specific capture, otherwise full screen
-        let img;
-        if (process.platform === "darwin") {
-          try {
-            // Capture specific window on Mac
-            img = await captureWindowScreenshot();
-          } catch (windowError) {
-            console.error("Window capture failed, falling back to screen capture:", windowError);
-            // Fall back to full screen
-            img = await captureScreenshot();
-          }
-        } else {
-          // Use regular screen capture on other platforms
-          img = await captureScreenshot();
+        // Hide the main window temporarily
+        const wasVisible = mainWindow.isVisible();
+        if (wasVisible) {
+          mainWindow.hide();
+          // Wait a bit for the window to hide
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+
+        // Try automatic screenshot first
+        const img = await captureScreenshot();
+
+        // Show the main window again
+        if (wasVisible) {
+          mainWindow.show();
         }
 
         // Verify the screenshot captured something
@@ -1498,41 +1645,14 @@ function createWindow() {
     }
   });
 
-  // Area screenshot shortcut
-  globalShortcut.register(`${modifierKey}+D`, async () => {
+  // Area screenshot shortcut using electron-screenshots
+  globalShortcut.register(`${modifierKey}+D`, () => {
     try {
       updateInstruction("Select an area to screenshot...");
-
-      try {
-        // Use the area screenshot function
-        const img = await captureAreaScreenshot();
-
-        // Verify the screenshot captured something
-        if (!img || img.length < 1000) {
-          mainWindow.webContents.send("warning", "Area screenshot appears to be empty or invalid. Please try again.");
-          updateInstruction(getDefaultInstructions());
-          return;
-        }
-
-        screenshots.push(img);
-        updateInstruction("Processing area screenshot with AI...");
-        await processScreenshots(true);
-      } catch (screenshotError) {
-        if (
-          screenshotError.message === "Area selection cancelled" ||
-          screenshotError.message === "Area capture was canceled"
-        ) {
-          // User cancelled the selection, no need to show an error
-          console.log("Area selection was cancelled by user");
-        } else {
-          console.error(`Area screenshot error:`, screenshotError);
-          mainWindow.webContents.send("error", `Failed to capture area screenshot: ${screenshotError.message}`);
-        }
-        updateInstruction(getDefaultInstructions());
-      }
+      screenshotInstance.startCapture();
     } catch (error) {
       console.error(`${modifierKey}+D error:`, error);
-      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
       updateInstruction(getDefaultInstructions());
     }
   });
@@ -1802,20 +1922,141 @@ function getDefaultInstructions() {
   return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
 }
 
-// Toggle window visibility
-function toggleWindowVisibility(visible = null) {
-  // If a value is provided, use it, otherwise toggle
-  isWindowVisible = visible !== null ? visible : !isWindowVisible;
+// Function to manage hotkey registration based on visibility
+function updateHotkeys(isVisible) {
+  // Unregister all existing shortcuts
+  globalShortcut.unregisterAll();
 
-  if (isWindowVisible) {
-    mainWindow.show();
-    mainWindow.setOpacity(1.0);
-  } else {
-    // Don't hide completely, but make nearly invisible
-    mainWindow.setOpacity(0.05);
+  // Always register the visibility toggle shortcut
+  globalShortcut.register(`${modifierKey}+B`, () => {
+    toggleWindowVisibility();
+  });
+
+  // Only register other shortcuts if window is visible
+  if (isVisible) {
+    // Process screenshots shortcut
+    globalShortcut.register(`${modifierKey}+Enter`, () => {
+      if (screenshots.length === 0) {
+        mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
+        return;
+      }
+      processScreenshotsWithAI();
+    });
+
+    // Settings shortcut
+    globalShortcut.register(`${modifierKey}+,`, () => {
+      createModelSelectionWindow();
+    });
+
+    // Window movement shortcuts
+    globalShortcut.register(`${modifierKey}+Left`, () => {
+      moveWindow("left");
+    });
+
+    globalShortcut.register(`${modifierKey}+Right`, () => {
+      moveWindow("right");
+    });
+
+    globalShortcut.register(`${modifierKey}+Up`, () => {
+      moveWindow("up");
+    });
+
+    globalShortcut.register(`${modifierKey}+Down`, () => {
+      moveWindow("down");
+    });
+
+    // Screenshot shortcuts
+    globalShortcut.register(`${modifierKey}+H`, async () => {
+      try {
+        updateInstruction("Taking screenshot...");
+        const img = await captureScreenshot();
+        screenshots.push(img);
+        updateInstruction("Processing screenshot with AI...");
+        await processScreenshots(true);
+      } catch (error) {
+        console.error(`${modifierKey}+H error:`, error);
+        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    });
+
+    globalShortcut.register(`${modifierKey}+D`, () => {
+      try {
+        updateInstruction("Select an area to screenshot...");
+        screenshotInstance.startCapture();
+      } catch (error) {
+        console.error(`${modifierKey}+D error:`, error);
+        mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    });
+
+    // Multi-page mode shortcut
+    globalShortcut.register(`${modifierKey}+A`, async () => {
+      try {
+        if (!multiPageMode) {
+          multiPageMode = true;
+          updateInstruction(
+            `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+          );
+        }
+        updateInstruction("Taking screenshot for multi-mode...");
+        const img = await captureScreenshot();
+        screenshots.push(img);
+        updateInstruction(
+          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+        );
+      } catch (error) {
+        console.error(`${modifierKey}+A error:`, error);
+        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      }
+    });
+
+    // Reset shortcut
+    globalShortcut.register(`${modifierKey}+R`, () => {
+      resetProcess();
+    });
+
+    // Quit shortcut
+    globalShortcut.register(`${modifierKey}+Q`, () => {
+      console.log("Quitting application...");
+      app.quit();
+    });
+
+    // Model selection shortcut
+    globalShortcut.register(`${modifierKey}+M`, () => {
+      createModelSelectionWindow();
+    });
   }
+}
 
-  console.log(`Window visibility set to: ${isWindowVisible}`);
+// Update the toggleWindowVisibility function
+function toggleWindowVisibility(forceState) {
+  isWindowVisible = typeof forceState === 'boolean' ? forceState : !isWindowVisible;
+  
+  if (mainWindow) {
+    if (isWindowVisible) {
+      mainWindow.show();
+      mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+      if (modelListWindow) {
+        modelListWindow.show();
+        modelListWindow.setOpacity(1);
+      }
+    } else {
+      mainWindow.hide();
+      mainWindow.setAlwaysOnTop(false);
+      if (modelListWindow) {
+        modelListWindow.hide();
+        modelListWindow.setOpacity(0);
+      }
+    }
+    
+    // Update hotkeys based on visibility
+    updateHotkeys(isWindowVisible);
+    
+    // Notify renderer about visibility change
+    mainWindow.webContents.send('update-visibility', isWindowVisible);
+  }
 }
 
 // Move window using keyboard shortcuts
