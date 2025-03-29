@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Screenshot Assistant</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --background-color: #1a1a1a;
+            --text-color: #ffffff;
+            --border-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            -webkit-app-region: drag;
+        }
+
+        .titlebar {
+            height: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 16px;
+            background-color: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(12px);
+            -webkit-app-region: drag;
+        }
+
+        .titlebar-buttons {
+            display: flex;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+        }
+
+        .close { background-color: #ff5f57; }
+        .minimize { background-color: #ffbd2e; }
+        .maximize { background-color: #28c940; }
+
+        .main-content {
+            flex: 1;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            -webkit-app-region: no-drag;
+        }
+
+        .screenshot-area {
+            flex: 1;
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .screenshot-preview {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            padding: 16px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: var(--border-radius);
+        }
+
+        .button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: var(--border-radius);
+            background-color: var(--primary-color);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .button:active {
+            transform: translateY(1px);
+        }
+
+        .result-area {
+            flex: 1;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .shortcut-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            font-size: 12px;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        <div class="titlebar-buttons">
+            <button class="titlebar-button close" id="closeBtn"></button>
+            <button class="titlebar-button minimize" id="minimizeBtn"></button>
+            <button class="titlebar-button maximize" id="maximizeBtn"></button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="screenshot-area" id="screenshotArea">
+            <img class="screenshot-preview" id="screenshotPreview">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="button" id="captureBtn">
+                <span>Capture Screen</span>
+                <span class="shortcut">[⌘/Ctrl + Shift + 1]</span>
+            </button>
+            <button class="button" id="areaBtn">
+                <span>Select Area</span>
+                <span class="shortcut">[⌘/Ctrl + Shift + 2]</span>
+            </button>
+            <button class="button" id="analyzeBtn">
+                <span>Analyze</span>
+                <span class="shortcut">[⌘/Ctrl + Enter]</span>
+            </button>
+        </div>
+
+        <div class="result-area" id="resultArea">
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Renderer process code will be here
+        const { ipcRenderer } = require('electron');
+
+        // Window control buttons
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            ipcRenderer.send('close-window');
+        });
+
+        document.getElementById('minimizeBtn').addEventListener('click', () => {
+            ipcRenderer.send('minimize-window');
+        });
+
+        document.getElementById('maximizeBtn').addEventListener('click', () => {
+            ipcRenderer.send('maximize-window');
+        });
+
+        // Screenshot buttons
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            ipcRenderer.send('capture-screen');
+        });
+
+        document.getElementById('areaBtn').addEventListener('click', () => {
+            ipcRenderer.send('capture-area');
+        });
+
+        document.getElementById('analyzeBtn').addEventListener('click', () => {
+            ipcRenderer.send('analyze-screenshots');
+        });
+
+        // IPC handlers
+        ipcRenderer.on('screenshot-saved', (event, data) => {
+            const preview = document.getElementById('screenshotPreview');
+            preview.src = `file://${data.path}`;
+            preview.style.display = 'block';
+        });
+
+        ipcRenderer.on('loading', (event, isLoading) => {
+            document.getElementById('loading').classList.toggle('active', isLoading);
+        });
+
+        ipcRenderer.on('analysis-result', (event, result) => {
+            document.getElementById('result').innerHTML = result;
+        });
+
+        ipcRenderer.on('error', (event, message) => {
+            console.error(message);
+            // Implement error display UI
+        });
+
+        // Handle visibility updates
+        ipcRenderer.on('update-visibility', (event, isVisible) => {
+            document.body.style.opacity = isVisible ? '1' : '0';
+        });
+    </script>
+</body>
+</html> 

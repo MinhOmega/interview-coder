@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Selection</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --background-color: #1a1a1a;
+            --text-color: #ffffff;
+            --border-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            padding: 24px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 24px;
+        }
+
+        .model-section {
+            margin-bottom: 32px;
+        }
+
+        .model-section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #9ca3af;
+        }
+
+        .model-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .model-option {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 16px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .model-option:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .model-option.selected {
+            background-color: var(--primary-color);
+        }
+
+        .model-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .model-description {
+            font-size: 14px;
+            color: #9ca3af;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: var(--border-radius);
+            background-color: var(--primary-color);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+
+        .button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .button.secondary {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .button.secondary:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <h1>Select AI Model</h1>
+
+    <div class="model-section">
+        <h2>OpenAI Models</h2>
+        <div class="model-list">
+            <div class="model-option" data-model="gpt-4-vision-preview">
+                <div class="model-name">GPT-4 Vision</div>
+                <div class="model-description">Most capable vision model, can analyze images with high accuracy</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="model-section">
+        <h2>Google Models</h2>
+        <div class="model-list">
+            <div class="model-option" data-model="gemini-pro-vision">
+                <div class="model-name">Gemini Pro Vision</div>
+                <div class="model-description">Google's latest multimodal model with strong vision capabilities</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="model-section">
+        <h2>Local Models (Ollama)</h2>
+        <div class="model-list">
+            <div class="model-option" data-model="deepseek-r1:14b">
+                <div class="model-name">DeepSeek R1 14B</div>
+                <div class="model-description">Open-source vision model with good performance</div>
+            </div>
+            <div class="model-option" data-model="llava">
+                <div class="model-name">LLaVA</div>
+                <div class="model-description">Open-source multimodal model</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="button-group">
+        <button class="button" id="saveBtn">Save Selection</button>
+        <button class="button secondary" id="cancelBtn">Cancel</button>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        // Get all model options
+        const modelOptions = document.querySelectorAll('.model-option');
+        let selectedModel = null;
+
+        // Add click handlers to model options
+        modelOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // Remove selected class from all options
+                modelOptions.forEach(opt => opt.classList.remove('selected'));
+                // Add selected class to clicked option
+                option.classList.add('selected');
+                selectedModel = option.dataset.model;
+            });
+        });
+
+        // Save button handler
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            if (selectedModel) {
+                ipcRenderer.send('model-selected', selectedModel);
+            }
+        });
+
+        // Cancel button handler
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            ipcRenderer.send('model-selection-cancelled');
+        });
+
+        // Handle current model
+        ipcRenderer.on('current-model', (event, model) => {
+            const option = document.querySelector(`[data-model="${model}"]`);
+            if (option) {
+                option.classList.add('selected');
+                selectedModel = model;
+            }
+        });
+    </script>
+</body>
+</html> 
