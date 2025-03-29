@@ -816,11 +816,11 @@ async function captureApplicationWindow() {
 }
 
 /**
- * Capture a screenshot of the entire screen
+ * Capture a screenshot of the entire screen or active window using the most reliable method for the platform
  */
 async function captureScreenshot() {
   try {
-    console.log("Capturing full screen screenshot...");
+    console.log("Capturing screen content...");
     
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
     const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
@@ -833,119 +833,209 @@ async function captureScreenshot() {
       await new Promise(resolve => setTimeout(resolve, 300));
     }
     
-    // Function to attempt screenshot with retries
-    const attemptScreenshot = async (maxRetries = 2) => {
-      let lastError = null;
-      
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          if (attempt > 0) {
-            console.log(`Retrying screenshot capture (attempt ${attempt} of ${maxRetries})...`);
-          }
-          
-          // Use screenshot-desktop for reliability
-          await screenshot({ filename: imagePath });
-          
-          // Verify the screenshot was taken
-          if (!fs.existsSync(imagePath)) {
-            throw new Error("Screenshot file was not created");
-          }
-          
-          const stats = fs.statSync(imagePath);
-          if (stats.size < 1000) {
-            throw new Error("Screenshot file is too small, likely empty");
-          }
-          
-          // Read the image and convert to base64
-          const imageBuffer = fs.readFileSync(imagePath);
-          const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-          
-          // Get image dimensions
-          const dimensions = { width: 0, height: 0 };
-          try {
-            const sizeOf = require('image-size');
-            const imageDimensions = sizeOf(imagePath);
-            dimensions.width = imageDimensions.width;
-            dimensions.height = imageDimensions.height;
-          } catch (dimError) {
-            console.error("Error getting image dimensions:", dimError);
-            // Continue without dimensions if there's an error
-          }
-          
-          // Notify about saved screenshot
-          mainWindow.webContents.send("screenshot-saved", {
-            path: imagePath,
-            isArea: false,
-            dimensions: dimensions
-          });
-          
-          console.log(`Full screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
-          return base64Image;
-          
-        } catch (error) {
-          console.error(`Screenshot attempt ${attempt + 1} failed:`, error);
-          lastError = error;
-          
-          // Short pause before retry
-          if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        }
-      }
-      
-      // If we get here, all attempts failed
-      throw lastError || new Error("All screenshot attempts failed");
-    };
+    let success = false;
     
-    try {
-      // Attempt the screenshot with retries
-      const base64Image = await attemptScreenshot();
-      
-      // Show the main window again if it was hidden
-      if (wasVisible && !mainWindow.isVisible()) {
-        mainWindow.show();
-      }
-      
-      return base64Image;
-    } catch (error) {
-      console.error("Error capturing screenshot:", error);
-      
-      // Show the main window again if it was hidden
-      if (wasVisible && !mainWindow.isVisible()) {
-        mainWindow.show();
-      }
-      
-      // If we have a serious error, try a different approach as a last resort
+    // Use platform-specific approach for best results
+    if (process.platform === 'darwin') {
+      // On macOS, use the native screencapture command which works reliably
       try {
-        console.log("Attempting alternative screenshot method...");
-        
-        // Use a different approach using native macOS screencapture command on Mac
-        if (process.platform === 'darwin') {
-          await new Promise((resolve, reject) => {
-            const { exec } = require('child_process');
-            exec(`screencapture -x "${imagePath}"`, (error) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve();
-              }
-            });
+        console.log("Using native macOS screencapture command");
+        await new Promise((resolve, reject) => {
+          const { exec } = require('child_process');
+          // -x suppresses the sound, -D captures a specific display (default is main display)
+          // -c copies to clipboard as well
+          exec(`screencapture -x "${imagePath}"`, (error) => {
+            if (error) {
+              reject(error);
+            } else {
+              success = true;
+              resolve();
+            }
           });
-          
-          // Read the image and convert to base64
-          const imageBuffer = fs.readFileSync(imagePath);
-          const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-          return base64Image;
-        } else {
-          throw new Error("No alternative screenshot method available for this platform");
-        }
-      } catch (alternativeError) {
-        console.error("Alternative screenshot method failed:", alternativeError);
-        throw error; // Throw the original error
+        });
+      } catch (macOSError) {
+        console.error("macOS screencapture failed:", macOSError);
+        // Fall back to screenshot-desktop
+        await screenshot({ filename: imagePath });
       }
+    } else if (process.platform === 'win32') {
+      try {
+        console.log("Using native Windows screenshot method");
+        // Try to use PowerShell to capture the screen on Windows
+        await new Promise((resolve, reject) => {
+          const { exec } = require('child_process');
+          const psScript = `
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+            $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+            $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
+            $bitmap.Save("${imagePath.replace(/\\/g, '\\\\')}")
+            $graphics.Dispose()
+            $bitmap.Dispose()
+          `;
+          exec(`powershell -command "${psScript}"`, (error) => {
+            if (error) {
+              reject(error);
+            } else {
+              success = true;
+              resolve();
+            }
+          });
+        });
+      } catch (windowsError) {
+        console.error("Windows PowerShell screenshot failed:", windowsError);
+        // Fall back to screenshot-desktop
+        await screenshot({ filename: imagePath });
+      }
+    } else {
+      // For Linux and other platforms
+      await screenshot({ filename: imagePath });
+      success = true;
     }
+    
+    // Show the main window again
+    if (wasVisible) {
+      mainWindow.show();
+    }
+    
+    // Verify the screenshot was taken
+    if (!fs.existsSync(imagePath)) {
+      throw new Error("Screenshot file was not created");
+    }
+    
+    const stats = fs.statSync(imagePath);
+    if (stats.size < 1000) {
+      throw new Error("Screenshot file is too small, likely empty");
+    }
+    
+    // Read the image and convert to base64
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    
+    // Get image dimensions
+    const dimensions = { width: 0, height: 0 };
+    try {
+      const sizeOf = require('image-size');
+      const imageDimensions = sizeOf(imagePath);
+      dimensions.width = imageDimensions.width;
+      dimensions.height = imageDimensions.height;
+    } catch (dimError) {
+      console.error("Error getting image dimensions:", dimError);
+      // Continue without dimensions if there's an error
+    }
+    
+    // Notify about saved screenshot
+    mainWindow.webContents.send("screenshot-saved", {
+      path: imagePath,
+      isArea: false,
+      dimensions: dimensions
+    });
+    
+    console.log(`Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
+    return base64Image;
   } catch (error) {
     console.error("Screenshot capture failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Capture a specific window by prompting the user to click on it
+ */
+async function captureWindowScreenshot() {
+  try {
+    console.log("Preparing to capture specific window...");
+    
+    // Hide our app window first
+    const wasVisible = mainWindow.isVisible();
+    if (wasVisible) {
+      mainWindow.hide();
+    }
+    
+    // Show instruction in notification
+    const notification = new Notification({
+      title: 'Screenshot',
+      body: 'Please click on the window you want to capture.'
+    });
+    notification.show();
+    
+    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+    const imagePath = path.join(app.getPath("pictures"), `window-screenshot-${timestamp}.png`);
+    
+    let success = false;
+    
+    // Use platform-specific approach for window capture
+    if (process.platform === 'darwin') {
+      try {
+        console.log("Using native macOS window capture");
+        // -w flag captures the window the user clicks on
+        await new Promise((resolve, reject) => {
+          const { exec } = require('child_process');
+          exec(`screencapture -w "${imagePath}"`, (error) => {
+            if (error) {
+              reject(error);
+            } else {
+              success = true;
+              resolve();
+            }
+          });
+        });
+      } catch (macOSError) {
+        console.error("macOS window capture failed:", macOSError);
+        if (wasVisible) mainWindow.show();
+        throw macOSError;
+      }
+    } else {
+      // For other platforms, just use regular screenshot as there's no easy native way
+      // to capture a specific window without additional dependencies
+      if (wasVisible) mainWindow.show();
+      return await captureScreenshot();
+    }
+    
+    // Show the main window again
+    if (wasVisible) {
+      mainWindow.show();
+    }
+    
+    // Verify the screenshot was taken (user might have canceled)
+    if (!fs.existsSync(imagePath)) {
+      console.log("Window capture was canceled or failed");
+      throw new Error("Window capture was canceled");
+    }
+    
+    const stats = fs.statSync(imagePath);
+    if (stats.size < 1000) {
+      throw new Error("Window screenshot file is too small, likely empty");
+    }
+    
+    // Read the image and convert to base64
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    
+    // Get image dimensions
+    const dimensions = { width: 0, height: 0 };
+    try {
+      const sizeOf = require('image-size');
+      const imageDimensions = sizeOf(imagePath);
+      dimensions.width = imageDimensions.width;
+      dimensions.height = imageDimensions.height;
+    } catch (dimError) {
+      console.error("Error getting image dimensions:", dimError);
+    }
+    
+    // Notify about saved screenshot
+    mainWindow.webContents.send("screenshot-saved", {
+      path: imagePath,
+      isArea: false,
+      dimensions: dimensions
+    });
+    
+    console.log(`Window screenshot saved to ${imagePath}`);
+    return base64Image;
+  } catch (error) {
+    console.error("Window screenshot capture failed:", error);
     throw error;
   }
 }
@@ -963,111 +1053,154 @@ async function captureAreaScreenshot() {
   try {
     console.log("Preparing to capture area...");
     
-    // Create a window for the screenshot area selection
-    // TODO: In future, enhance this with desktopCapturer when permissions issues are resolved
-    let captureWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
-      frame: false,
-      fullscreen: process.platform !== "darwin", // For macOS, don't use fullscreen to avoid animation
-      transparent: true,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-      },
-    });
-
-    // Load the capture-helper.html from the file system
-    await captureWindow.loadFile("capture-helper.html");
-
-    return new Promise((resolve, reject) => {
-      ipcMain.once("area-selected", async (event, { x, y, width, height, imageData }) => {
-        console.log("Area selected:", x, y, width, height);
-        
-        try {
-          if (width < 10 || height < 10) {
-            captureWindow.close();
-            mainWindow.show();
-            reject(new Error("Selected area is too small"));
-            return;
-          }
-
-          // If we received image data directly from the renderer
-          if (imageData) {
-            console.log("Using image data from renderer");
-            captureWindow.close();
-            mainWindow.show();
-            
-            // We have the image data directly, no need to read from file
-            const dimensions = { width, height };
-            
-            // Generate a filename for the screenshot based on the current time
-            const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-            const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
-            
-            // Save the image data to file
-            try {
-              const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), "base64");
-              fs.writeFileSync(imagePath, buffer);
-              
-              // Emit event to show notification for saved screenshot
-              mainWindow.webContents.send("screenshot-saved", {
-                path: imagePath,
-                isArea: true,
-                dimensions
-              });
-              
-              console.log(`Area screenshot saved to ${imagePath}`);
-              resolve(imageData);
-            } catch (error) {
-              console.error("Error saving area screenshot:", error);
+    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+    const imagePath = path.join(app.getPath("pictures"), `area-screenshot-${timestamp}.png`);
+    
+    // Use platform-specific approach for area capture
+    if (process.platform === 'darwin') {
+      try {
+        console.log("Using native macOS area selection");
+        // -s flag allows user to select an area
+        await new Promise((resolve, reject) => {
+          const { exec } = require('child_process');
+          exec(`screencapture -s "${imagePath}"`, (error) => {
+            if (error) {
               reject(error);
+            } else {
+              resolve();
             }
-            return;
-          }
-          
-          // Fallback to full screen capture if we don't have image data
-          console.log("No image data from renderer, using fallback method");
-          captureWindow.close();
-          mainWindow.show();
+          });
+        });
+      } catch (macOSError) {
+        console.error("macOS area capture failed:", macOSError);
+        mainWindow.show();
+        throw macOSError;
+      }
+    } else {
+      // For Windows and Linux, use the existing area selection implementation
+      // Simplified for brevity - would need to be implemented based on platform
+
+      // Create a window for the screenshot area selection
+      let captureWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        frame: false,
+        fullscreen: true,
+        transparent: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+        },
+      });
+
+      // Load the capture-helper.html from the file system
+      await captureWindow.loadFile("capture-helper.html");
+
+      return new Promise((resolve, reject) => {
+        ipcMain.once("area-selected", async (event, { x, y, width, height, imageData }) => {
+          console.log("Area selected:", x, y, width, height);
           
           try {
-            const fullScreenshot = await captureScreenshot();
-            mainWindow.webContents.send("warning", "Using full screenshot instead of area screenshot");
-            resolve(fullScreenshot);
-          } catch (fallbackError) {
-            console.error("Fallback screenshot failed:", fallbackError);
-            reject(new Error("Failed to capture fallback screenshot: " + fallbackError.message));
+            if (width < 10 || height < 10) {
+              captureWindow.close();
+              mainWindow.show();
+              reject(new Error("Selected area is too small"));
+              return;
+            }
+
+            // If we received image data directly from the renderer
+            if (imageData) {
+              console.log("Using image data from renderer");
+              captureWindow.close();
+              mainWindow.show();
+              
+              try {
+                const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), "base64");
+                fs.writeFileSync(imagePath, buffer);
+                
+                // Get dimensions for notification
+                const dimensions = { width, height };
+                
+                // Notify about saved screenshot
+                mainWindow.webContents.send("screenshot-saved", {
+                  path: imagePath,
+                  isArea: true,
+                  dimensions
+                });
+                
+                console.log(`Area screenshot saved to ${imagePath}`);
+                resolve(imageData);
+              } catch (error) {
+                console.error("Error saving area screenshot:", error);
+                reject(error);
+              }
+            } else {
+              // No image data, fallback to full screen
+              captureWindow.close();
+              mainWindow.show();
+              const fullScreenshot = await captureScreenshot();
+              resolve(fullScreenshot);
+            }
+          } catch (error) {
+            console.error("Error processing area selection:", error);
+            captureWindow.close();
+            mainWindow.show();
+            reject(error);
           }
-        } catch (error) {
-          console.error("Error during area selection processing:", error);
+        });
+
+        ipcMain.once("area-selection-cancelled", () => {
+          console.log("Area selection cancelled by user");
           captureWindow.close();
           mainWindow.show();
-          reject(error);
-        }
+          reject(new Error("Area selection cancelled"));
+        });
       });
-
-      ipcMain.once("area-selection-cancelled", () => {
-        console.log("Area selection cancelled by user");
-        captureWindow.close();
-        mainWindow.show();
-        reject(new Error("Area selection cancelled"));
-      });
-
-      captureWindow.on("closed", () => {
-        // If the window is closed without selecting an area, show the main window again
-        if (mainWindow && !mainWindow.isVisible()) {
-          mainWindow.show();
-          reject(new Error("Area selection window was closed"));
-        }
-      });
-    });
-  } catch (error) {
-    console.error("Error in captureAreaScreenshot:", error);
-    // Make sure main window is shown again
-    if (mainWindow && !mainWindow.isVisible()) {
-      mainWindow.show();
     }
+    
+    // Check if the file exists (user might have canceled)
+    if (!fs.existsSync(imagePath)) {
+      console.log("Area capture was canceled");
+      mainWindow.show();
+      throw new Error("Area capture was canceled");
+    }
+    
+    const stats = fs.statSync(imagePath);
+    if (stats.size < 1000) {
+      mainWindow.show();
+      throw new Error("Area screenshot file is too small, likely empty");
+    }
+    
+    // Read the image and convert to base64
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    
+    // Get image dimensions
+    const dimensions = { width: 0, height: 0 };
+    try {
+      const sizeOf = require('image-size');
+      const imageDimensions = sizeOf(imagePath);
+      dimensions.width = imageDimensions.width;
+      dimensions.height = imageDimensions.height;
+    } catch (dimError) {
+      console.error("Error getting image dimensions:", dimError);
+    }
+    
+    // Show main window again
+    mainWindow.show();
+    
+    // Notify about saved screenshot
+    mainWindow.webContents.send("screenshot-saved", {
+      path: imagePath,
+      isArea: true,
+      dimensions: dimensions
+    });
+    
+    console.log(`Area screenshot saved to ${imagePath}`);
+    return base64Image;
+  } catch (error) {
+    console.error("Area screenshot failed:", error);
+    mainWindow.show();
     throw error;
   }
 }
@@ -1304,57 +1437,28 @@ function createWindow() {
       updateInstruction("Taking screenshot...");
       
       try {
+        // On Mac, use window-specific capture, otherwise full screen
         let img;
-        
-        // Add a timeout for the entire process
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(new Error("Screenshot process timed out"));
-          }, 10000); // 10 second timeout for the whole process
-        });
-        
-        const capturePromise = new Promise(async (resolve, reject) => {
+        if (process.platform === 'darwin') {
           try {
-            // First try with the enhanced application window capture
-            console.log("Attempting window capture...");
-            const windowImg = await captureApplicationWindow();
-            resolve(windowImg);
-          } catch (windowCaptureError) {
-            console.error("Window capture error:", windowCaptureError);
-            
-            // Fall back to regular screenshot
-            console.log("Falling back to regular screenshot...");
-            try {
-              const regularImg = await captureScreenshot();
-              resolve(regularImg);
-            } catch (regularCaptureError) {
-              reject(regularCaptureError);
-            }
-          }
-        });
-        
-        try {
-          // Wait for the screenshot with a timeout
-          img = await Promise.race([capturePromise, timeoutPromise]);
-          
-          // Verify the screenshot captured something
-          if (!img || img.length < 1000) {
-            console.warn("Screenshot appears to be empty or invalid");
-            
-            // Try again with just the regular screenshot method
-            console.log("Retrying with regular screenshot method");
+            // Capture specific window on Mac
+            img = await captureWindowScreenshot();
+          } catch (windowError) {
+            console.error("Window capture failed, falling back to screen capture:", windowError);
+            // Fall back to full screen
             img = await captureScreenshot();
-            
-            if (!img || img.length < 1000) {
-              throw new Error("Screenshot appears to be empty or invalid");
-            }
           }
-        } catch (timeoutError) {
-          console.error("Screenshot process timed out or failed:", timeoutError);
-          
-          // Last resort: direct screenshot
-          console.log("Using direct screenshot method as last resort");
+        } else {
+          // Use regular screen capture on other platforms
           img = await captureScreenshot();
+        }
+        
+        // Verify the screenshot captured something
+        if (!img || img.length < 1000) {
+          console.warn("Screenshot appears to be empty or invalid");
+          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
+          updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+          return;
         }
         
         // Process the image
@@ -1381,6 +1485,7 @@ function createWindow() {
       updateInstruction("Select an area to screenshot...");
       
       try {
+        // Use the area screenshot function
         const img = await captureAreaScreenshot();
         
         // Verify the screenshot captured something
@@ -1394,7 +1499,8 @@ function createWindow() {
         updateInstruction("Processing area screenshot with AI...");
         await processScreenshots(true); // Use streaming by default
       } catch (screenshotError) {
-        if (screenshotError.message === "Area selection cancelled") {
+        if (screenshotError.message === "Area selection cancelled" || 
+            screenshotError.message === "Area capture was canceled") {
           // User cancelled the selection, no need to show an error
           console.log("Area selection was cancelled by user");
         } else {
@@ -1422,57 +1528,27 @@ function createWindow() {
       updateInstruction("Taking screenshot for multi-mode...");
       
       try {
+        // On Mac, use window-specific capture, otherwise full screen
         let img;
-        
-        // Add a timeout for the entire process
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(new Error("Screenshot process timed out"));
-          }, 10000); // 10 second timeout for the whole process
-        });
-        
-        const capturePromise = new Promise(async (resolve, reject) => {
+        if (process.platform === 'darwin') {
           try {
-            // First try with the enhanced application window capture
-            console.log("Attempting window capture for multi-mode...");
-            const windowImg = await captureApplicationWindow();
-            resolve(windowImg);
-          } catch (windowCaptureError) {
-            console.error("Window capture error in multi-mode:", windowCaptureError);
-            
-            // Fall back to regular screenshot
-            console.log("Falling back to regular screenshot for multi-mode...");
-            try {
-              const regularImg = await captureScreenshot();
-              resolve(regularImg);
-            } catch (regularCaptureError) {
-              reject(regularCaptureError);
-            }
-          }
-        });
-        
-        try {
-          // Wait for the screenshot with a timeout
-          img = await Promise.race([capturePromise, timeoutPromise]);
-          
-          // Verify the screenshot captured something
-          if (!img || img.length < 1000) {
-            console.warn("Multi-mode screenshot appears to be empty or invalid");
-            
-            // Try again with just the regular screenshot method
-            console.log("Retrying with regular screenshot method for multi-mode");
+            // Capture specific window on Mac
+            img = await captureWindowScreenshot();
+          } catch (windowError) {
+            console.error("Window capture failed in multi-mode, falling back to screen capture:", windowError);
+            // Fall back to full screen
             img = await captureScreenshot();
-            
-            if (!img || img.length < 1000) {
-              throw new Error("Screenshot appears to be empty or invalid");
-            }
           }
-        } catch (timeoutError) {
-          console.error("Multi-mode screenshot process timed out or failed:", timeoutError);
-          
-          // Last resort: direct screenshot
-          console.log("Using direct screenshot method as last resort for multi-mode");
+        } else {
+          // Use regular screen capture on other platforms
           img = await captureScreenshot();
+        }
+        
+        // Verify the screenshot captured something
+        if (!img || img.length < 1000) {
+          console.warn("Multi-mode screenshot appears to be empty or invalid");
+          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
+          return;
         }
         
         // Add the screenshot to the collection
