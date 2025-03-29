@@ -74,6 +74,153 @@ let modelListWindow;
 let screenshots = [];
 let multiPageMode = false;
 
+// Define shortcuts configuration
+const SHORTCUTS = {
+  TOGGLE_VISIBILITY: {
+    key: `${modifierKey}+B`,
+    handler: () => toggleWindowVisibility(),
+    alwaysActive: true
+  },
+  PROCESS_SCREENSHOTS: {
+    key: `${modifierKey}+Enter`,
+    handler: () => {
+      if (screenshots.length === 0) {
+        mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
+        return;
+      }
+      processScreenshotsWithAI();
+    }
+  },
+  OPEN_SETTINGS: {
+    key: `${modifierKey}+,`,
+    handler: () => createModelSelectionWindow()
+  },
+  MOVE_LEFT: {
+    key: `${modifierKey}+Left`,
+    handler: () => moveWindow("left")
+  },
+  MOVE_RIGHT: {
+    key: `${modifierKey}+Right`,
+    handler: () => moveWindow("right")
+  },
+  MOVE_UP: {
+    key: `${modifierKey}+Up`,
+    handler: () => moveWindow("up")
+  },
+  MOVE_DOWN: {
+    key: `${modifierKey}+Down`,
+    handler: () => moveWindow("down")
+  },
+  TAKE_SCREENSHOT: {
+    key: `${modifierKey}+H`,
+    handler: async () => {
+      try {
+        updateInstruction("Taking screenshot...");
+        const img = await captureScreenshot();
+        screenshots.push(img);
+        updateInstruction("Processing screenshot with AI...");
+        await processScreenshots(true);
+      } catch (error) {
+        console.error(`${modifierKey}+H error:`, error);
+        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    }
+  },
+  AREA_SCREENSHOT: {
+    key: `${modifierKey}+D`,
+    handler: () => {
+      try {
+        updateInstruction("Select an area to screenshot...");
+        screenshotInstance.startCapture();
+      } catch (error) {
+        console.error(`${modifierKey}+D error:`, error);
+        mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    }
+  },
+  MULTI_PAGE: {
+    key: `${modifierKey}+A`,
+    handler: async () => {
+      try {
+        if (!multiPageMode) {
+          multiPageMode = true;
+          updateInstruction(
+            `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+          );
+        }
+        updateInstruction("Taking screenshot for multi-mode...");
+        const img = await captureScreenshot();
+        screenshots.push(img);
+        updateInstruction(
+          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+        );
+      } catch (error) {
+        console.error(`${modifierKey}+A error:`, error);
+        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      }
+    }
+  },
+  RESET: {
+    key: `${modifierKey}+R`,
+    handler: () => resetProcess()
+  },
+  QUIT: {
+    key: `${modifierKey}+Q`,
+    handler: () => {
+      console.log("Quitting application...");
+      app.quit();
+    }
+  },
+  MODEL_SELECTION: {
+    key: `${modifierKey}+M`,
+    handler: () => createModelSelectionWindow()
+  }
+};
+
+// Function to manage hotkey registration based on visibility
+function updateHotkeys(isVisible) {
+  // Unregister all existing shortcuts
+  globalShortcut.unregisterAll();
+
+  // Register shortcuts based on visibility state
+  Object.values(SHORTCUTS).forEach(shortcut => {
+    if (isVisible || shortcut.alwaysActive) {
+      globalShortcut.register(shortcut.key, shortcut.handler);
+    }
+  });
+}
+
+// Update the toggleWindowVisibility function
+function toggleWindowVisibility(forceState) {
+  isWindowVisible = typeof forceState === 'boolean' ? forceState : !isWindowVisible;
+  
+  if (mainWindow) {
+    if (isWindowVisible) {
+      mainWindow.show();
+      mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+      if (modelListWindow) {
+        modelListWindow.show();
+        modelListWindow.setOpacity(1);
+      }
+    } else {
+      mainWindow.hide();
+      mainWindow.setAlwaysOnTop(false);
+      if (modelListWindow) {
+        modelListWindow.hide();
+        modelListWindow.setOpacity(0);
+      }
+    }
+    
+    // Update hotkeys based on visibility
+    updateHotkeys(isWindowVisible);
+    
+    // Notify renderer about visibility change
+    mainWindow.webContents.send('update-visibility', isWindowVisible);
+  }
+}
+
 // Get list of models from Ollama
 async function getOllamaModels() {
   try {
@@ -1561,277 +1708,8 @@ function createWindow() {
     }
   }
 
-  // Register new hotkey functions
-
-  // Toggle window visibility (Cmd/Ctrl+B)
-  globalShortcut.register(`${modifierKey}+B`, () => {
-    toggleWindowVisibility();
-  });
-
-  // Process screenshots based on current mode (Cmd/Ctrl+Enter)
-  globalShortcut.register(`${modifierKey}+Enter`, () => {
-    if (screenshots.length === 0) {
-      mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
-      return;
-    }
-    processScreenshotsWithAI();
-  });
-
-  // Open model selector with Cmd/Ctrl+comma
-  globalShortcut.register(`${modifierKey}+,`, () => {
-    createModelSelectionWindow();
-  });
-
-  // Move window with keyboard (Cmd/Ctrl+Arrow keys)
-  globalShortcut.register(`${modifierKey}+Left`, () => {
-    moveWindow("left");
-  });
-
-  globalShortcut.register(`${modifierKey}+Right`, () => {
-    moveWindow("right");
-  });
-
-  globalShortcut.register(`${modifierKey}+Up`, () => {
-    moveWindow("up");
-  });
-
-  globalShortcut.register(`${modifierKey}+Down`, () => {
-    moveWindow("down");
-  });
-
-  // Single or final screenshot shortcut
-  globalShortcut.register(`${modifierKey}+H`, async () => {
-    try {
-      updateInstruction("Taking screenshot...");
-
-      try {
-        // Hide the main window temporarily
-        const wasVisible = mainWindow.isVisible();
-        if (wasVisible) {
-          mainWindow.hide();
-          // Wait a bit for the window to hide
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-
-        // Try automatic screenshot first
-        const img = await captureScreenshot();
-
-        // Show the main window again
-        if (wasVisible) {
-          mainWindow.show();
-        }
-
-        // Verify the screenshot captured something
-        if (!img || img.length < 1000) {
-          console.warn("Screenshot appears to be empty or invalid");
-          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
-          updateInstruction(getDefaultInstructions());
-          return;
-        }
-
-        // Process the image
-        screenshots.push(img);
-        updateInstruction("Processing screenshot with AI...");
-        await processScreenshots(true);
-      } catch (screenshotError) {
-        console.error(`Screenshot capture error:`, screenshotError);
-        mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
-        updateInstruction(getDefaultInstructions());
-      }
-    } catch (error) {
-      console.error(`${modifierKey}+H error:`, error);
-      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-      updateInstruction(getDefaultInstructions());
-    }
-  });
-
-  // Area screenshot shortcut using electron-screenshots
-  globalShortcut.register(`${modifierKey}+D`, () => {
-    try {
-      updateInstruction("Select an area to screenshot...");
-      screenshotInstance.startCapture();
-    } catch (error) {
-      console.error(`${modifierKey}+D error:`, error);
-      mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
-      updateInstruction(getDefaultInstructions());
-    }
-  });
-
-  // Multi-page mode shortcut
-  globalShortcut.register(`${modifierKey}+A`, async () => {
-    try {
-      if (!multiPageMode) {
-        multiPageMode = true;
-        updateInstruction(
-          `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`,
-        );
-      }
-      updateInstruction("Taking screenshot for multi-mode...");
-
-      try {
-        // On Mac, use window-specific capture, otherwise full screen
-        let img;
-        if (process.platform === "darwin") {
-          try {
-            // Capture specific window on Mac
-            img = await captureWindowScreenshot();
-          } catch (windowError) {
-            console.error("Window capture failed in multi-mode, falling back to screen capture:", windowError);
-            // Fall back to full screen
-            img = await captureScreenshot();
-          }
-        } else {
-          // Use regular screen capture on other platforms
-          img = await captureScreenshot();
-        }
-
-        // Verify the screenshot captured something
-        if (!img || img.length < 1000) {
-          console.warn("Multi-mode screenshot appears to be empty or invalid");
-          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
-          return;
-        }
-
-        // Add the screenshot to the collection
-        screenshots.push(img);
-        updateInstruction(
-          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`,
-        );
-      } catch (screenshotError) {
-        console.error(`Screenshot error in multi-mode:`, screenshotError);
-        mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
-        updateInstruction(
-          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`,
-        );
-      }
-    } catch (error) {
-      console.error(`${modifierKey}+A error:`, error);
-      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-    }
-  });
-
-  // Reset shortcut (now using Cmd/Ctrl+R instead of Cmd/Ctrl+Shift+R)
-  globalShortcut.register(`${modifierKey}+R`, () => {
-    resetProcess();
-  });
-
-  // Quit shortcut (now using Cmd/Ctrl+Q instead of Cmd/Ctrl+Shift+Q)
-  globalShortcut.register(`${modifierKey}+Q`, () => {
-    console.log("Quitting application...");
-    app.quit();
-  });
-
-  // Model selection shortcut
-  globalShortcut.register(`${modifierKey}+M`, () => {
-    createModelSelectionWindow();
-  });
-
-  // IPC handlers for model selection
-  ipcMain.handle("get-ollama-models", async () => {
-    return await getOllamaModels();
-  });
-
-  ipcMain.handle("get-current-settings", () => {
-    return {
-      aiProvider,
-      currentModel,
-      ollamaUrl: OLLAMA_BASE_URL,
-    };
-  });
-
-  ipcMain.on("update-model-settings", (event, settings) => {
-    aiProvider = settings.aiProvider;
-    currentModel = settings.currentModel;
-
-    // Update Ollama URL if provided
-    if (settings.ollamaUrl) {
-      process.env.OLLAMA_BASE_URL = settings.ollamaUrl;
-      // Update the global variable, ensuring we use IPv4
-      const updatedUrl = settings.ollamaUrl.replace("localhost", "127.0.0.1");
-      console.log(`Updating Ollama URL to: ${updatedUrl}`);
-      OLLAMA_BASE_URL = updatedUrl;
-    }
-
-    console.log(`Updated settings: Provider=${aiProvider}, Model=${currentModel}, URL=${OLLAMA_BASE_URL}`);
-
-    // Notify renderer about model change
-    if (mainWindow?.webContents) {
-      mainWindow.webContents.send("model-changed");
-    }
-
-    // Update instruction to show currently selected model
-    resetProcess();
-  });
-
-  // Setup IPC handlers for the new functions
-  ipcMain.on("toggle-visibility", (event, visible) => {
-    toggleWindowVisibility(visible);
-  });
-
-  ipcMain.on("move-window", (event, direction) => {
-    moveWindow(direction);
-  });
-
-  ipcMain.on("process-screenshots", () => {
-    processScreenshotsWithAI();
-  });
-
-  ipcMain.on("auto-screenshot", async () => {
-    try {
-      updateInstruction("Taking screenshot...");
-
-      try {
-        // On Mac, use window-specific capture, otherwise full screen
-        let img;
-        if (process.platform === "darwin") {
-          try {
-            // Capture specific window on Mac
-            img = await captureWindowScreenshot();
-          } catch (windowError) {
-            console.error("Window capture failed, falling back to screen capture:", windowError);
-            // Fall back to full screen
-            img = await captureScreenshot();
-          }
-        } else {
-          // Use regular screen capture on other platforms
-          img = await captureScreenshot();
-        }
-
-        // Verify the screenshot captured something
-        if (!img || img.length < 1000) {
-          console.warn("Screenshot appears to be empty or invalid");
-          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
-          updateInstruction(getDefaultInstructions());
-          return;
-        }
-
-        // Process the image
-        screenshots.push(img);
-        updateInstruction("Processing screenshot with AI...");
-        await processScreenshots(true);
-      } catch (screenshotError) {
-        console.error(`Screenshot capture error:`, screenshotError);
-        mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
-        updateInstruction(getDefaultInstructions());
-      }
-    } catch (error) {
-      console.error(`Auto screenshot error:`, error);
-      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-      updateInstruction(getDefaultInstructions());
-    }
-  });
-
-  ipcMain.on("reset-process", () => {
-    resetProcess();
-  });
-
-  ipcMain.on("quit-app", () => {
-    app.quit();
-  });
-
-  ipcMain.on("open-settings", () => {
-    createModelSelectionWindow();
-  });
+  // Replace all individual globalShortcut.register calls with a single updateHotkeys call
+  updateHotkeys(true);
 
   // Send initial status to renderer
   setTimeout(() => {
@@ -1920,171 +1798,6 @@ function getDefaultInstructions() {
   }
 
   return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
-}
-
-// Function to manage hotkey registration based on visibility
-function updateHotkeys(isVisible) {
-  // Unregister all existing shortcuts
-  globalShortcut.unregisterAll();
-
-  // Always register the visibility toggle shortcut
-  globalShortcut.register(`${modifierKey}+B`, () => {
-    toggleWindowVisibility();
-  });
-
-  // Only register other shortcuts if window is visible
-  if (isVisible) {
-    // Process screenshots shortcut
-    globalShortcut.register(`${modifierKey}+Enter`, () => {
-      if (screenshots.length === 0) {
-        mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
-        return;
-      }
-      processScreenshotsWithAI();
-    });
-
-    // Settings shortcut
-    globalShortcut.register(`${modifierKey}+,`, () => {
-      createModelSelectionWindow();
-    });
-
-    // Window movement shortcuts
-    globalShortcut.register(`${modifierKey}+Left`, () => {
-      moveWindow("left");
-    });
-
-    globalShortcut.register(`${modifierKey}+Right`, () => {
-      moveWindow("right");
-    });
-
-    globalShortcut.register(`${modifierKey}+Up`, () => {
-      moveWindow("up");
-    });
-
-    globalShortcut.register(`${modifierKey}+Down`, () => {
-      moveWindow("down");
-    });
-
-    // Screenshot shortcuts
-    globalShortcut.register(`${modifierKey}+H`, async () => {
-      try {
-        updateInstruction("Taking screenshot...");
-        const img = await captureScreenshot();
-        screenshots.push(img);
-        updateInstruction("Processing screenshot with AI...");
-        await processScreenshots(true);
-      } catch (error) {
-        console.error(`${modifierKey}+H error:`, error);
-        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-        updateInstruction(getDefaultInstructions());
-      }
-    });
-
-    globalShortcut.register(`${modifierKey}+D`, () => {
-      try {
-        updateInstruction("Select an area to screenshot...");
-        screenshotInstance.startCapture();
-      } catch (error) {
-        console.error(`${modifierKey}+D error:`, error);
-        mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
-        updateInstruction(getDefaultInstructions());
-      }
-    });
-
-    // Multi-page mode shortcut
-    globalShortcut.register(`${modifierKey}+A`, async () => {
-      try {
-        if (!multiPageMode) {
-          multiPageMode = true;
-          updateInstruction(
-            `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
-          );
-        }
-        updateInstruction("Taking screenshot for multi-mode...");
-        const img = await captureScreenshot();
-        screenshots.push(img);
-        updateInstruction(
-          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
-        );
-      } catch (error) {
-        console.error(`${modifierKey}+A error:`, error);
-        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-      }
-    });
-
-    // Reset shortcut
-    globalShortcut.register(`${modifierKey}+R`, () => {
-      resetProcess();
-    });
-
-    // Quit shortcut
-    globalShortcut.register(`${modifierKey}+Q`, () => {
-      console.log("Quitting application...");
-      app.quit();
-    });
-
-    // Model selection shortcut
-    globalShortcut.register(`${modifierKey}+M`, () => {
-      createModelSelectionWindow();
-    });
-  }
-}
-
-// Update the toggleWindowVisibility function
-function toggleWindowVisibility(forceState) {
-  isWindowVisible = typeof forceState === 'boolean' ? forceState : !isWindowVisible;
-  
-  if (mainWindow) {
-    if (isWindowVisible) {
-      mainWindow.show();
-      mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
-      if (modelListWindow) {
-        modelListWindow.show();
-        modelListWindow.setOpacity(1);
-      }
-    } else {
-      mainWindow.hide();
-      mainWindow.setAlwaysOnTop(false);
-      if (modelListWindow) {
-        modelListWindow.hide();
-        modelListWindow.setOpacity(0);
-      }
-    }
-    
-    // Update hotkeys based on visibility
-    updateHotkeys(isWindowVisible);
-    
-    // Notify renderer about visibility change
-    mainWindow.webContents.send('update-visibility', isWindowVisible);
-  }
-}
-
-// Move window using keyboard shortcuts
-function moveWindow(direction) {
-  if (!mainWindow) return;
-
-  const [x, y] = mainWindow.getPosition();
-  const moveStep = 20; // Pixels to move in each direction
-
-  let newX = x;
-  let newY = y;
-
-  switch (direction) {
-    case "left":
-      newX = x - moveStep;
-      break;
-    case "right":
-      newX = x + moveStep;
-      break;
-    case "up":
-      newY = y - moveStep;
-      break;
-    case "down":
-      newY = y + moveStep;
-      break;
-  }
-
-  mainWindow.setPosition(newX, newY);
 }
 
 // Process screenshots based on current mode
