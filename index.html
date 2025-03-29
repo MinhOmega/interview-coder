@@ -1295,6 +1295,16 @@
 
       // If Ctrl/Cmd key is pressed
       if (ctrlOrCmd) {
+        // When window is invisible, only handle Command/Ctrl + B
+        if (!isWindowVisible) {
+          if (e.key === 'b') {
+            toggleWindowVisibility();
+            e.preventDefault();
+          }
+          return;
+        }
+
+        // Handle all shortcuts when window is visible
         switch (e.key) {
           case 'b': // Toggle visibility
             toggleWindowVisibility();

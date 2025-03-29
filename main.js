@@ -1922,34 +1922,141 @@ function getDefaultInstructions() {
   return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
 }
 
-// Toggle window visibility
-function toggleWindowVisibility(visible = null) {
-  // If a value is provided, use it, otherwise toggle
-  isWindowVisible = visible !== null ? visible : !isWindowVisible;
+// Function to manage hotkey registration based on visibility
+function updateHotkeys(isVisible) {
+  // Unregister all existing shortcuts
+  globalShortcut.unregisterAll();
 
-  if (isWindowVisible) {
-    mainWindow.show();
-    mainWindow.setOpacity(1.0);
-    mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
-    
-    // Show model selector window if it exists
-    if (modelListWindow) {
-      modelListWindow.show();
-      modelListWindow.setOpacity(1.0);
-    }
-  } else {
-    // Don't hide completely, but make nearly invisible and allow other apps to overlay
-    mainWindow.setOpacity(0.0);
-    mainWindow.setAlwaysOnTop(false);
-    
-    // Hide model selector window if it exists
-    if (modelListWindow) {
-      modelListWindow.setOpacity(0.0);
-      modelListWindow.setAlwaysOnTop(false);
-    }
+  // Always register the visibility toggle shortcut
+  globalShortcut.register(`${modifierKey}+B`, () => {
+    toggleWindowVisibility();
+  });
+
+  // Only register other shortcuts if window is visible
+  if (isVisible) {
+    // Process screenshots shortcut
+    globalShortcut.register(`${modifierKey}+Enter`, () => {
+      if (screenshots.length === 0) {
+        mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
+        return;
+      }
+      processScreenshotsWithAI();
+    });
+
+    // Settings shortcut
+    globalShortcut.register(`${modifierKey}+,`, () => {
+      createModelSelectionWindow();
+    });
+
+    // Window movement shortcuts
+    globalShortcut.register(`${modifierKey}+Left`, () => {
+      moveWindow("left");
+    });
+
+    globalShortcut.register(`${modifierKey}+Right`, () => {
+      moveWindow("right");
+    });
+
+    globalShortcut.register(`${modifierKey}+Up`, () => {
+      moveWindow("up");
+    });
+
+    globalShortcut.register(`${modifierKey}+Down`, () => {
+      moveWindow("down");
+    });
+
+    // Screenshot shortcuts
+    globalShortcut.register(`${modifierKey}+H`, async () => {
+      try {
+        updateInstruction("Taking screenshot...");
+        const img = await captureScreenshot();
+        screenshots.push(img);
+        updateInstruction("Processing screenshot with AI...");
+        await processScreenshots(true);
+      } catch (error) {
+        console.error(`${modifierKey}+H error:`, error);
+        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    });
+
+    globalShortcut.register(`${modifierKey}+D`, () => {
+      try {
+        updateInstruction("Select an area to screenshot...");
+        screenshotInstance.startCapture();
+      } catch (error) {
+        console.error(`${modifierKey}+D error:`, error);
+        mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    });
+
+    // Multi-page mode shortcut
+    globalShortcut.register(`${modifierKey}+A`, async () => {
+      try {
+        if (!multiPageMode) {
+          multiPageMode = true;
+          updateInstruction(
+            `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+          );
+        }
+        updateInstruction("Taking screenshot for multi-mode...");
+        const img = await captureScreenshot();
+        screenshots.push(img);
+        updateInstruction(
+          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+        );
+      } catch (error) {
+        console.error(`${modifierKey}+A error:`, error);
+        mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      }
+    });
+
+    // Reset shortcut
+    globalShortcut.register(`${modifierKey}+R`, () => {
+      resetProcess();
+    });
+
+    // Quit shortcut
+    globalShortcut.register(`${modifierKey}+Q`, () => {
+      console.log("Quitting application...");
+      app.quit();
+    });
+
+    // Model selection shortcut
+    globalShortcut.register(`${modifierKey}+M`, () => {
+      createModelSelectionWindow();
+    });
   }
+}
 
-  console.log(`Window visibility set to: ${isWindowVisible}`);
+// Update the toggleWindowVisibility function
+function toggleWindowVisibility(forceState) {
+  isWindowVisible = typeof forceState === 'boolean' ? forceState : !isWindowVisible;
+  
+  if (mainWindow) {
+    if (isWindowVisible) {
+      mainWindow.show();
+      mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+      if (modelListWindow) {
+        modelListWindow.show();
+        modelListWindow.setOpacity(1);
+      }
+    } else {
+      mainWindow.hide();
+      mainWindow.setAlwaysOnTop(false);
+      if (modelListWindow) {
+        modelListWindow.hide();
+        modelListWindow.setOpacity(0);
+      }
+    }
+    
+    // Update hotkeys based on visibility
+    updateHotkeys(isWindowVisible);
+    
+    // Notify renderer about visibility change
+    mainWindow.webContents.send('update-visibility', isWindowVisible);
+  }
 }
 
 // Move window using keyboard shortcuts
