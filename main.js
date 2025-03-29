@@ -621,6 +621,7 @@ async function generateWithGemini(messages, model, streaming = false) {
         try {
           for await (const chunk of streamingResponse.stream) {
             const chunkText = chunk.text();
+            console.log("Gemini stream chunk received:", chunkText.substring(0, 50) + "...");
             fullResponse += chunkText;
 
             // Emit the chunk
@@ -628,9 +629,11 @@ async function generateWithGemini(messages, model, streaming = false) {
           }
 
           // Emit completion event
+          console.log("Gemini stream complete, total length:", fullResponse.length);
           emitter.emit("complete", fullResponse);
         } catch (error) {
           console.error("Error in Gemini stream processing:", error);
+          console.error("Stack trace:", error.stack);
           emitter.emit("error", error);
         }
       })();
@@ -1281,6 +1284,14 @@ function createModelSelectionWindow() {
 
   modelListWindow.loadFile("model-selector.html");
 
+  // Register the Escape key shortcut to close the window
+  const escapeShortcut = `Escape`;
+  const shortcutRet = modelListWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Escape') {
+      modelListWindow.close();
+    }
+  });
+
   modelListWindow.on("closed", () => {
     modelListWindow = null;
   });
@@ -1319,12 +1330,16 @@ function createWindow() {
     alwaysOnTop: true,
     paintWhenInitiallyHidden: true,
     contentProtection: true,
-    type: "toolbar",
-    movable: true, // Make sure the window can be moved
-    roundedCorners: true, // Enable rounded corners on MacOS
-    titleBarStyle: "hiddenInset", // This helps with the custom title bar
-    skipTaskbar: true, // Don't show in taskbar
-    autoHideMenuBar: true, // Hide menu bar
+    movable: true, // Ensure window is movable
+    roundedCorners: true,
+    titleBarStyle: "hidden", // Hide title bar completely
+    titleBarOverlay: false,
+    trafficLightPosition: { x: -999, y: -999 }, // Move traffic lights far off-screen
+    fullscreenable: true,
+    skipTaskbar: true, 
+    autoHideMenuBar: true,
+    hasShadow: true, // Add shadow for better visibility
+    enableLargerThanScreen: false, // Prevent window from being larger than screen
   });
 
   mainWindow.loadFile("index.html");
@@ -1641,6 +1656,51 @@ function createWindow() {
     processScreenshotsWithAI();
   });
 
+  ipcMain.on("auto-screenshot", async () => {
+    try {
+      updateInstruction("Taking screenshot...");
+
+      try {
+        // On Mac, use window-specific capture, otherwise full screen
+        let img;
+        if (process.platform === "darwin") {
+          try {
+            // Capture specific window on Mac
+            img = await captureWindowScreenshot();
+          } catch (windowError) {
+            console.error("Window capture failed, falling back to screen capture:", windowError);
+            // Fall back to full screen
+            img = await captureScreenshot();
+          }
+        } else {
+          // Use regular screen capture on other platforms
+          img = await captureScreenshot();
+        }
+
+        // Verify the screenshot captured something
+        if (!img || img.length < 1000) {
+          console.warn("Screenshot appears to be empty or invalid");
+          mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
+          updateInstruction(getDefaultInstructions());
+          return;
+        }
+
+        // Process the image
+        screenshots.push(img);
+        updateInstruction("Processing screenshot with AI...");
+        await processScreenshots(true);
+      } catch (screenshotError) {
+        console.error(`Screenshot capture error:`, screenshotError);
+        mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
+        updateInstruction(getDefaultInstructions());
+      }
+    } catch (error) {
+      console.error(`Auto screenshot error:`, error);
+      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      updateInstruction(getDefaultInstructions());
+    }
+  });
+
   ipcMain.on("reset-process", () => {
     resetProcess();
   });
@@ -1657,6 +1717,29 @@ function createWindow() {
   setTimeout(() => {
     updateInstruction(getDefaultInstructions());
   }, 1000);
+
+  // Make sure window control handlers exist even if buttons are removed
+  ipcMain.on("minimize-window", () => {
+    if (mainWindow) {
+      mainWindow.minimize();
+    }
+  });
+
+  ipcMain.on("maximize-window", () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
+
+  ipcMain.on("close-window", () => {
+    if (mainWindow) {
+      mainWindow.close();
+    }
+  });
 
   // Add compatibility handling for both area-selector.html and capture-helper.html
   ipcMain.on("area-cancelled", () => {
@@ -1706,19 +1789,6 @@ function createWindow() {
       console.error("Error in backward compatibility area-selected handler:", err);
       mainWindow.webContents.send("error", `Failed to process area selection: ${err.message}`);
       updateInstruction(getDefaultInstructions());
-    }
-  });
-
-  // IPC handlers for window controls
-  ipcMain.on("minimize-window", () => {
-    if (mainWindow) {
-      mainWindow.minimize();
-    }
-  });
-
-  ipcMain.on("close-window", () => {
-    if (mainWindow) {
-      mainWindow.close();
     }
   });
 }
@@ -1805,18 +1875,5 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
-  }
-});
-
-// IPC handlers for window controls
-ipcMain.on("minimize-window", () => {
-  if (mainWindow) {
-    mainWindow.minimize();
-  }
-});
-
-ipcMain.on("close-window", () => {
-  if (mainWindow) {
-    mainWindow.close();
   }
 });
