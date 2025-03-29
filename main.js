@@ -662,7 +662,11 @@ async function generateWithGemini(messages, model, streaming = false) {
 }
 
 function updateInstruction(instruction) {
-  if (mainWindow?.webContents) {
+  if (!instruction || instruction.trim() === "") {
+    // If instruction is empty, hide the instruction banner
+    mainWindow.webContents.send("hide-instruction");
+  } else {
+    // Show the instruction with the provided text
     mainWindow.webContents.send("update-instruction", instruction);
   }
 }
@@ -1102,17 +1106,34 @@ I need you to provide the best possible solution with excellent performance and 
 Guidelines:
 1. Start with a clear understanding of the problem before diving into code.
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
-3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
-4. Structure your code with clean architecture principles.
-5. Include robust error handling and edge case considerations.
-6. If multiple solutions exist, present the optimal approach and explain your decision.
+3. Structure your code with clean architecture principles.
+4. Include robust error handling and edge case considerations.
+5. If multiple solutions exist, present the optimal approach and explain your decision.
 
-Format your response in Markdown with well-organized sections:
-- Problem Analysis: Brief overview of what you understand the problem to be
-- Approach: Your strategy for solving it
-- Solution: Well-commented, complete implementation with clean syntax
-- Complexity Analysis: Time and space complexity breakdown
-- Optimizations: Any further improvements that could be made`;
+Your response MUST follow this exact structure with these three main sections:
+
+# Analyzing the Problem
+Provide a clear understanding of what the problem is asking, including:
+- The key requirements and constraints
+- Input/output specifications
+- Important edge cases to consider
+- Any implicit assumptions
+
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
+Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
     } else {
       promptText = `These ${screenshots.length} screenshots show a multi-part programming problem. 
 I need you to provide the best possible solution with excellent performance and readability.
@@ -1120,17 +1141,34 @@ I need you to provide the best possible solution with excellent performance and 
 Guidelines:
 1. Start with a clear understanding of the full problem scope across all screenshots.
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
-3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
-4. Structure your code with clean architecture principles.
-5. Include robust error handling and edge case considerations.
-6. Ensure your solution addresses all parts of the problem comprehensively.
+3. Structure your code with clean architecture principles.
+4. Include robust error handling and edge case considerations.
+5. If multiple solutions exist, present the optimal approach and explain your decision.
 
-Format your response in Markdown with well-organized sections:
-- Problem Analysis: Brief overview of what you understand the problem to be
-- Approach: Your strategy for solving the multi-part problem
-- Solution: Well-commented, complete implementation with clean syntax
-- Complexity Analysis: Time and space complexity breakdown
-- Optimizations: Any further improvements that could be made`;
+Your response MUST follow this exact structure with these three main sections:
+
+# Analyzing the Problem
+Provide a clear understanding of what the problem is asking, including:
+- The key requirements and constraints
+- Input/output specifications
+- Important edge cases to consider
+- Any implicit assumptions
+
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
+Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
     }
 
     // Build message with text + each screenshot
@@ -1240,7 +1278,7 @@ Format your response in Markdown with well-organized sections:
     console.log("Analysis complete and sent to renderer");
 
     // Update instruction after processing
-    updateInstruction(getDefaultInstructions());
+    mainWindow.webContents.send("hide-instruction");
   } catch (err) {
     console.error("Error in processScreenshots:", err);
 
@@ -1283,14 +1321,6 @@ function createModelSelectionWindow() {
   });
 
   modelListWindow.loadFile("model-selector.html");
-
-  // Register the Escape key shortcut to close the window
-  const escapeShortcut = `Escape`;
-  const shortcutRet = modelListWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'Escape') {
-      modelListWindow.close();
-    }
-  });
 
   modelListWindow.on("closed", () => {
     modelListWindow = null;
@@ -1336,7 +1366,7 @@ function createWindow() {
     titleBarOverlay: false,
     trafficLightPosition: { x: -999, y: -999 }, // Move traffic lights far off-screen
     fullscreenable: true,
-    skipTaskbar: true, 
+    skipTaskbar: true,
     autoHideMenuBar: true,
     hasShadow: true, // Add shadow for better visibility
     enableLargerThanScreen: false, // Prevent window from being larger than screen
@@ -1812,7 +1842,7 @@ function toggleWindowVisibility(visible = null) {
     mainWindow.setOpacity(1.0);
   } else {
     // Don't hide completely, but make nearly invisible
-    mainWindow.setOpacity(0.05);
+    mainWindow.setOpacity(0.0);
   }
 
   console.log(`Window visibility set to: ${isWindowVisible}`);
