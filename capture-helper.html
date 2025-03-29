@@ -99,7 +99,7 @@
   <div id="notification"></div>
   
   <script>
-    const { ipcRenderer } = require('electron');
+    const { ipcRenderer, desktopCapturer } = require('electron');
     const fs = require('fs');
     
     // Area selection variables
@@ -169,35 +169,99 @@
         
         showNotification("Capturing selection...");
         
-        // Use the HTML2Canvas library to capture the area
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        // Get source ID from global variable if available
+        const sourceId = global?.sourceId;
         
-        // Create a context to draw the screenshot
-        const context = canvas.getContext('2d');
-        
-        // Get screenshot of entire screen
-        try {
-          // Try to capture directly using html2canvas
-          // In most environments, this will only capture the current browser window
-          context.drawWindow(window, x, y, width, height, "rgb(255,255,255)");
-          
-          // Get the image data
-          const imageData = canvas.toDataURL('image/png');
-          
-          // Send the selected area coordinates and image data back to main process
-          ipcRenderer.send('area-selected', { x, y, width, height, imageData });
-        } catch (err) {
-          console.error("Error capturing with drawWindow:", err);
-          
-          // Send just the coordinates without image data
-          // This will make the main process use the fallback full screenshot method
+        if (sourceId) {
+          // If we have a sourceId, we can use getDisplayMedia to capture the screen
+          try {
+            // Create a video element to show the screen capture
+            const video = document.createElement('video');
+            video.style.cssText = 'position:absolute; top:-10000px; left:-10000px;';
+            document.body.appendChild(video);
+            
+            // Get the media stream for the desktop
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: sourceId,
+                  minWidth: 1280,
+                  maxWidth: 8000,
+                  minHeight: 720,
+                  maxHeight: 8000
+                }
+              }
+            });
+            
+            video.srcObject = stream;
+            
+            // Wait for the video to load
+            video.onloadedmetadata = () => {
+              video.play();
+              
+              // Wait a bit for the video to start playing
+              setTimeout(() => {
+                // Create a canvas to capture the area
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                // Draw the selected area to the canvas
+                ctx.drawImage(
+                  video, 
+                  x, y, width, height, // Source rectangle
+                  0, 0, width, height  // Destination rectangle
+                );
+                
+                // Generate a filename for the screenshot
+                const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+                const imagePath = require('path').join(require('electron').app.getPath("pictures"), `screenshot-${timestamp}.png`);
+                
+                // Convert to base64
+                const imageData = canvas.toDataURL('image/png');
+                
+                // Save the image
+                try {
+                  const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+                  fs.writeFileSync(imagePath, buffer);
+                  
+                  // Clean up
+                  stream.getTracks().forEach(track => track.stop());
+                  video.remove();
+                  
+                  // Send the image data back to main process
+                  ipcRenderer.send('area-selected', { x, y, width, height, imageData });
+                } catch (saveError) {
+                  console.error("Error saving screenshot:", saveError);
+                  ipcRenderer.send('area-selected', { x, y, width, height });
+                }
+              }, 300);
+            };
+          } catch (err) {
+            console.error("Error using desktop capture:", err);
+            // If desktop capture fails, send coordinates only
+            ipcRenderer.send('area-selected', { x, y, width, height });
+          }
+        } else {
+          // No sourceId, just send the coordinates
           ipcRenderer.send('area-selected', { x, y, width, height });
         }
       } catch (err) {
         console.error("Error in capture button handler:", err);
         showNotification("Error capturing selection: " + err.message);
+        // Still try to send the coordinates if we can
+        try {
+          const x = parseInt(selectionArea.style.left);
+          const y = parseInt(selectionArea.style.top);
+          const width = parseInt(selectionArea.style.width);
+          const height = parseInt(selectionArea.style.height);
+          ipcRenderer.send('area-selected', { x, y, width, height });
+        } catch (e) {
+          ipcRenderer.send('area-selection-cancelled');
+        }
       }
     });
     
@@ -209,37 +273,6 @@
       setTimeout(() => {
         notification.classList.remove('visible');
       }, 3000);
-    }
-    
-    // Helper function to capture from a video element to a canvas
-    async function captureVideoToCanvas(video, x, y, width, height) {
-      // Create a canvas to capture the area
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      
-      const ctx = canvas.getContext('2d');
-      
-      // Draw the selected area to the canvas
-      ctx.drawImage(
-        video, 
-        x, y, width, height, // Source rectangle
-        0, 0, width, height  // Destination rectangle
-      );
-      
-      return canvas;
-    }
-    
-    // Helper function to save canvas to file and return base64
-    function saveCanvasToFile(canvas, imagePath) {
-      // Convert canvas to PNG
-      const dataUrl = canvas.toDataURL('image/png');
-      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-      
-      // Save the image
-      fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
-      
-      return base64Data;
     }
     
     // Helper function to get video stream
@@ -284,42 +317,62 @@
             // Wait a moment for the video to start playing
             setTimeout(() => {
               try {
-                const canvas = captureVideoToCanvas(
+                // Create a canvas to capture the area
+                const canvas = document.createElement('canvas');
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                
+                const ctx = canvas.getContext('2d');
+                // Draw the selected area to the canvas
+                ctx.drawImage(
                   video, 
-                  rect.x, rect.y, rect.width, rect.height
+                  rect.x, rect.y, rect.width, rect.height, // Source rectangle
+                  0, 0, rect.width, rect.height  // Destination rectangle
                 );
                 
-                // Save the canvas to a file
-                const base64Data = saveCanvasToFile(canvas, imagePath);
+                // Convert to base64
+                const imageData = canvas.toDataURL('image/png');
                 
-                // Clean up
-                stream.getTracks().forEach(track => track.stop());
-                video.remove();
-                
-                // Log success
-                console.log(`Area screenshot saved successfully: ${imagePath}`);
-                
-                // Notify main process that the capture is complete
-                ipcRenderer.send('area-captured', { 
-                  success: true,
-                  path: imagePath,
-                  base64Image: base64Data
-                });
-              } catch (err) {
+                // Save the image
+                try {
+                  const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+                  fs.writeFileSync(imagePath, buffer);
+                  
+                  // Clean up
+                  stream.getTracks().forEach(track => track.stop());
+                  video.remove();
+                  
+                  // Send the image data back to main process
+                  ipcRenderer.send('area-captured', { 
+                    success: true,
+                    path: imagePath,
+                    base64Image: imageData
+                  });
+                } catch (saveError) {
+                  console.error("Error saving screenshot:", saveError);
+                  ipcRenderer.send('area-captured', { 
+                    success: false, 
+                    error: `Error saving screenshot: ${saveError.message}` 
+                  });
+                }
+              } catch (captureError) {
+                console.error("Error capturing area:", captureError);
                 ipcRenderer.send('area-captured', { 
                   success: false, 
-                  error: `Error capturing image: ${err.message}` 
+                  error: `Error capturing area: ${captureError.message}` 
                 });
               }
-            }, 300); // Give the video a moment to start playing
+            }, 300);
           };
-        } catch (err) {
+        } catch (streamError) {
+          console.error("Error accessing media stream:", streamError);
           ipcRenderer.send('area-captured', { 
             success: false, 
-            error: `Error accessing display media: ${err.message}` 
+            error: `Error accessing media stream: ${streamError.message}` 
           });
         }
       } catch (err) {
+        console.error("Error in capture-screen handler:", err);
         ipcRenderer.send('area-captured', { 
           success: false, 
           error: `Capture process error: ${err.message}` 
@@ -362,37 +415,49 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Save the canvas to a file
-                const base64Data = saveCanvasToFile(canvas, imagePath);
+                // Convert to base64
+                const imageData = canvas.toDataURL('image/png');
                 
-                // Clean up
-                stream.getTracks().forEach(track => track.stop());
-                video.remove();
-                
-                // Log success
-                console.log(`Full screen screenshot saved successfully: ${imagePath}`);
-                
-                // Notify main process that the capture is complete
-                ipcRenderer.send('full-screen-captured', { 
-                  success: true,
-                  path: imagePath,
-                  base64Image: base64Data
-                });
-              } catch (err) {
+                // Save the image
+                try {
+                  const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+                  fs.writeFileSync(imagePath, buffer);
+                  
+                  // Clean up
+                  stream.getTracks().forEach(track => track.stop());
+                  video.remove();
+                  
+                  // Send the image data back to main process
+                  ipcRenderer.send('full-screen-captured', { 
+                    success: true,
+                    path: imagePath,
+                    base64Image: imageData
+                  });
+                } catch (saveError) {
+                  console.error("Error saving screenshot:", saveError);
+                  ipcRenderer.send('full-screen-captured', { 
+                    success: false, 
+                    error: `Error saving screenshot: ${saveError.message}` 
+                  });
+                }
+              } catch (captureError) {
+                console.error("Error capturing full screen:", captureError);
                 ipcRenderer.send('full-screen-captured', { 
                   success: false, 
-                  error: `Error capturing full screen: ${err.message}` 
+                  error: `Error capturing full screen: ${captureError.message}` 
                 });
               }
-            }, 300); // Give the video a moment to start playing
+            }, 300);
           };
-        } catch (err) {
+        } catch (streamError) {
+          console.error("Error accessing media stream:", streamError);
           ipcRenderer.send('full-screen-captured', { 
             success: false, 
-            error: `Error accessing display media: ${err.message}` 
+            error: `Error accessing media stream: ${streamError.message}` 
           });
         }
       } catch (err) {
+        console.error("Error in capture-full-screen handler:", err);
         ipcRenderer.send('full-screen-captured', { 
           success: false, 
           error: `Full screen capture process error: ${err.message}` 
@@ -400,12 +465,94 @@
       }
     });
     
+    // Listen for the window capture request
+    ipcRenderer.on('capture-window', async (event, data) => {
+      try {
+        const { sourceId, imagePath } = data;
+        
+        // Create a video element to capture the screen
+        const video = document.createElement('video');
+        video.style.cssText = 'position:absolute; top:-10000px; left:-10000px;';
+        
+        // Add to DOM temporarily
+        document.body.appendChild(video);
+        
+        try {
+          // Get the media stream
+          const stream = await getVideoStream(sourceId);
+          
+          // Set up video
+          video.srcObject = stream;
+          video.onloadedmetadata = async () => {
+            // Start playing the video
+            video.play();
+            
+            // Wait a moment for the video to start playing
+            setTimeout(() => {
+              try {
+                // Create a canvas with the same dimensions as the video
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Convert to base64
+                const imageData = canvas.toDataURL('image/png');
+                
+                // Save the image
+                try {
+                  const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+                  fs.writeFileSync(imagePath, buffer);
+                  
+                  // Clean up
+                  stream.getTracks().forEach(track => track.stop());
+                  video.remove();
+                  
+                  // Send the image data back to main process
+                  ipcRenderer.send('window-captured', { 
+                    success: true,
+                    path: imagePath,
+                    base64Image: imageData
+                  });
+                } catch (saveError) {
+                  console.error("Error saving window screenshot:", saveError);
+                  ipcRenderer.send('window-captured', { 
+                    success: false, 
+                    error: `Error saving window screenshot: ${saveError.message}` 
+                  });
+                }
+              } catch (captureError) {
+                console.error("Error capturing window:", captureError);
+                ipcRenderer.send('window-captured', { 
+                  success: false, 
+                  error: `Error capturing window: ${captureError.message}` 
+                });
+              }
+            }, 300);
+          };
+        } catch (streamError) {
+          console.error("Error accessing window stream:", streamError);
+          ipcRenderer.send('window-captured', { 
+            success: false, 
+            error: `Error accessing window stream: ${streamError.message}` 
+          });
+        }
+      } catch (err) {
+        console.error("Error in capture-window handler:", err);
+        ipcRenderer.send('window-captured', { 
+          success: false, 
+          error: `Window capture process error: ${err.message}` 
+        });
+      }
+    });
+    
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      // Escape key cancels
       if (e.key === 'Escape') {
         ipcRenderer.send('area-selection-cancelled');
-      } else if (e.key === 'Enter' && captureBtn.style.display !== 'none') {
-        captureBtn.click();
       }
     });
   </script>
