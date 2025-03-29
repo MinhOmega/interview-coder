@@ -12,6 +12,9 @@
     "electron": "^35.1.2",
     "image-size": "^2.0.0",
     "openai": "^4.90.0",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-html": "^16.0.1",
     "screenshot-desktop": "^1.15.0"
   }
 }
