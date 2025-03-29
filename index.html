@@ -15,27 +15,31 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background: none;
-      font-family: Arial, sans-serif;
+      background: rgba(25, 25, 25, 0.85); /* Darker, more modern semi-transparent background */
+      font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
       overflow: hidden;
       position: relative;
+      border-radius: 12px; /* More rounded corners */
+      border: 1px solid rgba(100, 100, 100, 0.3); /* Subtle border */
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); /* Stronger shadow for depth */
     }
     
     /* Improved instruction banner */
     #instruction-banner {
       position: fixed;
-      top: 0;
+      top: 40px; /* Positioned further below the drag handle */
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.85);
+      background: rgba(20, 20, 20, 0.9);
       color: #fff;
-      padding: 8px 15px;
+      padding: 10px 18px;
       font-size: 14px;
-      border-radius: 0 0 8px 8px;
+      border-radius: 8px;
       z-index: 9999;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      transition: opacity 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: opacity 0.3s ease, transform 0.3s ease;
       user-select: none;
+      border: 1px solid rgba(120, 120, 120, 0.2);
     }
     
     #response-overlay {
@@ -44,12 +48,12 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.85);
+      background: rgba(20, 20, 20, 0.92);
       opacity: 0;
       visibility: hidden;
       transition: opacity 0.3s ease, visibility 0.3s;
       z-index: 9998;
-      backdrop-filter: blur(3px);
+      backdrop-filter: blur(4px);
     }
     
     #response-overlay.visible {
@@ -66,14 +70,15 @@
       max-width: 900px;
       max-height: 90vh;
       overflow-y: auto;
-      background: rgba(25,25,25,0.95);
+      background: rgba(28, 28, 28, 0.95);
       color: #fff;
       padding: 25px;
       box-sizing: border-box;
       font-size: 15px;
-      line-height: 1.5;
-      border-radius: 8px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+      line-height: 1.6;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(120, 120, 120, 0.2);
     }
     
     #response-box::-webkit-scrollbar {
@@ -81,36 +86,39 @@
     }
     
     #response-box::-webkit-scrollbar-track {
-      background: rgba(0,0,0,0.1);
+      background: rgba(0, 0, 0, 0.1);
       border-radius: 4px;
     }
     
     #response-box::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.3);
+      background: rgba(255, 255, 255, 0.2);
       border-radius: 4px;
     }
     
     pre {
-      background: rgba(40,40,40,0.95);
+      background: rgba(35, 35, 35, 0.95);
       color: #f0f0f0;
-      padding: 15px;
-      border-radius: 6px;
+      padding: 16px;
+      border-radius: 8px;
       white-space: pre;
       overflow-x: auto;
-      margin: 1em 0;
-      border: 1px solid rgba(255,255,255,0.1);
+      margin: 1.2em 0;
+      border: 1px solid rgba(100, 100, 100, 0.2);
+      font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+      font-size: 0.9em;
     }
     
     code {
-      font-family: 'Fira Code', Consolas, 'Courier New', monospace;
-      background: rgba(60,60,60,0.95);
+      font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+      background: rgba(60, 60, 60, 0.95);
       color: #fff;
-      padding: 2px 6px;
+      padding: 3px 6px;
       border-radius: 4px;
+      font-size: 0.9em;
     }
     
     #response-box p {
-      margin: 0 0 10px 0;
+      margin: 0 0 12px 0;
     }
     
     #response-box p:last-child {
@@ -118,21 +126,21 @@
     }
     
     .error-message {
-      color: #ff4444;
-      background: rgba(255,68,68,0.1);
-      padding: 15px;
-      border-radius: 6px;
-      border-left: 4px solid #ff4444;
-      margin: 10px 0;
+      color: #ff4d4d;
+      background: rgba(255, 77, 77, 0.08);
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid #ff4d4d;
+      margin: 15px 0;
     }
     
     .warning-message {
-      color: #ffbb33;
-      background: rgba(255,187,51,0.1);
-      padding: 15px;
-      border-radius: 6px;
-      border-left: 4px solid #ffbb33;
-      margin: 10px 0;
+      color: #ffcc33;
+      background: rgba(255, 204, 51, 0.08);
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid #ffcc33;
+      margin: 15px 0;
     }
     
     /* Loading indicator */
@@ -147,9 +155,9 @@
     .spinner {
       width: 50px;
       height: 50px;
-      border: 5px solid rgba(255,255,255,0.3);
+      border: 4px solid rgba(255, 255, 255, 0.1);
       border-radius: 50%;
-      border-top-color: #fff;
+      border-top-color: #5e9eff;
       animation: spin 1s ease-in-out infinite;
       margin-bottom: 20px;
     }
@@ -160,12 +168,12 @@
     
     .model-badge {
       position: fixed;
-      bottom: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.7);
+      bottom: 12px;
+      right: 12px;
+      background: rgba(30, 30, 30, 0.8);
       color: #fff;
-      padding: 5px 10px;
-      border-radius: 4px;
+      padding: 6px 12px;
+      border-radius: 6px;
       font-size: 12px;
       user-select: none;
       max-width: 300px;
@@ -173,23 +181,25 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       z-index: 8000;
+      border: 1px solid rgba(100, 100, 100, 0.3);
     }
     
     .screenshot-notification {
       position: fixed;
-      bottom: 40px;
-      right: 10px;
-      background: rgba(0, 150, 0, 0.85);
+      bottom: 50px;
+      right: 12px;
+      background: rgba(20, 130, 20, 0.9);
       color: #fff;
-      padding: 10px 15px;
-      border-radius: 4px;
+      padding: 12px 16px;
+      border-radius: 8px;
       font-size: 13px;
       z-index: 9000;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.3s ease, transform 0.3s ease;
       max-width: 400px;
+      border: 1px solid rgba(120, 180, 120, 0.3);
     }
     
     .screenshot-notification.visible {
@@ -207,35 +217,304 @@
     #notification {
       position: fixed;
       bottom: 20px;
-      right: 20px;
-      padding: 12px 20px;
+      left: 20px;
+      padding: 14px 20px;
       background-color: #4CAF50;
       color: white;
-      border-radius: 4px;
+      border-radius: 8px;
       font-size: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
       z-index: 1000;
       opacity: 0;
       transition: opacity 0.3s ease;
       max-width: 400px;
       word-break: break-word;
+      border: 1px solid rgba(120, 180, 120, 0.3);
     }
     
     #notification.warning {
       background-color: #FF9800;
+      border: 1px solid rgba(180, 130, 20, 0.3);
     }
     
     #notification.error {
       background-color: #F44336;
+      border: 1px solid rgba(180, 70, 70, 0.3);
     }
     
     #notification.visible {
       opacity: 1;
     }
+    
+    /* Drag handle for window movement */
+    #drag-handle {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 32px;
+      background: linear-gradient(to bottom, rgba(50, 50, 50, 0.95), rgba(40, 40, 40, 0.85));
+      -webkit-app-region: drag; /* Makes the area draggable in Electron */
+      z-index: 8500;
+      cursor: move;
+      border-radius: 12px 12px 0 0; /* Rounded top corners */
+      border-bottom: 1px solid rgba(100, 100, 100, 0.2); /* Subtle separator */
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+    
+    /* App title in drag handle */
+    #app-title {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      pointer-events: none; /* Allow click-through */
+      user-select: none; /* No selection */
+      display: flex;
+      align-items: center;
+    }
+    
+    /* Window control buttons in the drag handle */
+    .window-controls {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .window-control {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      -webkit-app-region: no-drag; /* Make buttons clickable */
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    
+    .window-control:hover {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+    
+    .close-btn {
+      background-color: #ff5f57;
+      border: 1px solid rgba(200, 0, 0, 0.2);
+    }
+    
+    .minimize-btn {
+      background-color: #ffbd2e;
+      border: 1px solid rgba(200, 150, 0, 0.2);
+    }
+    
+    /* App icon */
+    #app-icon {
+      margin-right: 8px;
+      width: 16px;
+      height: 16px;
+      opacity: 0.9;
+    }
+    
+    /* Mode indicator */
+    .mode-indicator {
+      position: fixed;
+      top: 40px;
+      left: 12px;
+      background: rgba(60, 120, 200, 0.9);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      z-index: 9000;
+      user-select: none;
+      opacity: 0.9;
+      border: 1px solid rgba(80, 140, 220, 0.3);
+    }
+    
+    /* Keyboard shortcut help */
+    .shortcut-help {
+      position: fixed;
+      bottom: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(30, 30, 30, 0.95);
+      border: 1px solid rgba(100, 100, 100, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      color: white;
+      font-size: 13px;
+      z-index: 9500;
+      max-width: 500px;
+      display: none;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    
+    .shortcut-help.visible {
+      display: block;
+    }
+    
+    .shortcut-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 16px;
+    }
+    
+    .shortcut-key {
+      background: rgba(50, 50, 50, 0.7);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(100, 100, 100, 0.3);
+      display: inline-block;
+      text-align: center;
+      min-width: 80px;
+    }
+    
+    .shortcut-description {
+      padding: 2px 0;
+    }
+    
+    .shortcut-help h3 {
+      margin: 0 0 10px 0;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+    }
+    
+    /* For making the window invisible during screen sharing */
+    body.invisible-mode {
+      opacity: 0.05;
+      transition: opacity 0.3s ease;
+    }
+    
+    body.invisible-mode:hover {
+      opacity: 0.8;
+    }
+    
+    /* Floating Toolbar */
+    #floating-toolbar {
+      position: fixed;
+      top: 42px;
+      right: 10px;
+      background: rgba(40, 40, 40, 0.85);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 9000;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(100, 100, 100, 0.3);
+      user-select: none;
+      transition: width 0.3s ease;
+      width: 36px;
+      overflow: hidden;
+    }
+    
+    #floating-toolbar:hover {
+      width: 150px;
+    }
+    
+    .toolbar-button {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(50, 50, 50, 0.7);
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 12px;
+      white-space: nowrap;
+      width: 100%;
+    }
+    
+    .toolbar-button:hover {
+      background: rgba(70, 70, 70, 0.9);
+    }
+    
+    .toolbar-button .icon {
+      font-size: 14px;
+      margin-right: 8px;
+      min-width: 16px;
+      text-align: center;
+    }
+    
+    .toolbar-button .label {
+      flex: 1;
+      text-align: left;
+      margin-right: 8px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    
+    .toolbar-button .shortcut {
+      font-size: 10px;
+      opacity: 0;
+      background: rgba(30, 30, 30, 0.7);
+      padding: 2px 5px;
+      border-radius: 4px;
+      min-width: 20px;
+      text-align: center;
+      transition: opacity 0.2s;
+    }
+    
+    #floating-toolbar:hover .toolbar-button .label,
+    #floating-toolbar:hover .toolbar-button .shortcut {
+      opacity: 1;
+    }
+    
+    .toolbar-help-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: rgba(50, 90, 150, 0.8);
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin: 0 auto;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
+  <!-- Drag handle for moving the window -->
+  <div id="drag-handle" />
+  
+  <div id="floating-toolbar">
+    <div class="toolbar-button" id="btn-toggle-visibility" title="Show/Hide (Cmd/Ctrl+B)">
+      <span class="icon">👁️</span>
+      <span class="label">Show/Hide</span>
+      <span class="shortcut">⌘ B</span>
+    </div>
+    
+    <div class="toolbar-button" id="btn-process" title="Process Screenshots (Cmd/Ctrl+Enter)">
+      <span class="icon">📸</span>
+      <span class="label">Process</span>
+      <span class="shortcut">⌘ ↵</span>
+    </div>
+    
+    <div class="toolbar-button" id="btn-reset" title="Reset (Cmd/Ctrl+R)">
+      <span class="icon">🔄</span>
+      <span class="label">Reset</span>
+      <span class="shortcut">⌘ R</span>
+    </div>
+    
+    <div class="toolbar-button" id="btn-settings" title="Settings (Cmd/Ctrl+,)">
+      <span class="icon">⚙️</span>
+      <span class="shortcut">⌘ ,</span>
+    </div>
+    
+    <div class="toolbar-help-button" id="btn-help" title="Show Keyboard Shortcuts">
+      <span class="icon">?</span>
+    </div>
+  </div>
+  
   <div id="instruction-banner"></div>
+  
   <div id="response-overlay">
     <div id="response-box">
       <div id="loading-content" class="loading-container" style="display: none;">
@@ -249,249 +528,353 @@
   <div id="model-badge" class="model-badge"></div>
 
   <div id="notification"></div>
+  
+  <div id="shortcut-help" class="shortcut-help">
+    <h3>Keyboard Shortcuts</h3>
+    <div class="shortcut-grid">
+      <div class="shortcut-key" id="key-toggle-visibility"></div>
+      <div class="shortcut-description">Toggle window visibility</div>
+      
+      <div class="shortcut-key" id="key-process"></div>
+      <div class="shortcut-description">Process screenshots with AI</div>
+      
+      <div class="shortcut-key" id="key-reset"></div>
+      <div class="shortcut-description">Reset everything</div>
+      
+      <div class="shortcut-key" id="key-quit"></div>
+      <div class="shortcut-description">Quit application</div>
+    </div>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
+    const remark = require('remark');
+    const remarkGfm = require('remark-gfm');
+    const remarkHtml = require('remark-html');
     
     // Detect platform for correct key labels
     const isMac = navigator.platform.includes('Mac');
     const modifierKey = isMac ? 'Command' : 'Ctrl';
     
-    marked.setOptions({
-      sanitize: true,
-      breaks: true,
-      gfm: true
+    // Application state
+    let isWindowVisible = true;
+    let isShortcutHelpVisible = false;
+    
+    // Setup window control buttons
+    document.getElementById('minimize-btn').addEventListener('click', () => {
+      ipcRenderer.send('minimize-window');
     });
     
-    const showOverlay = () => {
-      const overlay = document.getElementById('response-overlay');
-      overlay.classList.add('visible');
-    };
-    
-    const hideOverlay = () => {
-      const overlay = document.getElementById('response-overlay');
-      overlay.classList.remove('visible');
-    };
-    
-    const updateBanner = (text, show = true) => {
-      const banner = document.getElementById('instruction-banner');
-      banner.style.opacity = show ? '1' : '0';
-      if (text) banner.textContent = text;
-    };
-    
-    // Get model badge element
-    const modelBadge = document.getElementById('model-badge');
-    const loadingContent = document.getElementById('loading-content');
-    const resultContent = document.getElementById('result-content');
-    
-    // Update the model name display
-    const updateModelDisplay = async () => {
-      try {
-        const settings = await ipcRenderer.invoke('get-current-settings');
-        let provider;
-        
-        if (settings.aiProvider === 'openai') {
-          provider = 'OpenAI';
-        } else if (settings.aiProvider === 'gemini') {
-          provider = 'Gemini';
-        } else {
-          provider = 'Ollama';
-        }
-        
-        modelBadge.textContent = `${provider}: ${settings.currentModel}`;
-      } catch (error) {
-        console.error('Error getting current model:', error);
-      }
-    };
-    
-    // Call once at startup
-    updateModelDisplay();
-    
-    const handlers = {
-      'analysis-result': (event, result) => {
-        loadingContent.style.display = 'none';
-        resultContent.style.display = 'block';
-        resultContent.innerHTML = marked.parse(result);
-        showOverlay();
-        updateBanner(`${modifierKey}+Shift+R: Repeat process`);
-      },
-      
-      'stream-start': () => {
-        resultContent.style.display = 'block';
-        resultContent.innerHTML = '';
-        showOverlay();
-      },
-      
-      'stream-chunk': (event, chunk) => {
-        resultContent.innerHTML = marked.parse(resultContent.textContent + chunk);
-        // Scroll to bottom to show latest content
-        resultContent.scrollTop = resultContent.scrollHeight;
-      },
-      
-      'stream-end': () => {
-        updateBanner(`${modifierKey}+Shift+R: Repeat process`);
-      },
-      
-      'error': (event, error) => {
-        loadingContent.style.display = 'none';
-        resultContent.style.display = 'block';
-        showOverlay();
-        resultContent.innerHTML = 
-          `<div class="error-message">
-            <strong>Error:</strong> ${error}
-            <br><small>Press ${modifierKey}+Shift+R to try again</small>
-          </div>`;
-      },
-      
-      'model-not-found': (event, data) => {
-        loadingContent.style.display = 'none';
-        resultContent.style.display = 'block';
-        showOverlay();
-        
-        let suggestionsHtml = '';
-        if (data.suggestedModels && data.suggestedModels.length > 0) {
-          suggestionsHtml = `
-            <div style="margin-top: 15px;">
-              <strong>Available vision models:</strong>
-              <ul>
-                ${data.suggestedModels.map(model => `<li>${model}</li>`).join('')}
-              </ul>
-              <p>
-                You can pull these models with:
-                <pre>ollama pull ${data.suggestedModels[0]}</pre>
-                or select an existing model via ${modifierKey}+Shift+M
-              </p>
-            </div>
-          `;
-        }
-        
-        resultContent.innerHTML = 
-          `<div class="error-message">
-            <strong>Model not found:</strong> ${data.model}
-            <p>${data.error}</p>
-            ${suggestionsHtml}
-          </div>`;
-      },
-      
-      'warning': (event, warning) => {
-        // Don't hide loading, just show the warning alongside
-        if (resultContent.innerHTML === '') {
-          resultContent.style.display = 'block';
-          showOverlay();
-        }
-        
-        // Add warning to the top of the result content
-        const warningElement = document.createElement('div');
-        warningElement.className = 'warning-message';
-        warningElement.innerHTML = `<strong>Warning:</strong> ${warning}`;
-        
-        // Insert at the top
-        resultContent.insertBefore(warningElement, resultContent.firstChild);
-      },
-      
-      'update-instruction': (event, instruction) => {
-        updateBanner(instruction, true);
-      },
-      
-      'hide-instruction': () => {
-        updateBanner('', false);
-      },
-      
-      'clear-result': () => {
-        resultContent.innerHTML = "";
-        hideOverlay();
-      },
-      
-      'loading': (event, isLoading) => {
-        if (isLoading) {
-          showOverlay();
-          resultContent.style.display = 'none';
-          loadingContent.style.display = 'flex';
-        } else {
-          loadingContent.style.display = 'none';
-        }
-      },
-      
-      'model-changed': () => {
-        updateModelDisplay();
-      },
-      
-      'screenshot-saved': (event, data) => {
-        // Create a notification element
-        const notification = document.createElement('div');
-        notification.className = 'screenshot-notification';
-        
-        let message = `<strong>${data.isArea ? 'Area Screenshot' : 'Screenshot'} Saved</strong>`;
-        if (data.dimensions) {
-          message += ` (${data.dimensions})`;
-        }
-        message += `<div class="file-path">${data.path}</div>`;
-        
-        notification.innerHTML = message;
-        document.body.appendChild(notification);
-        
-        // Show the notification with animation
-        setTimeout(() => {
-          notification.classList.add('visible');
-        }, 100);
-        
-        // Hide and remove after 5 seconds
-        setTimeout(() => {
-          notification.classList.remove('visible');
-          setTimeout(() => {
-            if (notification.parentNode) {
-              document.body.removeChild(notification);
-            }
-          }, 300); // Wait for transition to finish
-        }, 5000);
-      }
-    };
-    
-    Object.entries(handlers).forEach(([channel, handler]) => {
-      ipcRenderer.on(channel, handler);
+    document.getElementById('close-btn').addEventListener('click', () => {
+      ipcRenderer.send('close-window');
     });
     
-    window.addEventListener('unload', () => {
-      Object.keys(handlers).forEach(channel => {
-        ipcRenderer.removeAllListeners(channel);
+    // Setup remark processor with GitHub Flavored Markdown support
+    const processor = remark()
+      .use(remarkGfm)
+      .use(remarkHtml, {
+        sanitize: true
       });
-    });
     
-    updateBanner(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models | ${modifierKey}+Shift+Q: Close`);
+    // Set the shortcut key labels
+    const shortcutKeys = {
+      toggleVisibility: `${modifierKey}+B`,
+      process: `${modifierKey}+Enter`,
+      reset: `${modifierKey}+R`,
+      quit: `${modifierKey}+Q`
+    };
     
-    function showNotification(message, type = 'success') {
-      const notification = document.getElementById('notification');
-      
-      // Reset any existing classes
-      notification.classList.remove('success', 'warning', 'error', 'visible');
-      
-      // Set the message and type
-      notification.textContent = message;
-      notification.classList.add(type);
-      notification.classList.add('visible');
-      
-      // Hide after 5 seconds (for success/warning) or 8 seconds (for errors)
-      const timeout = type === 'error' ? 8000 : 5000;
-      setTimeout(() => {
-        notification.classList.remove('visible');
-      }, timeout);
+    document.getElementById('key-toggle-visibility').textContent = shortcutKeys.toggleVisibility;
+    document.getElementById('key-process').textContent = shortcutKeys.process;
+    document.getElementById('key-reset').textContent = shortcutKeys.reset;
+    document.getElementById('key-quit').textContent = shortcutKeys.quit;
+    
+    // Toggle shortcut help visibility
+    function toggleShortcutHelp() {
+      const helpPanel = document.getElementById('shortcut-help');
+      isShortcutHelpVisible = !isShortcutHelpVisible;
+      if (isShortcutHelpVisible) {
+        helpPanel.classList.add('visible');
+      } else {
+        helpPanel.classList.remove('visible');
+      }
     }
     
-    // Event listeners for notification types
-    ipcRenderer.on("screenshot-saved", (event, data) => {
-      const { path, isArea, dimensions } = data;
-      const typeText = isArea ? "Area screenshot" : "Full screenshot";
-      const dimensionsText = dimensions ? ` (${dimensions.width}x${dimensions.height})` : '';
-      showNotification(`${typeText}${dimensionsText} saved: ${path}`);
+    // Show shortcut help on press '?'
+    document.addEventListener('keydown', (e) => {
+      // Show shortcuts help when pressing "?"
+      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        toggleShortcutHelp();
+      } else if (isShortcutHelpVisible) {
+        // Hide on any other key press
+        toggleShortcutHelp();
+      }
     });
     
-    ipcRenderer.on("warning", (event, message) => {
+    // Toggle window visibility
+    function toggleWindowVisibility() {
+      isWindowVisible = !isWindowVisible;
+      document.body.classList.toggle('invisible-mode', !isWindowVisible);
+      
+      // Notify main process
+      ipcRenderer.send('toggle-visibility', isWindowVisible);
+      
+      showTemporaryNotification(isWindowVisible ? 'Window visible' : 'Window hidden - hover to see');
+    }
+    
+    // Listen for main process messages
+    ipcRenderer.on('update-instruction', (event, instruction) => {
+      const banner = document.getElementById('instruction-banner');
+      banner.textContent = instruction;
+      banner.style.opacity = '1';
+    });
+    
+    ipcRenderer.on('hide-instruction', () => {
+      const banner = document.getElementById('instruction-banner');
+      banner.style.opacity = '0';
+    });
+    
+    ipcRenderer.on('notification', (event, data) => {
+      showNotification(data.body, data.title.toLowerCase().includes('error') ? 'error' : null);
+    });
+    
+    ipcRenderer.on('warning', (event, message) => {
       showNotification(message, 'warning');
     });
     
-    ipcRenderer.on("error", (event, message) => {
+    ipcRenderer.on('error', (event, message) => {
       showNotification(message, 'error');
+    });
+    
+    ipcRenderer.on('loading', (event, isLoading) => {
+      document.getElementById('loading-content').style.display = isLoading ? 'flex' : 'none';
+      document.getElementById('result-content').style.display = isLoading ? 'none' : 'block';
+      
+      const overlay = document.getElementById('response-overlay');
+      if (isLoading) {
+        overlay.classList.add('visible');
+      }
+    });
+    
+    ipcRenderer.on('analysis-result', async (event, markdown) => {
+      const html = await processMarkdown(markdown);
+      document.getElementById('result-content').innerHTML = html;
+      document.getElementById('response-overlay').classList.add('visible');
+    });
+    
+    // Setup for streaming results
+    ipcRenderer.on('stream-start', () => {
+      document.getElementById('result-content').innerHTML = '';
+      document.getElementById('response-overlay').classList.add('visible');
+    });
+    
+    ipcRenderer.on('stream-chunk', async (event, chunk) => {
+      // Append the new text
+      const currentContent = document.getElementById('result-content').innerHTML;
+      const chunkHtml = await processMarkdown(chunk);
+      document.getElementById('result-content').innerHTML = currentContent + chunkHtml;
+    });
+    
+    ipcRenderer.on('stream-update', async (event, fullText) => {
+      // Replace the content with the full updated text (better for Gemini streaming)
+      const html = await processMarkdown(fullText);
+      document.getElementById('result-content').innerHTML = html;
+    });
+    
+    ipcRenderer.on('stream-end', () => {
+      // Streaming is complete, nothing special to do here
+    });
+    
+    ipcRenderer.on('clear-result', () => {
+      document.getElementById('result-content').innerHTML = '';
+      document.getElementById('response-overlay').classList.remove('visible');
+    });
+    
+    // Update AI provider/model badge display
+    ipcRenderer.on('model-changed', () => {
+      updateModelBadge();
+    });
+    
+    // Handle screen sharing detection
+    ipcRenderer.on('screen-sharing-detected', () => {
+      // Make the window nearly invisible
+      isWindowVisible = false;
+      document.body.classList.add('invisible-mode');
+      
+      // Show temporary notification
+      showTemporaryNotification('Screen sharing detected - window hidden. Press ' + shortcutKeys.toggleVisibility + ' to show.', 'warning');
+    });
+    
+    // Screenshot notification
+    ipcRenderer.on('screenshot-saved', (event, data) => {
+      const { path, dimensions, isArea } = data;
+      const notification = document.createElement('div');
+      notification.className = 'screenshot-notification';
+      
+      notification.innerHTML = `
+        <div><strong>${isArea ? 'Area' : 'Screen'} Screenshot Saved</strong></div>
+        ${dimensions ? `<div>Size: ${dimensions.width}×${dimensions.height}px</div>` : ''}
+        <div class="file-path">${path}</div>
+      `;
+      
+      document.body.appendChild(notification);
+      
+      // Animate in
+      setTimeout(() => {
+        notification.classList.add('visible');
+      }, 10);
+      
+      // Remove after a few seconds
+      setTimeout(() => {
+        notification.classList.remove('visible');
+        setTimeout(() => {
+          notification.remove();
+        }, 300);
+      }, 5000);
+    });
+    
+    // Update the model badge with current settings
+    async function updateModelBadge() {
+      try {
+        const settings = await ipcRenderer.invoke('get-current-settings');
+        const badge = document.getElementById('model-badge');
+        
+        let providerName = '';
+        switch(settings.aiProvider) {
+          case 'openai': providerName = 'OpenAI'; break;
+          case 'ollama': providerName = 'Ollama'; break;
+          case 'gemini': providerName = 'Gemini'; break;
+          default: providerName = settings.aiProvider;
+        }
+        
+        badge.textContent = `${providerName}: ${settings.currentModel}`;
+      } catch (error) {
+        console.error('Error updating model badge:', error);
+      }
+    }
+    
+    // Process markdown text to HTML
+    async function processMarkdown(text) {
+      return new Promise((resolve, reject) => {
+        processor.process(text, (err, file) => {
+          if (err) {
+            console.error('Error processing markdown:', err);
+            reject(err);
+            return;
+          }
+          resolve(String(file));
+        });
+      });
+    }
+    
+    // Show notification
+    function showNotification(message, type = null) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      
+      // Reset classes
+      notification.className = '';
+      notification.classList.add('notification');
+      
+      if (type) {
+        notification.classList.add(type);
+      }
+      
+      notification.classList.add('visible');
+      
+      // Hide after 5 seconds
+      setTimeout(() => {
+        notification.classList.remove('visible');
+      }, 5000);
+    }
+    
+    // Show temporary notification that disappears faster
+    function showTemporaryNotification(message, type = null) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      
+      // Reset classes
+      notification.className = '';
+      notification.classList.add('notification');
+      
+      if (type) {
+        notification.classList.add(type);
+      }
+      
+      notification.classList.add('visible');
+      
+      // Hide after 2 seconds (faster than regular notifications)
+      setTimeout(() => {
+        notification.classList.remove('visible');
+      }, 2000);
+    }
+    
+    // Register for keyboard events to handle shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Allow event to propagate to text fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      // Don't process if some modifier keys are pressed (to avoid conflicts)
+      if (e.altKey) return;
+      
+      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
+      
+      // If Ctrl/Cmd key is pressed
+      if (ctrlOrCmd) {
+        switch (e.key) {
+          case 'b': // Toggle visibility
+            toggleWindowVisibility();
+            e.preventDefault();
+            break;
+            
+          case 'Enter': // Process screenshots
+            ipcRenderer.send('process-screenshots');
+            e.preventDefault();
+            break;
+            
+          case 'r': // Reset
+            ipcRenderer.send('reset-process');
+            e.preventDefault();
+            break;
+            
+          case 'q': // Quit
+            ipcRenderer.send('quit-app');
+            e.preventDefault();
+            break;
+        }
+      }
+    });
+    
+    // Initialize
+    updateModelBadge();
+    
+    // Setup toolbar button handlers
+    document.getElementById('btn-toggle-visibility').addEventListener('click', () => {
+      toggleWindowVisibility();
+    });
+    
+    document.getElementById('btn-process').addEventListener('click', () => {
+      ipcRenderer.send('process-screenshots');
+    });
+    
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      ipcRenderer.send('reset-process');
+    });
+    
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      ipcRenderer.send('open-settings');
+    });
+    
+    document.getElementById('btn-help').addEventListener('click', () => {
+      toggleShortcutHelp();
+    });
+    
+    // Update shortcut labels based on platform
+    document.querySelectorAll('.shortcut').forEach(el => {
+      const text = el.textContent;
+      el.textContent = text.replace('⌘', isMac ? '⌘' : 'Ctrl');
     });
   </script>
 </body>

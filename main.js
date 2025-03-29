@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, dialog, ipcMain, desktopCapturer } = require("electron");
+const { app, BrowserWindow, globalShortcut, dialog, ipcMain, desktopCapturer, screen, systemPreferences, Menu, shell } = require("electron");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
 const fs = require("fs");
@@ -12,9 +12,12 @@ const isMac = process.platform === "darwin";
 const modifierKey = isMac ? "Command" : "Control";
 
 // Default values - use IPv4 address explicitly for Ollama
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ? process.env.OLLAMA_BASE_URL.replace('localhost', '127.0.0.1') : "http://127.0.0.1:11434";
+let OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ? process.env.OLLAMA_BASE_URL.replace('localhost', '127.0.0.1') : "http://127.0.0.1:11434";
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+
+// Application modes
+let isWindowVisible = true;
 
 // Configure axios to use IPv4
 axios.defaults.family = 4;
@@ -525,8 +528,12 @@ async function generateWithGemini(messages, model, streaming = false) {
         contentParts.push({ text: message.text });
       } else if (message.type === "image_url") {
         const imageUrl = message.image_url.url;
-        // Extract base64 data from data URL
+        // Extract base64 data from data URL - Gemini requires just the base64 data without the prefix
         const base64Data = imageUrl.split(',')[1];
+        if (!base64Data) {
+          console.error("Invalid base64 data in image:", imageUrl.substring(0, 50) + "...");
+          continue; // Skip this image
+        }
         contentParts.push({
           inlineData: {
             data: base64Data,
@@ -610,208 +617,6 @@ async function generateWithGemini(messages, model, streaming = false) {
 function updateInstruction(instruction) {
   if (mainWindow?.webContents) {
     mainWindow.webContents.send("update-instruction", instruction);
-  }
-}
-
-function hideInstruction() {
-  if (mainWindow?.webContents) {
-    mainWindow.webContents.send("hide-instruction");
-  }
-}
-
-/**
- * Enhanced screenshot functionality that can capture specific windows
- */
-async function captureApplicationWindow() {
-  try {
-    console.log("Listing available windows for capture...");
-    
-    // Add a timeout to prevent hanging if desktopCapturer gets stuck
-    const sourcesPromise = new Promise(async (resolve, reject) => {
-      try {
-        // Set a timeout to prevent the app from getting stuck
-        const timeoutId = setTimeout(() => {
-          console.log("desktopCapturer timed out, falling back to regular screenshot");
-          resolve([]);
-        }, 3000); // 3 second timeout
-        
-        // Get all available sources including windows and screens
-        const sources = await desktopCapturer.getSources({ 
-          types: ['window', 'screen'],
-          thumbnailSize: { width: 150, height: 150 } // Small thumbnails to show in a picker
-        });
-        
-        // Clear the timeout since we got a result
-        clearTimeout(timeoutId);
-        resolve(sources);
-      } catch (error) {
-        console.error("Error getting sources:", error);
-        reject(error);
-      }
-    });
-    
-    // Wait for sources with a fallback
-    let sources;
-    try {
-      sources = await sourcesPromise;
-    } catch (error) {
-      console.error("Failed to get sources:", error);
-      console.log("Falling back to regular screenshot due to source listing error");
-      return await captureScreenshot();
-    }
-    
-    // If there are no sources or only one source (just the screen), fall back to regular screenshot
-    if (!sources || sources.length <= 1) {
-      console.log("Only found screen source or no sources, falling back to regular screenshot");
-      return await captureScreenshot();
-    }
-    
-    // Create a window to display the available sources for selection
-    const sourcePickerWindow = new BrowserWindow({
-      width: 600,
-      height: 400,
-      frame: true,
-      resizable: true,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
-      }
-    });
-    
-    // Load a custom HTML file for source selection
-    try {
-      await sourcePickerWindow.loadFile('source-picker.html');
-    } catch (loadError) {
-      console.error("Error loading source picker:", loadError);
-      sourcePickerWindow.close();
-      return await captureScreenshot();
-    }
-    
-    // Pass the sources to the renderer
-    sourcePickerWindow.webContents.send('SET_SOURCES', sources);
-    
-    // Wait for user to select a source
-    return new Promise((resolve, reject) => {
-      ipcMain.once('SOURCE_SELECTED', async (event, sourceId) => {
-        try {
-          if (!sourceId) {
-            sourcePickerWindow.close();
-            console.log("No source selected, falling back to regular screenshot");
-            const fallbackImage = await captureScreenshot();
-            resolve(fallbackImage);
-            return;
-          }
-          
-          console.log(`Selected source: ${sourceId}`);
-          sourcePickerWindow.close();
-          
-          // Now capture the selected source
-          const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-          const imagePath = path.join(app.getPath("pictures"), `app-screenshot-${timestamp}.png`);
-          
-          // Create a temporary window to capture the source
-          const captureWindow = new BrowserWindow({
-            width: 400,
-            height: 300,
-            show: false,
-            webPreferences: {
-              nodeIntegration: true,
-              contextIsolation: false
-            }
-          });
-          
-          await captureWindow.loadFile('capture-helper.html');
-          
-          // Add a timeout to the capture process as well
-          const captureTimeoutPromise = new Promise((_, timeoutReject) => {
-            setTimeout(() => {
-              timeoutReject(new Error("Window capture timed out"));
-            }, 5000); // 5 second timeout
-          });
-          
-          // Create a promise to wait for the capture result
-          const capturePromise = new Promise((resolveCapture, rejectCapture) => {
-            ipcMain.once('window-captured', (event, result) => {
-              if (result.success) {
-                resolveCapture(result.base64Image);
-              } else {
-                rejectCapture(new Error(result.error || "Failed to capture window"));
-              }
-              captureWindow.close();
-            });
-          });
-          
-          // Tell the capture-helper to take the window screenshot
-          captureWindow.webContents.send('capture-window', {
-            sourceId: sourceId,
-            imagePath: imagePath
-          });
-          
-          try {
-            // Wait for the capture to complete or timeout
-            const base64Image = await Promise.race([
-              capturePromise,
-              captureTimeoutPromise
-            ]);
-            
-            // Get image dimensions
-            const dimensions = { width: 0, height: 0 };
-            try {
-              const sizeOf = require('image-size');
-              const imageDimensions = sizeOf(imagePath);
-              dimensions.width = imageDimensions.width;
-              dimensions.height = imageDimensions.height;
-            } catch (dimError) {
-              console.error("Error getting image dimensions:", dimError);
-            }
-            
-            // Notify about saved screenshot
-            mainWindow.webContents.send("screenshot-saved", {
-              path: imagePath,
-              isArea: false,
-              dimensions: dimensions
-            });
-            
-            console.log(`Application window screenshot saved to ${imagePath}`);
-            resolve(base64Image);
-          } catch (captureError) {
-            console.error("Error capturing application window:", captureError);
-            captureWindow.close();
-            // Fall back to regular screenshot
-            const fallbackImage = await captureScreenshot();
-            resolve(fallbackImage);
-          }
-        } catch (error) {
-          console.error("Error processing selected source:", error);
-          sourcePickerWindow.close();
-          // Fall back to regular screenshot
-          const fallbackImage = await captureScreenshot();
-          resolve(fallbackImage);
-        }
-      });
-      
-      ipcMain.once('SOURCE_SELECTION_CANCELLED', async () => {
-        console.log("Source selection cancelled, falling back to regular screenshot");
-        sourcePickerWindow.close();
-        const fallbackImage = await captureScreenshot();
-        resolve(fallbackImage);
-      });
-      
-      sourcePickerWindow.on('closed', async () => {
-        // If closed without selecting a source
-        console.log("Source picker window closed, falling back to regular screenshot");
-        try {
-          const fallbackImage = await captureScreenshot();
-          resolve(fallbackImage);
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
-  } catch (error) {
-    console.error("Error in captureApplicationWindow:", error);
-    // Fall back to regular screenshot
-    return await captureScreenshot();
   }
 }
 
@@ -955,11 +760,10 @@ async function captureWindowScreenshot() {
     }
     
     // Show instruction in notification
-    const notification = new Notification({
+    mainWindow.webContents.send("notification", {
       title: 'Screenshot',
       body: 'Please click on the window you want to capture.'
     });
-    notification.show();
     
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
     const imagePath = path.join(app.getPath("pictures"), `window-screenshot-${timestamp}.png`);
@@ -1207,7 +1011,7 @@ async function captureAreaScreenshot() {
 
 async function processScreenshots(useStreaming = false) {
   try {
-    console.log("Starting processScreenshots with provider:", aiProvider, "and model:", currentModel);
+    console.log(`Starting processScreenshots with provider: ${aiProvider}, model: ${currentModel}`);
     
     // Show loading state
     mainWindow.webContents.send("loading", true);
@@ -1239,20 +1043,44 @@ async function processScreenshots(useStreaming = false) {
       }
     }
 
-    // Create a better prompt based on the number of screenshots
+    // Create an improved prompt based on the number of screenshots
     let promptText = "";
     if (screenshots.length === 1) {
-      promptText = `The screenshot shows a programming problem or question. 
-Please analyze it carefully and provide a detailed solution with explanation. 
-If there's code involved, provide the complete implementation with clear comments. 
-If it's a theoretical question, provide a comprehensive answer.
-Please highlight any key concepts or algorithms used in the solution.`;
+        promptText = `The screenshot shows a programming problem or question. 
+I need you to provide the best possible solution with excellent performance and readability.
+
+Guidelines:
+1. Start with a clear understanding of the problem before diving into code.
+2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
+3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
+4. Structure your code with clean architecture principles.
+5. Include robust error handling and edge case considerations.
+6. If multiple solutions exist, present the optimal approach and explain your decision.
+
+Format your response in Markdown with well-organized sections:
+- Problem Analysis: Brief overview of what you understand the problem to be
+- Approach: Your strategy for solving it
+- Solution: Well-commented, complete implementation with clean syntax
+- Complexity Analysis: Time and space complexity breakdown
+- Optimizations: Any further improvements that could be made`;
     } else {
-      promptText = `These ${screenshots.length} screenshots show a multi-part programming problem or question. 
-Please analyze all parts carefully and provide a complete solution that addresses all aspects.
-If there's code involved, provide the full implementation with clear comments.
-Break down your response into sections if needed to address each part of the problem.
-Please highlight any key concepts or algorithms used in the solution.`;
+        promptText = `These ${screenshots.length} screenshots show a multi-part programming problem. 
+I need you to provide the best possible solution with excellent performance and readability.
+
+Guidelines:
+1. Start with a clear understanding of the full problem scope across all screenshots.
+2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
+3. Explain any key concepts, patterns, or algorithms used and why they're appropriate.
+4. Structure your code with clean architecture principles.
+5. Include robust error handling and edge case considerations.
+6. Ensure your solution addresses all parts of the problem comprehensively.
+
+Format your response in Markdown with well-organized sections:
+- Problem Analysis: Brief overview of what you understand the problem to be
+- Approach: Your strategy for solving the multi-part problem
+- Solution: Well-commented, complete implementation with clean syntax
+- Complexity Analysis: Time and space complexity breakdown
+- Optimizations: Any further improvements that could be made`;
     }
 
     // Build message with text + each screenshot
@@ -1260,9 +1088,11 @@ Please highlight any key concepts or algorithms used in the solution.`;
     console.log(`Processing ${screenshots.length} screenshots`);
     
     for (const img of screenshots) {
+      // Check if the image already has the data URL prefix or not
+      const imageData = img.startsWith('data:image/') ? img : `data:image/png;base64,${img}`;
       messages.push({
         type: "image_url",
-        image_url: { url: `data:image/png;base64,${img}` },
+        image_url: { url: imageData },
       });
     }
 
@@ -1280,7 +1110,7 @@ Please highlight any key concepts or algorithms used in the solution.`;
         const stream = await openai.chat.completions.create({
           model: currentModel,
           messages: [{ role: "user", content: messages }],
-          max_tokens: 5000,
+          max_tokens: 8000, // Increased max tokens for more detailed responses
           stream: true,
         });
         
@@ -1302,7 +1132,7 @@ Please highlight any key concepts or algorithms used in the solution.`;
         const response = await openai.chat.completions.create({
           model: currentModel,
           messages: [{ role: "user", content: messages }],
-          max_tokens: 5000,
+          max_tokens: 8000, // Increased max tokens for more detailed responses
         });
 
         result = response.choices[0].message.content;
@@ -1324,8 +1154,14 @@ Please highlight any key concepts or algorithms used in the solution.`;
         mainWindow.webContents.send("loading", false);
         mainWindow.webContents.send("stream-start");
         
+        // For Gemini, we need to handle streaming differently
+        let accumulatedText = "";
+        
         streamingResult.emitter.on('chunk', (chunk) => {
-          mainWindow.webContents.send("stream-chunk", chunk);
+          // Add the new chunk to our accumulated text
+          accumulatedText += chunk;
+          // Send the full accumulated text for proper markdown rendering
+          mainWindow.webContents.send("stream-update", accumulatedText);
         });
         
         streamingResult.emitter.on('complete', () => {
@@ -1352,6 +1188,9 @@ Please highlight any key concepts or algorithms used in the solution.`;
     // Send the text to the renderer
     mainWindow.webContents.send("analysis-result", result);
     console.log("Analysis complete and sent to renderer");
+    
+    // Update instruction after processing
+    updateInstruction(getDefaultInstructions());
   } catch (err) {
     console.error("Error in processScreenshots:", err);
     
@@ -1405,34 +1244,156 @@ function resetProcess() {
   screenshots = [];
   multiPageMode = false;
   mainWindow.webContents.send("clear-result");
-  updateInstruction(
-    `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
-  );
+  updateInstruction(getDefaultInstructions());
 }
 
 function createWindow() {
+  // Get primary display dimensions for centering
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: displayWidth, height: displayHeight } = primaryDisplay.workAreaSize;
+  
+  // Window dimensions
+  const windowWidth = 800;
+  const windowHeight = 600;
+  
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: windowWidth,
+    height: windowHeight,
+    x: Math.floor((displayWidth - windowWidth) / 2),
+    y: Math.floor((displayHeight - windowHeight) / 2),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000', // Transparent background
     alwaysOnTop: true,
     paintWhenInitiallyHidden: true,
     contentProtection: true,
     type: "toolbar",
+    movable: true, // Make sure the window can be moved
+    roundedCorners: true, // Enable rounded corners on MacOS
+    titleBarStyle: 'hiddenInset', // This helps with the custom title bar
+    skipTaskbar: true, // Don't show in taskbar
+    autoHideMenuBar: true, // Hide menu bar
   });
 
   mainWindow.loadFile("index.html");
   mainWindow.setContentProtection(true);
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+  
+  // Detect screen capture/sharing
+  if (process.platform === 'darwin') {
+    // macOS screen capture detection
+    const { systemPreferences } = require('electron');
+    
+    try {
+      // Check if screen recording permission is granted
+      const hasScreenCapturePermission = systemPreferences.getMediaAccessStatus('screen');
+      
+      if (hasScreenCapturePermission === 'granted') {
+        console.log("Screen capture permission is granted");
+        
+        // Check if screen is being captured/shared
+        systemPreferences.subscribeWorkspaceNotification(
+          'NSWorkspaceScreenIsSharedDidChangeNotification',
+          () => {
+            const isBeingCaptured = systemPreferences.getMediaAccessStatus('screen') === 'granted';
+            console.log("Screen sharing status changed:", isBeingCaptured ? "sharing active" : "sharing inactive");
+            
+            if (isBeingCaptured) {
+              // Screen is being shared, make window nearly invisible
+              toggleWindowVisibility(false);
+              
+              // Also notify the renderer
+              if (mainWindow?.webContents) {
+                mainWindow.webContents.send("screen-sharing-detected");
+              }
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error setting up screen capture detection:", error);
+    }
+  }
+  
+  // Add listener for screen sharing detection on Windows/Linux
+  if (process.platform === 'win32' || process.platform === 'linux') {
+    try {
+      // Use desktopCapturer as a way to detect screen sharing
+      let checkInterval = setInterval(() => {
+        desktopCapturer.getSources({ types: ['screen'] })
+          .then(sources => {
+            // If more than one screen source is found, it might indicate screen sharing
+            if (sources.length > 1) {
+              console.log("Multiple screen sources detected, possible screen sharing");
+              toggleWindowVisibility(false);
+              
+              // Notify the renderer
+              if (mainWindow?.webContents) {
+                mainWindow.webContents.send("screen-sharing-detected");
+              }
+            }
+          })
+          .catch(error => {
+            console.error("Error checking screen sources:", error);
+          });
+      }, 5000); // Check every 5 seconds
+      
+      // Clear interval when window is closed
+      mainWindow.on('closed', () => {
+        clearInterval(checkInterval);
+        checkInterval = null;
+      });
+    } catch (error) {
+      console.error("Error setting up screen sharing detection:", error);
+    }
+  }
+  
+  // Register new hotkey functions
+  
+  // Toggle window visibility (Cmd/Ctrl+B)
+  globalShortcut.register(`${modifierKey}+B`, () => {
+    toggleWindowVisibility();
+  });
+  
+  // Process screenshots based on current mode (Cmd/Ctrl+Enter)
+  globalShortcut.register(`${modifierKey}+Enter`, () => {
+    if (screenshots.length === 0) {
+      mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
+      return;
+    }
+    processScreenshotsWithAI();
+  });
+  
+  // Open model selector with Cmd/Ctrl+comma
+  globalShortcut.register(`${modifierKey}+,`, () => {
+    createModelSelectionWindow();
+  });
+  
+  // Move window with keyboard (Cmd/Ctrl+Arrow keys)
+  globalShortcut.register(`${modifierKey}+Left`, () => {
+    moveWindow('left');
+  });
+  
+  globalShortcut.register(`${modifierKey}+Right`, () => {
+    moveWindow('right');
+  });
+  
+  globalShortcut.register(`${modifierKey}+Up`, () => {
+    moveWindow('up');
+  });
+  
+  globalShortcut.register(`${modifierKey}+Down`, () => {
+    moveWindow('down');
+  });
 
   // Single or final screenshot shortcut
-  globalShortcut.register(`${modifierKey}+Shift+S`, async () => {
+  globalShortcut.register(`${modifierKey}+H`, async () => {
     try {
       updateInstruction("Taking screenshot...");
       
@@ -1457,30 +1418,28 @@ function createWindow() {
         if (!img || img.length < 1000) {
           console.warn("Screenshot appears to be empty or invalid");
           mainWindow.webContents.send("warning", "Screenshot appears to be empty or invalid. Please try again.");
-          updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+          updateInstruction(getDefaultInstructions());
           return;
         }
         
         // Process the image
         screenshots.push(img);
         updateInstruction("Processing screenshot with AI...");
-        await processScreenshots(true); // Use streaming by default
+        await processScreenshots(true);
       } catch (screenshotError) {
         console.error(`Screenshot capture error:`, screenshotError);
         mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
-        updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+        updateInstruction(getDefaultInstructions());
       }
     } catch (error) {
-      console.error(`${modifierKey}+Shift+S error:`, error);
+      console.error(`${modifierKey}+H error:`, error);
       mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-      updateInstruction(
-        `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
-      );
+      updateInstruction(getDefaultInstructions());
     }
   });
   
   // Area screenshot shortcut
-  globalShortcut.register(`${modifierKey}+Shift+D`, async () => {
+  globalShortcut.register(`${modifierKey}+D`, async () => {
     try {
       updateInstruction("Select an area to screenshot...");
       
@@ -1491,13 +1450,13 @@ function createWindow() {
         // Verify the screenshot captured something
         if (!img || img.length < 1000) {
           mainWindow.webContents.send("warning", "Area screenshot appears to be empty or invalid. Please try again.");
-          updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+          updateInstruction(getDefaultInstructions());
           return;
         }
         
         screenshots.push(img);
         updateInstruction("Processing area screenshot with AI...");
-        await processScreenshots(true); // Use streaming by default
+        await processScreenshots(true);
       } catch (screenshotError) {
         if (screenshotError.message === "Area selection cancelled" || 
             screenshotError.message === "Area capture was canceled") {
@@ -1507,23 +1466,21 @@ function createWindow() {
           console.error(`Area screenshot error:`, screenshotError);
           mainWindow.webContents.send("error", `Failed to capture area screenshot: ${screenshotError.message}`);
         }
-        updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+        updateInstruction(getDefaultInstructions());
       }
     } catch (error) {
-      console.error(`${modifierKey}+Shift+D error:`, error);
+      console.error(`${modifierKey}+D error:`, error);
       mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-      updateInstruction(
-        `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
-      );
+      updateInstruction(getDefaultInstructions());
     }
   });
 
   // Multi-page mode shortcut
-  globalShortcut.register(`${modifierKey}+Shift+A`, async () => {
+  globalShortcut.register(`${modifierKey}+A`, async () => {
     try {
       if (!multiPageMode) {
         multiPageMode = true;
-        updateInstruction(`Multi-mode: ${modifierKey}+Shift+A to add, ${modifierKey}+Shift+S to finalize`);
+        updateInstruction(`Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`);
       }
       updateInstruction("Taking screenshot for multi-mode...");
       
@@ -1553,31 +1510,31 @@ function createWindow() {
         
         // Add the screenshot to the collection
         screenshots.push(img);
-        updateInstruction(`Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+Shift+A to add more, ${modifierKey}+Shift+S to finalize`);
+        updateInstruction(`Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`);
       } catch (screenshotError) {
         console.error(`Screenshot error in multi-mode:`, screenshotError);
         mainWindow.webContents.send("error", `Failed to capture screenshot: ${screenshotError.message}`);
-        updateInstruction(`Multi-mode: ${modifierKey}+Shift+A to add, ${modifierKey}+Shift+S to finalize`);
+        updateInstruction(`Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`);
       }
     } catch (error) {
-      console.error(`${modifierKey}+Shift+A error:`, error);
+      console.error(`${modifierKey}+A error:`, error);
       mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
     }
   });
 
-  // Reset shortcut
-  globalShortcut.register(`${modifierKey}+Shift+R`, () => {
+  // Reset shortcut (now using Cmd/Ctrl+R instead of Cmd/Ctrl+Shift+R)
+  globalShortcut.register(`${modifierKey}+R`, () => {
     resetProcess();
   });
 
-  // Quit shortcut
-  globalShortcut.register(`${modifierKey}+Shift+Q`, () => {
+  // Quit shortcut (now using Cmd/Ctrl+Q instead of Cmd/Ctrl+Shift+Q)
+  globalShortcut.register(`${modifierKey}+Q`, () => {
     console.log("Quitting application...");
     app.quit();
   });
 
   // Model selection shortcut
-  globalShortcut.register(`${modifierKey}+Shift+M`, () => {
+  globalShortcut.register(`${modifierKey}+M`, () => {
     createModelSelectionWindow();
   });
 
@@ -1617,12 +1574,35 @@ function createWindow() {
     // Update instruction to show currently selected model
     resetProcess();
   });
+  
+  // Setup IPC handlers for the new functions
+  ipcMain.on('toggle-visibility', (event, visible) => {
+    toggleWindowVisibility(visible);
+  });
+  
+  ipcMain.on('move-window', (event, direction) => {
+    moveWindow(direction);
+  });
+  
+  ipcMain.on('process-screenshots', () => {
+    processScreenshotsWithAI();
+  });
+  
+  ipcMain.on('reset-process', () => {
+    resetProcess();
+  });
+  
+  ipcMain.on('quit-app', () => {
+    app.quit();
+  });
+  
+  ipcMain.on('open-settings', () => {
+    createModelSelectionWindow();
+  });
 
   // Send initial status to renderer
   setTimeout(() => {
-    updateInstruction(
-      `${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`,
-    );
+    updateInstruction(getDefaultInstructions());
   }, 1000);
 
   // Add compatibility handling for both area-selector.html and capture-helper.html
@@ -1667,14 +1647,97 @@ function createWindow() {
       } catch (err) {
         console.error("Error handling backward compatibility screenshot:", err);
         mainWindow.webContents.send("error", `Failed to capture area: ${err.message}`);
-        updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+        updateInstruction(getDefaultInstructions());
       }
     } catch (err) {
       console.error("Error in backward compatibility area-selected handler:", err);
       mainWindow.webContents.send("error", `Failed to process area selection: ${err.message}`);
-      updateInstruction(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models`);
+      updateInstruction(getDefaultInstructions());
     }
   });
+
+  // IPC handlers for window controls
+  ipcMain.on('minimize-window', () => {
+    if (mainWindow) {
+      mainWindow.minimize();
+    }
+  });
+  
+  ipcMain.on('close-window', () => {
+    if (mainWindow) {
+      mainWindow.close();
+    }
+  });
+}
+
+// Get default instructions based on app state
+function getDefaultInstructions() {
+  if (multiPageMode) {
+    return `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`;
+  }
+  
+  return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
+}
+
+// Toggle window visibility
+function toggleWindowVisibility(visible = null) {
+  // If a value is provided, use it, otherwise toggle
+  isWindowVisible = (visible !== null) ? visible : !isWindowVisible;
+  
+  if (isWindowVisible) {
+    mainWindow.show();
+    mainWindow.setOpacity(1.0);
+  } else {
+    // Don't hide completely, but make nearly invisible
+    mainWindow.setOpacity(0.05);
+  }
+  
+  console.log(`Window visibility set to: ${isWindowVisible}`);
+}
+
+// Move window using keyboard shortcuts
+function moveWindow(direction) {
+  if (!mainWindow) return;
+  
+  const [x, y] = mainWindow.getPosition();
+  const moveStep = 20; // Pixels to move in each direction
+  
+  let newX = x;
+  let newY = y;
+  
+  switch (direction) {
+    case 'left':
+      newX = x - moveStep;
+      break;
+    case 'right':
+      newX = x + moveStep;
+      break;
+    case 'up':
+      newY = y - moveStep;
+      break;
+    case 'down':
+      newY = y + moveStep;
+      break;
+  }
+  
+  mainWindow.setPosition(newX, newY);
+}
+
+// Process screenshots based on current mode
+async function processScreenshotsWithAI() {
+  if (screenshots.length === 0) {
+    mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
+    return;
+  }
+  
+  try {
+    updateInstruction("Processing screenshots with AI...");
+    await processScreenshots(true);
+  } catch (error) {
+    console.error("Error processing screenshots:", error);
+    mainWindow.webContents.send("error", "Failed to process screenshots: " + error.message);
+    updateInstruction(getDefaultInstructions());
+  }
 }
 
 app.whenReady().then(createWindow);
@@ -1689,5 +1752,18 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+// IPC handlers for window controls
+ipcMain.on("minimize-window", () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on("close-window", () => {
+  if (mainWindow) {
+    mainWindow.close();
   }
 });

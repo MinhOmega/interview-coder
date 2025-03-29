@@ -10,7 +10,11 @@
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "electron": "^28.1.0",
+    "image-size": "^2.0.1",
     "openai": "^4.24.1",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-html": "^16.0.1",
     "screenshot-desktop": "^1.15.0"
   }
 }
