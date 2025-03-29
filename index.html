@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Interview Coder</title>
+  <style>
+    html {
+      width: 100%;
+      height: 100%;
+      background: none;
+    }
+    
+    body {
+      margin: 0; 
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: none;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* Improved instruction banner */
+    #instruction-banner {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 8px 15px;
+      font-size: 14px;
+      border-radius: 0 0 8px 8px;
+      z-index: 9999;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      transition: opacity 0.3s ease;
+      user-select: none;
+    }
+    
+    #response-overlay {
+      position: fixed;
+      top: 0; 
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s;
+      z-index: 9998;
+      backdrop-filter: blur(3px);
+    }
+    
+    #response-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    #response-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: rgba(25,25,25,0.95);
+      color: #fff;
+      padding: 25px;
+      box-sizing: border-box;
+      font-size: 15px;
+      line-height: 1.5;
+      border-radius: 8px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    }
+    
+    #response-box::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    #response-box::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+    
+    #response-box::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.3);
+      border-radius: 4px;
+    }
+    
+    pre {
+      background: rgba(40,40,40,0.95);
+      color: #f0f0f0;
+      padding: 15px;
+      border-radius: 6px;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 1em 0;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    code {
+      font-family: 'Fira Code', Consolas, 'Courier New', monospace;
+      background: rgba(60,60,60,0.95);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    
+    #response-box p {
+      margin: 0 0 10px 0;
+    }
+    
+    #response-box p:last-child {
+      margin-bottom: 0;
+    }
+    
+    .error-message {
+      color: #ff4444;
+      background: rgba(255,68,68,0.1);
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #ff4444;
+      margin: 10px 0;
+    }
+    
+    .warning-message {
+      color: #ffbb33;
+      background: rgba(255,187,51,0.1);
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #ffbb33;
+      margin: 10px 0;
+    }
+    
+    /* Loading indicator */
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .model-badge {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="instruction-banner"></div>
+  <div id="response-overlay">
+    <div id="response-box">
+      <div id="loading-content" class="loading-container" style="display: none;">
+        <div class="spinner"></div>
+        <div>Processing screenshots...</div>
+      </div>
+      <div id="result-content"></div>
+    </div>
+  </div>
+  
+  <div id="model-badge" class="model-badge"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    // Detect platform for correct key labels
+    const isMac = navigator.platform.includes('Mac');
+    const modifierKey = isMac ? 'Command' : 'Ctrl';
+    
+    marked.setOptions({
+      sanitize: true,
+      breaks: true,
+      gfm: true
+    });
+    
+    const showOverlay = () => {
+      const overlay = document.getElementById('response-overlay');
+      overlay.classList.add('visible');
+    };
+    
+    const hideOverlay = () => {
+      const overlay = document.getElementById('response-overlay');
+      overlay.classList.remove('visible');
+    };
+    
+    const updateBanner = (text, show = true) => {
+      const banner = document.getElementById('instruction-banner');
+      banner.style.opacity = show ? '1' : '0';
+      if (text) banner.textContent = text;
+    };
+    
+    // Get model badge element
+    const modelBadge = document.getElementById('model-badge');
+    const loadingContent = document.getElementById('loading-content');
+    const resultContent = document.getElementById('result-content');
+    
+    // Update the model name display
+    const updateModelDisplay = async () => {
+      try {
+        const settings = await ipcRenderer.invoke('get-current-settings');
+        const provider = settings.aiProvider === 'openai' ? 'OpenAI' : 'Ollama';
+        modelBadge.textContent = `${provider}: ${settings.currentModel}`;
+      } catch (error) {
+        console.error('Error getting current model:', error);
+      }
+    };
+    
+    // Call once at startup
+    updateModelDisplay();
+    
+    const handlers = {
+      'analysis-result': (event, result) => {
+        loadingContent.style.display = 'none';
+        resultContent.style.display = 'block';
+        resultContent.innerHTML = marked.parse(result);
+        showOverlay();
+        updateBanner(`${modifierKey}+Shift+R: Repeat process`);
+      },
+      
+      'stream-start': () => {
+        resultContent.style.display = 'block';
+        resultContent.innerHTML = '';
+        showOverlay();
+      },
+      
+      'stream-chunk': (event, chunk) => {
+        resultContent.innerHTML = marked.parse(resultContent.textContent + chunk);
+        // Scroll to bottom to show latest content
+        resultContent.scrollTop = resultContent.scrollHeight;
+      },
+      
+      'stream-end': () => {
+        updateBanner(`${modifierKey}+Shift+R: Repeat process`);
+      },
+      
+      'error': (event, error) => {
+        loadingContent.style.display = 'none';
+        resultContent.style.display = 'block';
+        showOverlay();
+        resultContent.innerHTML = 
+          `<div class="error-message">
+            <strong>Error:</strong> ${error}
+            <br><small>Press ${modifierKey}+Shift+R to try again</small>
+          </div>`;
+      },
+      
+      'model-not-found': (event, data) => {
+        loadingContent.style.display = 'none';
+        resultContent.style.display = 'block';
+        showOverlay();
+        
+        let suggestionsHtml = '';
+        if (data.suggestedModels && data.suggestedModels.length > 0) {
+          suggestionsHtml = `
+            <div style="margin-top: 15px;">
+              <strong>Available vision models:</strong>
+              <ul>
+                ${data.suggestedModels.map(model => `<li>${model}</li>`).join('')}
+              </ul>
+              <p>
+                You can pull these models with:
+                <pre>ollama pull ${data.suggestedModels[0]}</pre>
+                or select an existing model via ${modifierKey}+Shift+M
+              </p>
+            </div>
+          `;
+        }
+        
+        resultContent.innerHTML = 
+          `<div class="error-message">
+            <strong>Model not found:</strong> ${data.model}
+            <p>${data.error}</p>
+            ${suggestionsHtml}
+          </div>`;
+      },
+      
+      'warning': (event, warning) => {
+        // Don't hide loading, just show the warning alongside
+        if (resultContent.innerHTML === '') {
+          resultContent.style.display = 'block';
+          showOverlay();
+        }
+        
+        // Add warning to the top of the result content
+        const warningElement = document.createElement('div');
+        warningElement.className = 'warning-message';
+        warningElement.innerHTML = `<strong>Warning:</strong> ${warning}`;
+        
+        // Insert at the top
+        resultContent.insertBefore(warningElement, resultContent.firstChild);
+      },
+      
+      'update-instruction': (event, instruction) => {
+        updateBanner(instruction, true);
+      },
+      
+      'hide-instruction': () => {
+        updateBanner('', false);
+      },
+      
+      'clear-result': () => {
+        resultContent.innerHTML = "";
+        hideOverlay();
+      },
+      
+      'loading': (event, isLoading) => {
+        if (isLoading) {
+          showOverlay();
+          resultContent.style.display = 'none';
+          loadingContent.style.display = 'flex';
+        } else {
+          loadingContent.style.display = 'none';
+        }
+      },
+      
+      'model-changed': () => {
+        updateModelDisplay();
+      }
+    };
+    
+    Object.entries(handlers).forEach(([channel, handler]) => {
+      ipcRenderer.on(channel, handler);
+    });
+    
+    window.addEventListener('unload', () => {
+      Object.keys(handlers).forEach(channel => {
+        ipcRenderer.removeAllListeners(channel);
+      });
+    });
+    
+    updateBanner(`${modifierKey}+Shift+S: Full Screen | ${modifierKey}+Shift+D: Area | ${modifierKey}+Shift+A: Multi-mode | ${modifierKey}+Shift+M: Models | ${modifierKey}+Shift+Q: Close`);
+  </script>
+</body>
+</html>

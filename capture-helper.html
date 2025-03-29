@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Capture Helper</title>
+</head>
+<body>
+  <script>
+    const { ipcRenderer, desktopCapturer } = require('electron');
+    const fs = require('fs');
+    
+    // Listen for the capture-screen message
+    ipcRenderer.on('capture-screen', async (event, data) => {
+      try {
+        const { sourceId, rect, imagePath } = data;
+        
+        // Create a video element to capture the screen
+        const video = document.createElement('video');
+        video.style.cssText = 'position:absolute; top:-10000px; left:-10000px;';
+        
+        // Add to DOM temporarily
+        document.body.appendChild(video);
+        
+        try {
+          // Get the media stream
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceId,
+                minWidth: 1280,
+                maxWidth: 8000,
+                minHeight: 720,
+                maxHeight: 8000
+              }
+            }
+          });
+          
+          // Set up video
+          video.srcObject = stream;
+          video.onloadedmetadata = async () => {
+            // Start playing the video
+            video.play();
+            
+            // Create a canvas to capture the selected area
+            const canvas = document.createElement('canvas');
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Draw the selected area to the canvas
+            // Only draw once the video is playing
+            setTimeout(() => {
+              try {
+                ctx.drawImage(
+                  video, 
+                  rect.x, rect.y, rect.width, rect.height, // Source rectangle
+                  0, 0, rect.width, rect.height // Destination rectangle
+                );
+                
+                // Convert canvas to PNG
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+                
+                // Save the image
+                fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+                
+                // Clean up
+                stream.getTracks().forEach(track => track.stop());
+                video.remove();
+                
+                // Notify main process that the capture is complete
+                ipcRenderer.send('area-captured', { success: true });
+              } catch (err) {
+                ipcRenderer.send('area-captured', { 
+                  success: false, 
+                  error: `Error capturing image: ${err.message}` 
+                });
+              }
+            }, 300); // Give the video a moment to start playing
+          };
+        } catch (err) {
+          ipcRenderer.send('area-captured', { 
+            success: false, 
+            error: `Error accessing display media: ${err.message}` 
+          });
+        }
+      } catch (err) {
+        ipcRenderer.send('area-captured', { 
+          success: false, 
+          error: `Capture process error: ${err.message}` 
+        });
+      }
+    });
+  </script>
+</body>
+</html> 

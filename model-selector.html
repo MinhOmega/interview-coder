@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Select AI Model</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+      color: #444;
+    }
+    
+    .section {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .section h2 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #555;
+    }
+    
+    .radio-group {
+      margin-bottom: 15px;
+    }
+    
+    .radio-group label {
+      display: block;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    
+    select {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      margin-bottom: 15px;
+      background-color: white;
+    }
+    
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+    
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background-color: #45a049;
+    }
+    
+    .status {
+      margin-top: 15px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    .error {
+      color: #f44336;
+    }
+    
+    .success {
+      color: #4CAF50;
+    }
+    
+    .refresh-btn {
+      background-color: #2196F3;
+      margin-left: 10px;
+    }
+    
+    .refresh-btn:hover {
+      background-color: #0b7dda;
+    }
+    
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #3498db;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .note {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    .model-item {
+      padding: 8px;
+      margin-bottom: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .model-item:hover {
+      background-color: #f0f0f0;
+    }
+    
+    .model-item.selected {
+      background-color: #e3f2fd;
+      border-left: 3px solid #2196F3;
+    }
+    
+    .pull-model-btn {
+      background-color: #ff9800;
+      margin-left: 10px;
+    }
+    
+    .pull-model-btn:hover {
+      background-color: #f57c00;
+    }
+    
+    /* Modal dialog for pulling models */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+      background-color: white;
+      margin: 15% auto;
+      padding: 20px;
+      border-radius: 5px;
+      width: 80%;
+      max-width: 400px;
+    }
+    
+    .close-modal {
+      float: right;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .close-modal:hover {
+      color: #f44336;
+    }
+  </style>
+</head>
+<body>
+  <h1>Select AI Model</h1>
+  
+  <div class="section">
+    <h2>AI Provider</h2>
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="aiProvider" value="openai" checked> OpenAI (Requires API Key)
+      </label>
+      <label>
+        <input type="radio" name="aiProvider" value="ollama"> Ollama (Local, free)
+      </label>
+      <label>
+        <input type="radio" name="aiProvider" value="gemini"> Gemini (Google AI, Requires API Key)
+      </label>
+    </div>
+  </div>
+  
+  <div class="section" id="openai-section">
+    <h2>OpenAI Models</h2>
+    <select id="openai-model">
+      <option value="gpt-4o-mini">gpt-4o-mini</option>
+      <option value="gpt-4o">gpt-4o</option>
+      <option value="gpt-4-vision-preview">gpt-4-vision-preview</option>
+      <option value="gpt-4-turbo">gpt-4-turbo</option>
+    </select>
+  </div>
+  
+  <div class="section" id="gemini-section" style="display: none;">
+    <h2>Gemini Models</h2>
+    <select id="gemini-model">
+      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+      <option value="gemini-2.0-pro">gemini-2.0-pro</option>
+      <option value="gemini-2.5-pro-experimental">gemini-2.5-pro-experimental</option>
+    </select>
+    <div class="note">Note: Gemini models have excellent vision and streaming capabilities.</div>
+  </div>
+  
+  <div class="section" id="ollama-section" style="display: none;">
+    <h2>Ollama Models</h2>
+    <div class="btn-row">
+      <span id="ollama-status">Checking for Ollama models...</span>
+      <button id="refresh-models" class="refresh-btn">Refresh Models</button>
+    </div>
+    <select id="ollama-model">
+      <option value="loading">Loading...</option>
+    </select>
+    
+    <div id="vision-models-note" class="note" style="margin-bottom: 10px; display: none;">
+      Note: For image processing, it's recommended to use multi-modal models like: 
+      llava, bakllava, deepseek-r1, or moondream
+    </div>
+    
+    <h3>Ollama URL</h3>
+    <input type="text" id="ollama-url" placeholder="http://127.0.0.1:11434" value="http://127.0.0.1:11434">
+    <div class="note">Note: Use 127.0.0.1 instead of localhost to avoid IPv6 connection issues</div>
+    
+    <div id="connection-test-result" class="status"></div>
+    <div class="btn-row" style="margin-top: 10px;">
+      <button id="test-connection" class="refresh-btn">Test Connection</button>
+      <button id="pull-model-btn" class="pull-model-btn">Pull Model</button>
+    </div>
+  </div>
+  
+  <div class="btn-row" style="margin-top: 20px;">
+    <button id="save-settings">Save Settings</button>
+    <button id="cancel">Cancel</button>
+  </div>
+  
+  <div id="message" class="status"></div>
+  
+  <!-- Pull model modal dialog -->
+  <div id="pull-model-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h3>Pull Ollama Model</h3>
+      <p>Enter the name of the model to pull:</p>
+      <input type="text" id="model-to-pull" placeholder="e.g., llava:latest" style="width: 100%; margin: 10px 0;">
+      <div class="note">Recommended multimodal models: llava, bakllava, deepseek-r1, moondream</div>
+      <div id="pull-status" class="status"></div>
+      <div class="btn-row" style="margin-top: 15px;">
+        <button id="confirm-pull">Pull Model</button>
+        <button id="cancel-pull">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const { ipcRenderer } = require('electron');
+    const axios = require('axios');
+    
+    // Elements
+    const aiProviderRadios = document.querySelectorAll('input[name="aiProvider"]');
+    const openaiSection = document.getElementById('openai-section');
+    const ollamaSection = document.getElementById('ollama-section');
+    const geminiSection = document.getElementById('gemini-section');
+    const openaiModelSelect = document.getElementById('openai-model');
+    const ollamaModelSelect = document.getElementById('ollama-model');
+    const geminiModelSelect = document.getElementById('gemini-model');
+    const ollamaUrlInput = document.getElementById('ollama-url');
+    const ollamaStatus = document.getElementById('ollama-status');
+    const visionModelsNote = document.getElementById('vision-models-note');
+    const refreshModelsBtn = document.getElementById('refresh-models');
+    const testConnectionBtn = document.getElementById('test-connection');
+    const pullModelBtn = document.getElementById('pull-model-btn');
+    const connectionTestResult = document.getElementById('connection-test-result');
+    const saveBtn = document.getElementById('save-settings');
+    const cancelBtn = document.getElementById('cancel');
+    const messageDiv = document.getElementById('message');
+    
+    // Pull model modal elements
+    const pullModelModal = document.getElementById('pull-model-modal');
+    const closeModalBtn = document.querySelector('.close-modal');
+    const modelToPullInput = document.getElementById('model-to-pull');
+    const pullStatusDiv = document.getElementById('pull-status');
+    const confirmPullBtn = document.getElementById('confirm-pull');
+    const cancelPullBtn = document.getElementById('cancel-pull');
+    
+    // Load current settings
+    let currentSettings = {};
+    
+    // Test Ollama connection
+    async function testOllamaConnection() {
+      connectionTestResult.innerHTML = 'Testing connection... <span class="loading"></span>';
+      connectionTestResult.className = 'status';
+      
+      try {
+        // Always use IPv4 by replacing localhost with 127.0.0.1
+        const url = ollamaUrlInput.value.replace('localhost', '127.0.0.1');
+        
+        const response = await axios.get(`${url}/api/version`, {
+          timeout: 5000,
+          validateStatus: false
+        });
+        
+        if (response.status === 200) {
+          connectionTestResult.textContent = `Connected successfully! Ollama version: ${response.data.version}`;
+          connectionTestResult.className = 'status success';
+          return true;
+        } else {
+          connectionTestResult.textContent = `Error: Received status ${response.status}`;
+          connectionTestResult.className = 'status error';
+          return false;
+        }
+      } catch (error) {
+        connectionTestResult.textContent = `Connection failed: ${error.message}`;
+        connectionTestResult.className = 'status error';
+        return false;
+      }
+    }
+    
+    async function loadCurrentSettings() {
+      currentSettings = await ipcRenderer.invoke('get-current-settings');
+      
+      // Set UI based on current settings
+      document.querySelector(`input[name="aiProvider"][value="${currentSettings.aiProvider}"]`).checked = true;
+      
+      // Replace localhost with 127.0.0.1 for better compatibility
+      const baseUrl = currentSettings.ollamaUrl || 'http://127.0.0.1:11434';
+      ollamaUrlInput.value = baseUrl.replace('localhost', '127.0.0.1');
+      
+      // Select the appropriate model in dropdown
+      if (currentSettings.aiProvider === 'openai') {
+        // Try to find the model in the dropdown, default to first option if not found
+        const option = Array.from(openaiModelSelect.options).find(opt => opt.value === currentSettings.currentModel);
+        if (option) {
+          openaiModelSelect.value = currentSettings.currentModel;
+        }
+      } else if (currentSettings.aiProvider === 'gemini') {
+        // Try to find the model in the dropdown
+        const option = Array.from(geminiModelSelect.options).find(opt => opt.value === currentSettings.currentModel);
+        if (option) {
+          geminiModelSelect.value = currentSettings.currentModel;
+        }
+      }
+      
+      // Update visibility based on provider
+      updateSectionVisibility(currentSettings.aiProvider);
+      
+      // Load Ollama models
+      if (currentSettings.aiProvider === 'ollama') {
+        loadOllamaModels();
+      }
+    }
+    
+    // Update section visibility based on selected provider
+    function updateSectionVisibility(provider) {
+      if (provider === 'openai') {
+        openaiSection.style.display = 'block';
+        ollamaSection.style.display = 'none';
+        geminiSection.style.display = 'none';
+      } else if (provider === 'gemini') {
+        openaiSection.style.display = 'none';
+        ollamaSection.style.display = 'none';
+        geminiSection.style.display = 'block';
+      } else {
+        openaiSection.style.display = 'none';
+        ollamaSection.style.display = 'block';
+        geminiSection.style.display = 'none';
+      }
+    }
+    
+    // Load models from Ollama
+    async function loadOllamaModels() {
+      ollamaStatus.innerHTML = 'Loading models... <span class="loading"></span>';
+      ollamaStatus.className = 'status';
+      visionModelsNote.style.display = 'none';
+      
+      try {
+        const models = await ipcRenderer.invoke('get-ollama-models');
+        
+        // Clear and populate the select
+        ollamaModelSelect.innerHTML = '';
+        
+        if (models.length === 0) {
+          ollamaModelSelect.innerHTML = '<option value="">No models found</option>';
+          ollamaStatus.textContent = 'No models found. Is Ollama running?';
+          ollamaStatus.className = 'status error';
+          return;
+        }
+        
+        // Check for vision models
+        let hasVisionModels = false;
+        const visionModelNames = ['llava', 'bakllava', 'moondream', 'deepseek'];
+        
+        // Add all models to dropdown
+        models.forEach(model => {
+          const option = document.createElement('option');
+          option.value = model.name;
+          option.textContent = model.name;
+          
+          // Check if this is a vision model
+          const isVisionModel = visionModelNames.some(name => model.name.toLowerCase().includes(name));
+          if (isVisionModel) {
+            hasVisionModels = true;
+            option.textContent += ' (Vision)';
+            option.setAttribute('data-is-vision', 'true');
+          }
+          
+          ollamaModelSelect.appendChild(option);
+        });
+        
+        // If the current model is set and exists in the list, select it
+        if (currentSettings.aiProvider === 'ollama' && currentSettings.currentModel) {
+          const option = Array.from(ollamaModelSelect.options).find(opt => opt.value === currentSettings.currentModel);
+          if (option) {
+            ollamaModelSelect.value = currentSettings.currentModel;
+          }
+        }
+        
+        // Show vision model note if needed
+        if (hasVisionModels) {
+          visionModelsNote.style.display = 'block';
+        }
+        
+        ollamaStatus.textContent = `${models.length} models loaded`;
+        ollamaStatus.className = 'status success';
+      } catch (error) {
+        ollamaStatus.textContent = `Error: ${error.message}`;
+        ollamaStatus.className = 'status error';
+        ollamaModelSelect.innerHTML = '<option value="">Error loading models</option>';
+        
+        // Check if the error is likely due to Ollama not running
+        if (error.message.includes('ECONNREFUSED') || error.message.includes('ECONNRESET')) {
+          ollamaStatus.textContent = 'Cannot connect to Ollama. Is Ollama running?';
+        }
+      }
+    }
+    
+    // Pull an Ollama model
+    async function pullOllamaModel(modelName) {
+      pullStatusDiv.innerHTML = `Pulling model ${modelName}... <span class="loading"></span>`;
+      pullStatusDiv.className = 'status';
+      confirmPullBtn.disabled = true;
+      
+      try {
+        // Always use IPv4 by replacing localhost with 127.0.0.1
+        const url = ollamaUrlInput.value.replace('localhost', '127.0.0.1');
+        
+        pullStatusDiv.textContent = `Sending pull request for ${modelName}...`;
+        
+        // Use Ollama API to pull the model
+        const response = await axios.post(`${url}/api/pull`, {
+          name: modelName,
+          stream: false
+        }, {
+          timeout: 300000 // 5 minute timeout for pulling
+        });
+        
+        if (response.data && response.data.status === 'success') {
+          pullStatusDiv.textContent = `Successfully pulled model: ${modelName}`;
+          pullStatusDiv.className = 'status success';
+          
+          // Reload the model list
+          await loadOllamaModels();
+          
+          // Select the newly pulled model
+          const option = Array.from(ollamaModelSelect.options).find(opt => opt.value === modelName);
+          if (option) {
+            ollamaModelSelect.value = modelName;
+          }
+          
+          // Close the modal after a delay
+          setTimeout(() => {
+            pullModelModal.style.display = 'none';
+            confirmPullBtn.disabled = false;
+          }, 2000);
+          
+          return true;
+        } else {
+          pullStatusDiv.textContent = `Error pulling model: ${response.data.status || 'Unknown error'}`;
+          pullStatusDiv.className = 'status error';
+          confirmPullBtn.disabled = false;
+          return false;
+        }
+      } catch (error) {
+        pullStatusDiv.textContent = `Error pulling model: ${error.message}`;
+        pullStatusDiv.className = 'status error';
+        confirmPullBtn.disabled = false;
+        return false;
+      }
+    }
+    
+    // Event Listeners
+    for (const radio of aiProviderRadios) {
+      radio.addEventListener('change', () => {
+        const provider = radio.value;
+        updateSectionVisibility(provider);
+        
+        // Load Ollama models if switching to Ollama
+        if (provider === 'ollama') {
+          loadOllamaModels();
+        }
+      });
+    }
+    
+    refreshModelsBtn.addEventListener('click', loadOllamaModels);
+    testConnectionBtn.addEventListener('click', testOllamaConnection);
+    
+    // Pull model button
+    pullModelBtn.addEventListener('click', () => {
+      // Suggest a vision model
+      modelToPullInput.value = 'llava:latest';
+      pullStatusDiv.textContent = '';
+      pullStatusDiv.className = 'status';
+      confirmPullBtn.disabled = false;
+      pullModelModal.style.display = 'block';
+    });
+    
+    // Modal close button
+    closeModalBtn.addEventListener('click', () => {
+      pullModelModal.style.display = 'none';
+    });
+    
+    // Cancel pull button
+    cancelPullBtn.addEventListener('click', () => {
+      pullModelModal.style.display = 'none';
+    });
+    
+    // Confirm pull button
+    confirmPullBtn.addEventListener('click', async () => {
+      const modelName = modelToPullInput.value.trim();
+      if (!modelName) {
+        pullStatusDiv.textContent = 'Please enter a model name';
+        pullStatusDiv.className = 'status error';
+        return;
+      }
+      
+      await pullOllamaModel(modelName);
+    });
+    
+    // Close modal if clicking outside
+    window.addEventListener('click', (event) => {
+      if (event.target === pullModelModal) {
+        pullModelModal.style.display = 'none';
+      }
+    });
+    
+    saveBtn.addEventListener('click', async () => {
+      const aiProvider = document.querySelector('input[name="aiProvider"]:checked').value;
+      let currentModel;
+      
+      if (aiProvider === 'openai') {
+        currentModel = openaiModelSelect.value;
+      } else if (aiProvider === 'gemini') {
+        currentModel = geminiModelSelect.value;
+      } else {
+        currentModel = ollamaModelSelect.value;
+      }
+      
+      // Validate selection
+      if (aiProvider === 'ollama' && (!currentModel || currentModel === 'loading')) {
+        messageDiv.textContent = 'Please select a valid Ollama model';
+        messageDiv.className = 'status error';
+        return;
+      }
+      
+      // For Ollama, always ensure we're using IPv4
+      let ollamaUrl = ollamaUrlInput.value;
+      if (aiProvider === 'ollama') {
+        ollamaUrl = ollamaUrl.replace('localhost', '127.0.0.1');
+        
+        // If using Ollama, test the connection first
+        messageDiv.innerHTML = 'Testing Ollama connection... <span class="loading"></span>';
+        messageDiv.className = 'status';
+        
+        try {
+          const connectionTest = await axios.get(`${ollamaUrl}/api/version`, {
+            timeout: 3000,
+            validateStatus: false
+          });
+          
+          if (connectionTest.status !== 200) {
+            messageDiv.textContent = `Could not connect to Ollama at ${ollamaUrl}. Check if Ollama is running.`;
+            messageDiv.className = 'status error';
+            return;
+          }
+          
+          // Connection successful, continue with saving
+        } catch (error) {
+          messageDiv.textContent = `Connection to Ollama failed: ${error.message}`;
+          messageDiv.className = 'status error';
+          return;
+        }
+      }
+      
+      // Disable the save button to prevent multiple clicks
+      saveBtn.disabled = true;
+      
+      // Update settings
+      ipcRenderer.send('update-model-settings', {
+        aiProvider,
+        currentModel,
+        ollamaUrl // Pass the URL to main.js
+      });
+      
+      // Show success message and close
+      messageDiv.textContent = 'Settings saved!';
+      messageDiv.className = 'status success';
+      
+      // Close window after a brief delay
+      setTimeout(() => {
+        window.close();
+      }, 800);
+    });
+    
+    cancelBtn.addEventListener('click', () => {
+      window.close();
+    });
+    
+    // Initialize
+    loadCurrentSettings();
+  </script>
+</body>
+</html> 
