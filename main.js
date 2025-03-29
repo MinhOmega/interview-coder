@@ -16,6 +16,7 @@ const fs = require("fs");
 const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
+const Screenshots = require('electron-screenshots');
 require("dotenv").config();
 
 // Check if running on macOS
@@ -41,6 +42,9 @@ let geminiAI;
 let aiProvider = process.env.AI_PROVIDER || "openai"; // Default to OpenAI
 let currentModel =
   aiProvider === "openai" ? DEFAULT_MODEL : aiProvider === "gemini" ? DEFAULT_GEMINI_MODEL : DEFAULT_OLLAMA_MODEL;
+
+// Initialize electron-screenshots
+let screenshotInstance;
 
 try {
   // Get API key from .env file
@@ -690,65 +694,121 @@ async function captureScreenshot() {
     }
 
     let success = false;
+    let base64Image = '';
 
-    // Use platform-specific approach for best results
-    if (process.platform === "darwin") {
-      // On macOS, use the native screencapture command which works reliably
-      try {
-        console.log("Using native macOS screencapture command");
-        await new Promise((resolve, reject) => {
-          const { exec } = require("child_process");
-          // -x suppresses the sound, -D captures a specific display (default is main display)
-          // -c copies to clipboard as well
-          exec(`screencapture -x "${imagePath}"`, (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              success = true;
-              resolve();
-            }
-          });
-        });
-      } catch (macOSError) {
-        console.error("macOS screencapture failed:", macOSError);
-        // Fall back to screenshot-desktop
-        await screenshot({ filename: imagePath });
+    try {
+      // Get all screen sources
+      const sources = await desktopCapturer.getSources({ 
+        types: ['screen'],
+        thumbnailSize: { 
+          width: screen.getPrimaryDisplay().workAreaSize.width,
+          height: screen.getPrimaryDisplay().workAreaSize.height
+        }
+      });
+
+      // Get the primary display
+      const primaryDisplay = screen.getPrimaryDisplay();
+      
+      // Find the source that matches the primary display
+      const source = sources.find(s => {
+        const bounds = s.display?.bounds || s.bounds;
+        return bounds.x === 0 && bounds.y === 0 && 
+               bounds.width === primaryDisplay.size.width && 
+               bounds.height === primaryDisplay.size.height;
+      }) || sources[0];
+
+      if (!source) {
+        throw new Error('No screen source found');
       }
-    } else if (process.platform === "win32") {
-      try {
-        console.log("Using native Windows screenshot method");
-        // Try to use PowerShell to capture the screen on Windows
-        await new Promise((resolve, reject) => {
-          const { exec } = require("child_process");
-          const psScript = `
-            Add-Type -AssemblyName System.Windows.Forms
-            Add-Type -AssemblyName System.Drawing
-            $screen = [System.Windows.Forms.Screen]::PrimaryScreen
-            $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-            $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
-            $bitmap.Save("${imagePath.replace(/\\/g, "\\\\")}")
-            $graphics.Dispose()
-            $bitmap.Dispose()
-          `;
-          exec(`powershell -command "${psScript}"`, (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              success = true;
-              resolve();
-            }
-          });
+
+      // Create a temporary hidden BrowserWindow to capture the screen
+      const captureWin = new BrowserWindow({
+        width: primaryDisplay.size.width,
+        height: primaryDisplay.size.height,
+        show: false,
+        webPreferences: {
+          offscreen: true,
+          nodeIntegration: true,
+          contextIsolation: false
+        }
+      });
+
+      // Load a minimal HTML file
+      await captureWin.loadURL('data:text/html,<html><body></body></html>');
+
+      // Inject capture script
+      await captureWin.webContents.executeJavaScript(`
+        new Promise(async (resolve) => {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: '${source.id}',
+                  minWidth: ${primaryDisplay.size.width},
+                  maxWidth: ${primaryDisplay.size.width},
+                  minHeight: ${primaryDisplay.size.height},
+                  maxHeight: ${primaryDisplay.size.height}
+                }
+              }
+            });
+
+            const video = document.createElement('video');
+            video.style.cssText = 'position: absolute; top: -10000px; left: -10000px;';
+            video.srcObject = stream;
+
+            video.onloadedmetadata = () => {
+              video.play();
+              const canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0);
+              
+              const imageData = canvas.toDataURL('image/png');
+              video.remove();
+              stream.getTracks()[0].stop();
+              resolve(imageData);
+            };
+
+            document.body.appendChild(video);
+          } catch (err) {
+            resolve(null);
+            console.error('Capture error:', err);
+          }
         });
-      } catch (windowsError) {
-        console.error("Windows PowerShell screenshot failed:", windowsError);
-        // Fall back to screenshot-desktop
-        await screenshot({ filename: imagePath });
+      `);
+
+      // Get the captured image
+      const imageData = await captureWin.webContents.executeJavaScript('document.querySelector("canvas").toDataURL("image/png")');
+      
+      // Close the capture window
+      captureWin.close();
+
+      if (!imageData) {
+        throw new Error('Failed to capture screen');
       }
-    } else {
-      // For Linux and other platforms
-      await screenshot({ filename: imagePath });
+
+      // Save the image
+      const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
+      fs.writeFileSync(imagePath, base64Data, 'base64');
+      base64Image = imageData;
       success = true;
+
+    } catch (captureError) {
+      console.error("Desktop capturer failed:", captureError);
+      
+      // Fallback to screenshot-desktop
+      try {
+        await screenshot({ filename: imagePath });
+        const imageBuffer = fs.readFileSync(imagePath);
+        base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+        success = true;
+      } catch (fallbackError) {
+        console.error("Screenshot fallback failed:", fallbackError);
+        throw fallbackError;
+      }
     }
 
     // Show the main window again
@@ -766,10 +826,6 @@ async function captureScreenshot() {
       throw new Error("Screenshot file is too small, likely empty");
     }
 
-    // Read the image and convert to base64
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-
     // Get image dimensions
     const dimensions = { width: 0, height: 0 };
     try {
@@ -779,7 +835,6 @@ async function captureScreenshot() {
       dimensions.height = imageDimensions.height;
     } catch (dimError) {
       console.error("Error getting image dimensions:", dimError);
-      // Continue without dimensions if there's an error
     }
 
     // Notify about saved screenshot
@@ -1378,6 +1433,63 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
 
+  // Initialize electron-screenshots
+  screenshotInstance = new Screenshots({
+    singleWindow: true,
+    lang: 'en',
+    // Customize the appearance
+    styles: {
+      windowBackgroundColor: '#00000000',
+      mask: {
+        color: '#000000',
+        opacity: 0.6
+      },
+      toolbar: {
+        backgroundColor: '#2e2c29',
+        color: '#ffffff',
+        activeColor: '#2196f3'
+      }
+    }
+  });
+
+  // Listen for screenshot complete event
+  screenshotInstance.on('ok', async (data) => {
+    try {
+      const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+      const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+      
+      // Save the image
+      fs.writeFileSync(imagePath, data.buffer);
+      
+      // Convert to base64 for processing
+      const base64Image = `data:image/png;base64,${data.buffer.toString('base64')}`;
+      
+      // Add to screenshots array and process
+      screenshots.push(base64Image);
+      
+      // Get dimensions
+      const dimensions = { width: data.bounds.width, height: data.bounds.height };
+      
+      // Notify about saved screenshot
+      mainWindow.webContents.send("screenshot-saved", {
+        path: imagePath,
+        isArea: true,
+        dimensions: dimensions,
+      });
+      
+      // Process the screenshot
+      await processScreenshots(true);
+    } catch (error) {
+      console.error('Error handling screenshot:', error);
+      mainWindow.webContents.send("error", `Failed to process screenshot: ${error.message}`);
+    }
+  });
+
+  // Listen for cancel event
+  screenshotInstance.on('cancel', () => {
+    console.log('Screenshot cancelled');
+  });
+
   // Detect screen capture/sharing
   if (process.platform === "darwin") {
     // macOS screen capture detection
@@ -1489,20 +1601,20 @@ function createWindow() {
       updateInstruction("Taking screenshot...");
 
       try {
-        // On Mac, use window-specific capture, otherwise full screen
-        let img;
-        if (process.platform === "darwin") {
-          try {
-            // Capture specific window on Mac
-            img = await captureWindowScreenshot();
-          } catch (windowError) {
-            console.error("Window capture failed, falling back to screen capture:", windowError);
-            // Fall back to full screen
-            img = await captureScreenshot();
-          }
-        } else {
-          // Use regular screen capture on other platforms
-          img = await captureScreenshot();
+        // Hide the main window temporarily
+        const wasVisible = mainWindow.isVisible();
+        if (wasVisible) {
+          mainWindow.hide();
+          // Wait a bit for the window to hide
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+
+        // Try automatic screenshot first
+        const img = await captureScreenshot();
+
+        // Show the main window again
+        if (wasVisible) {
+          mainWindow.show();
         }
 
         // Verify the screenshot captured something
@@ -1529,41 +1641,14 @@ function createWindow() {
     }
   });
 
-  // Area screenshot shortcut
-  globalShortcut.register(`${modifierKey}+D`, async () => {
+  // Area screenshot shortcut using electron-screenshots
+  globalShortcut.register(`${modifierKey}+D`, () => {
     try {
       updateInstruction("Select an area to screenshot...");
-
-      try {
-        // Use the area screenshot function
-        const img = await captureAreaScreenshot();
-
-        // Verify the screenshot captured something
-        if (!img || img.length < 1000) {
-          mainWindow.webContents.send("warning", "Area screenshot appears to be empty or invalid. Please try again.");
-          updateInstruction(getDefaultInstructions());
-          return;
-        }
-
-        screenshots.push(img);
-        updateInstruction("Processing area screenshot with AI...");
-        await processScreenshots(true);
-      } catch (screenshotError) {
-        if (
-          screenshotError.message === "Area selection cancelled" ||
-          screenshotError.message === "Area capture was canceled"
-        ) {
-          // User cancelled the selection, no need to show an error
-          console.log("Area selection was cancelled by user");
-        } else {
-          console.error(`Area screenshot error:`, screenshotError);
-          mainWindow.webContents.send("error", `Failed to capture area screenshot: ${screenshotError.message}`);
-        }
-        updateInstruction(getDefaultInstructions());
-      }
+      screenshotInstance.startCapture();
     } catch (error) {
       console.error(`${modifierKey}+D error:`, error);
-      mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
+      mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
       updateInstruction(getDefaultInstructions());
     }
   });
