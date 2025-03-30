@@ -804,7 +804,6 @@ async function generateWithGemini(messages, model, streaming = false) {
         try {
           for await (const chunk of streamingResponse.stream) {
             const chunkText = chunk.text();
-            console.log("Gemini stream chunk received:", chunkText.substring(0, 50) + "...");
             fullResponse += chunkText;
 
             // Emit the chunk
@@ -1658,6 +1657,23 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
 
+  // Check for development mode environment variable
+  const isDev = process.env.NODE_ENV === 'development' || process.env.DEBUG_MODE === 'true';
+  
+  // Enable DevTools keyboard shortcut (will only work when called from renderer)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // Allow Cmd+Opt+I or Ctrl+Shift+I to open dev tools directly
+    const cmdOrCtrl = process.platform === 'darwin' ? input.meta : input.control;
+    if (
+      (cmdOrCtrl && input.alt && input.key.toLowerCase() === 'i') || 
+      (cmdOrCtrl && input.shift && input.key.toLowerCase() === 'i')
+    ) {
+      mainWindow.webContents.openDevTools();
+      mainWindow.webContents.send('devtools-toggled', true);
+      event.preventDefault();
+    }
+  });
+
   // Initialize electron-screenshots
   screenshotInstance = new Screenshots({
     singleWindow: true,
@@ -1873,7 +1889,7 @@ function getDefaultInstructions() {
     return `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`;
   }
 
-  return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
+  return `${modifierKey}+B: Toggle visibility \n ${modifierKey}+H: Take screenshot \n ${modifierKey}+R: Reset \n`;
 }
 
 // Process screenshots based on current mode
@@ -1906,4 +1922,58 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+ipcMain.on('add-context-screenshot', async () => {
+  try {
+    updateInstruction("Taking additional screenshot for context...");
+    const img = await captureScreenshot();
+    screenshots.push(img);
+    updateInstruction("Processing with new context...");
+    await processScreenshots(true);
+  } catch (error) {
+    console.error("Error adding context screenshot:", error);
+    mainWindow.webContents.send("error", `Error processing: ${error.message}`);
+    updateInstruction(getDefaultInstructions());
+  }
+});
+
+// Toggle DevTools when requested
+ipcMain.on('toggle-devtools', () => {
+  if (mainWindow) {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+      mainWindow.webContents.send('devtools-toggled', false);
+    } else {
+      mainWindow.webContents.openDevTools();
+      mainWindow.webContents.send('devtools-toggled', true);
+    }
+  }
+});
+
+// Show context menu for inspection
+ipcMain.on('show-context-menu', () => {
+  if (mainWindow) {
+    const template = [
+      { 
+        label: 'Inspect Element', 
+        click: () => {
+          mainWindow.webContents.openDevTools();
+          mainWindow.webContents.send('devtools-toggled', true);
+        } 
+      },
+      { type: 'separator' },
+      { label: 'Reload', click: () => mainWindow.reload() },
+      { type: 'separator' },
+      { label: 'Copy', role: 'copy' },
+      { label: 'Paste', role: 'paste' }
+    ];
+    
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup(BrowserWindow.fromWebContents(mainWindow.webContents));
+  }
+});
+
+ipcMain.on('report-solution-error', async (event, errorDescription) => {
+  // ... existing code ...
 });
