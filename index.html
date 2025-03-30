@@ -990,7 +990,36 @@
     // Update the model badge with current settings
     async function updateModelBadge() {
       try {
-        const settings = await ipcRenderer.invoke('get-current-settings');
+        let settings;
+        
+        try {
+          settings = await ipcRenderer.invoke('get-current-settings');
+        } catch (error) {
+          console.error('Error getting model settings from main process:', error);
+          
+          // Try to get settings from localStorage as fallback
+          try {
+            const savedSettings = localStorage.getItem('model-settings');
+            if (savedSettings) {
+              settings = JSON.parse(savedSettings);
+              console.log('Retrieved settings from localStorage:', settings);
+            } else {
+              // Fallback to default settings
+              settings = {
+                aiProvider: 'openai',
+                currentModel: 'gpt-4o-mini'
+              };
+            }
+          } catch (localStorageErr) {
+            console.error('Error retrieving from localStorage:', localStorageErr);
+            // Fallback to default settings
+            settings = {
+              aiProvider: 'openai',
+              currentModel: 'gpt-4o-mini'
+            };
+          }
+        }
+        
         const badge = document.getElementById('model-badge');
 
         let providerName = '';
@@ -998,12 +1027,23 @@
           case 'openai': providerName = 'OpenAI'; break;
           case 'ollama': providerName = 'Ollama'; break;
           case 'gemini': providerName = 'Gemini'; break;
-          default: providerName = settings.aiProvider;
+          default: providerName = settings.aiProvider || 'AI';
         }
 
-        badge.textContent = `${providerName}: ${settings.currentModel}`;
+        const modelName = settings.currentModel || 'Default Model';
+        badge.textContent = `${providerName}: ${modelName}`;
+        
+        // Save current settings to localStorage for persistence
+        try {
+          localStorage.setItem('model-settings', JSON.stringify(settings));
+        } catch (err) {
+          console.error('Error saving settings to localStorage:', err);
+        }
       } catch (error) {
         console.error('Error updating model badge:', error);
+        // Ensure badge always shows something useful even on complete failure
+        const badge = document.getElementById('model-badge');
+        badge.textContent = 'AI: Default Model';
       }
     }
 
@@ -1331,6 +1371,21 @@
 
     // Initialize
     updateModelBadge();
+
+    // Refresh model badge whenever focus returns to window
+    // (e.g., after closing model-selector)
+    window.addEventListener('focus', () => {
+      console.log('Window focused, refreshing model badge');
+      updateModelBadge();
+    });
+    
+    // Listen for postMessage from model-selector window
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'model-settings-updated') {
+        console.log('Received settings update from model selector:', event.data.settings);
+        updateModelBadge();
+      }
+    });
 
     // Setup toolbar button handlers
     document.getElementById('btn-toggle-visibility').addEventListener('click', () => {

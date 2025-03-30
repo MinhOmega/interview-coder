@@ -344,7 +344,21 @@
     }
 
     async function loadCurrentSettings() {
-      currentSettings = await ipcRenderer.invoke('get-current-settings');
+      try {
+        currentSettings = await ipcRenderer.invoke('get-current-settings');
+      } catch (error) {
+        console.error("Error getting current settings:", error.message);
+        // Set default settings if handler is not registered
+        currentSettings = {
+          aiProvider: 'openai',
+          currentModel: 'gpt-4o-mini',
+          ollamaUrl: 'http://127.0.0.1:11434'
+        };
+        
+        // Show notification about missing handler
+        messageDiv.textContent = 'Settings system not fully initialized. Using default configuration.';
+        messageDiv.className = 'status warning';
+      }
 
       // Set UI based on current settings
       document.querySelector(`input[name="aiProvider"][value="${currentSettings.aiProvider}"]`).checked = true;
@@ -401,7 +415,20 @@
       visionModelsNote.style.display = 'none';
 
       try {
-        let models = await ipcRenderer.invoke('get-ollama-models');
+        let models = [];
+        try {
+          models = await ipcRenderer.invoke('get-ollama-models');
+        } catch (invokeError) {
+          // Handle missing handler or other errors
+          if (invokeError.message.includes('No handler registered for')) {
+            ollamaStatus.textContent = 'Ollama support is not fully configured. Other AI providers are still available.';
+            ollamaStatus.className = 'status error';
+            ollamaModelSelect.innerHTML = '<option value="">Ollama not configured</option>';
+            return;
+          } else {
+            throw invokeError; // Re-throw other errors to be caught below
+          }
+        }
 
         // Clear and populate the select
         ollamaModelSelect.innerHTML = '';
@@ -570,6 +597,7 @@
       }
     });
 
+    // Save button handler
     saveBtn.addEventListener('click', async () => {
       const aiProvider = document.querySelector('input[name="aiProvider"]:checked').value;
       let currentModel;
@@ -583,7 +611,7 @@
       }
 
       // Validate selection
-      if (aiProvider === 'ollama' && (!currentModel || currentModel === 'loading')) {
+      if (aiProvider === 'ollama' && (!currentModel || currentModel === 'loading' || currentModel === 'Ollama not configured')) {
         messageDiv.textContent = 'Please select a valid Ollama model';
         messageDiv.className = 'status error';
         return;
@@ -621,21 +649,59 @@
       // Disable the save button to prevent multiple clicks
       saveBtn.disabled = true;
 
-      // Update settings
-      ipcRenderer.send('update-model-settings', {
+      // Create settings object to save
+      const settings = {
         aiProvider,
         currentModel,
-        ollamaUrl // Pass the URL to main.js
-      });
+        ollamaUrl
+      };
 
-      // Show success message and close
-      messageDiv.textContent = 'Settings saved!';
-      messageDiv.className = 'status success';
+      try {
+        // Update settings
+        ipcRenderer.send('update-model-settings', settings);
+        
+        // Show success message
+        messageDiv.textContent = 'Settings saved!';
+        messageDiv.className = 'status success';
+        
+        // Try to save settings to localStorage as fallback
+        try {
+          localStorage.setItem('model-settings', JSON.stringify(settings));
+        } catch (storageErr) {
+          console.error('Could not save to localStorage:', storageErr);
+        }
 
-      // Close window after a brief delay
-      setTimeout(() => {
-        window.close();
-      }, 800);
+        // For better synchronization, force the main window to refresh model badge
+        try {
+          // Check if we were opened by a parent window
+          if (window.opener) {
+            window.opener.postMessage({ type: 'model-settings-updated', settings }, '*');
+          }
+        } catch (e) {
+          console.error('Error notifying parent window:', e);
+        }
+
+        // Close window after a brief delay
+        setTimeout(() => {
+          window.close();
+        }, 800);
+      } catch (error) {
+        console.error('Error saving settings:', error);
+        
+        // Try to save settings to localStorage as fallback
+        try {
+          localStorage.setItem('model-settings', JSON.stringify(settings));
+          messageDiv.textContent = 'Settings saved locally (fallback mode).';
+          messageDiv.className = 'status success';
+          
+          // Re-enable save button
+          saveBtn.disabled = false;
+        } catch (storageErr) {
+          messageDiv.textContent = 'Could not save settings: ' + error.message;
+          messageDiv.className = 'status error';
+          saveBtn.disabled = false;
+        }
+      }
     });
 
     cancelBtn.addEventListener('click', () => {
