@@ -324,34 +324,6 @@
       showTemporaryNotification('Screen sharing detected - window hidden. Press ' + modifierKey + '+B to show.', 'warning');
     });
 
-    // Screenshot notification
-    ipcRenderer.on('screenshot-saved', (event, data) => {
-      const { path, dimensions, isArea } = data;
-      const notification = document.createElement('div');
-      notification.className = 'screenshot-notification';
-
-      notification.innerHTML = `
-        <div><strong>${isArea ? 'Area' : 'Screen'} Screenshot Saved</strong></div>
-        ${dimensions ? `<div>Size: ${dimensions.width}×${dimensions.height}px</div>` : ''}
-        <div class="file-path">${path}</div>
-      `;
-
-      document.body.appendChild(notification);
-
-      // Animate in
-      setTimeout(() => {
-        notification.classList.add('visible');
-      }, 10);
-
-      // Remove after a few seconds
-      setTimeout(() => {
-        notification.classList.remove('visible');
-        setTimeout(() => {
-          notification.remove();
-        }, 300);
-      }, 5000);
-    });
-
     // Update the model badge with current settings
     async function updateModelBadge() {
       try {
@@ -669,7 +641,7 @@
     function showNotification(message, type = 'success') {
       const container = document.getElementById('notification-container');
       const notification = document.createElement('div');
-      notification.textContent = message;
+      notification.textContent = message.replace(/\n/g, '<br>');
       notification.className = `notification ${type}`;
 
       container.appendChild(notification);
@@ -854,7 +826,99 @@
     // Handle content container visibility
     ipcRenderer.on('hide-content', () => {
       const contentContainer = document.getElementById('content-container');
-      contentContainer.style.display = 'none';
+      
+      // Save references to important elements before clearing
+      const banner = document.getElementById('instruction-banner');
+      const modelBadge = document.getElementById('model-badge');
+      const notificationContainer = document.getElementById('notification-container');
+      
+      // Clear the container
+      contentContainer.innerHTML = '';
+      
+      // Add back the instruction banner
+      contentContainer.appendChild(banner);
+      
+      // Recreate the main-content structure
+      const mainContent = document.createElement('div');
+      mainContent.id = 'main-content';
+      
+      // Recreate the loading content
+      const loadingContent = document.createElement('div');
+      loadingContent.id = 'loading-content';
+      loadingContent.className = 'loading-container';
+      loadingContent.style.display = 'none';
+      
+      // Add skeleton sections
+      for (let i = 0; i < 3; i++) {
+        const section = document.createElement('div');
+        section.className = 'skeleton-section';
+        
+        const header = document.createElement('div');
+        header.className = 'skeleton-header';
+        section.appendChild(header);
+        
+        // Add some skeleton text lines
+        for (let j = 0; j < 3; j++) {
+          const textLine = document.createElement('div');
+          textLine.className = `skeleton-text line-${Math.floor(70 + Math.random() * 30)}`;
+          section.appendChild(textLine);
+        }
+        
+        // Add a code block to the second section
+        if (i === 1) {
+          const codeBlock = document.createElement('div');
+          codeBlock.className = 'skeleton-code';
+          section.appendChild(codeBlock);
+        }
+        
+        loadingContent.appendChild(section);
+      }
+      
+      // Add the loading content to main content
+      mainContent.appendChild(loadingContent);
+      
+      // Create empty result content
+      const resultContent = document.createElement('div');
+      resultContent.id = 'result-content';
+      resultContent.className = 'result-content';
+      mainContent.appendChild(resultContent);
+      
+      // Recreate context actions container
+      const contextActions = document.createElement('div');
+      contextActions.id = 'context-actions';
+      contextActions.style.display = 'none';
+      
+      // Add the buttons
+      const addContextBtn = document.createElement('div');
+      addContextBtn.className = 'toolbar-button';
+      addContextBtn.id = 'btn-add-context';
+      addContextBtn.innerHTML = '<span class="icon">📷</span><span>Add screenshot to continue</span>';
+      
+      const reportErrorBtn = document.createElement('div');
+      reportErrorBtn.className = 'toolbar-button';
+      reportErrorBtn.id = 'btn-report-error';
+      reportErrorBtn.innerHTML = '<span class="icon">🔄</span><span>Report error in solution</span>';
+      
+      contextActions.appendChild(addContextBtn);
+      contextActions.appendChild(reportErrorBtn);
+      mainContent.appendChild(contextActions);
+      
+      // Add everything back to the container
+      contentContainer.appendChild(mainContent);
+      contentContainer.appendChild(modelBadge);
+      contentContainer.appendChild(notificationContainer);
+      
+      // Re-attach event listeners
+      document.getElementById('btn-add-context').addEventListener('click', () => {
+        ipcRenderer.send('add-context-screenshot');
+      });
+      
+      document.getElementById('btn-report-error').addEventListener('click', () => {
+        const errorDescription = prompt('Please describe the error in the solution:');
+        if (errorDescription && errorDescription.trim() !== '') {
+          ipcRenderer.send('report-solution-error', errorDescription);
+        }
+      });
     });
   </script>
 </body>
