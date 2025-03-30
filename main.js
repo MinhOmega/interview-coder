@@ -79,7 +79,7 @@ const SHORTCUTS = {
   TOGGLE_VISIBILITY: {
     key: `${modifierKey}+B`,
     handler: () => toggleWindowVisibility(),
-    alwaysActive: true
+    alwaysActive: true,
   },
   PROCESS_SCREENSHOTS: {
     key: `${modifierKey}+Enter`,
@@ -89,27 +89,27 @@ const SHORTCUTS = {
         return;
       }
       processScreenshotsWithAI();
-    }
+    },
   },
   OPEN_SETTINGS: {
     key: `${modifierKey}+,`,
-    handler: () => createModelSelectionWindow()
+    handler: () => createModelSelectionWindow(),
   },
   MOVE_LEFT: {
     key: `${modifierKey}+Left`,
-    handler: () => moveWindow("left")
+    handler: () => moveWindow("left"),
   },
   MOVE_RIGHT: {
     key: `${modifierKey}+Right`,
-    handler: () => moveWindow("right")
+    handler: () => moveWindow("right"),
   },
   MOVE_UP: {
     key: `${modifierKey}+Up`,
-    handler: () => moveWindow("up")
+    handler: () => moveWindow("up"),
   },
   MOVE_DOWN: {
     key: `${modifierKey}+Down`,
-    handler: () => moveWindow("down")
+    handler: () => moveWindow("down"),
   },
   TAKE_SCREENSHOT: {
     key: `${modifierKey}+H`,
@@ -125,7 +125,7 @@ const SHORTCUTS = {
         mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
         updateInstruction(getDefaultInstructions());
       }
-    }
+    },
   },
   AREA_SCREENSHOT: {
     key: `${modifierKey}+D`,
@@ -138,7 +138,7 @@ const SHORTCUTS = {
         mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
         updateInstruction(getDefaultInstructions());
       }
-    }
+    },
   },
   MULTI_PAGE: {
     key: `${modifierKey}+A`,
@@ -147,36 +147,36 @@ const SHORTCUTS = {
         if (!multiPageMode) {
           multiPageMode = true;
           updateInstruction(
-            `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+            `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`,
           );
         }
         updateInstruction("Taking screenshot for multi-mode...");
         const img = await captureScreenshot();
         screenshots.push(img);
         updateInstruction(
-          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`
+          `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`,
         );
       } catch (error) {
         console.error(`${modifierKey}+A error:`, error);
         mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
       }
-    }
+    },
   },
   RESET: {
     key: `${modifierKey}+R`,
-    handler: () => resetProcess()
+    handler: () => resetProcess(),
   },
   QUIT: {
     key: `${modifierKey}+Q`,
     handler: () => {
       console.log("Quitting application...");
       app.quit();
-    }
+    },
   },
   MODEL_SELECTION: {
     key: `${modifierKey}+M`,
-    handler: () => createModelSelectionWindow()
-  }
+    handler: () => createModelSelectionWindow(),
+  },
 };
 
 // Function to manage hotkey registration based on visibility
@@ -185,17 +185,49 @@ function updateHotkeys(isVisible) {
   globalShortcut.unregisterAll();
 
   // Register shortcuts based on visibility state
-  Object.values(SHORTCUTS).forEach(shortcut => {
+  Object.values(SHORTCUTS).forEach((shortcut) => {
     if (isVisible || shortcut.alwaysActive) {
       globalShortcut.register(shortcut.key, shortcut.handler);
     }
   });
 }
 
+// Function to move window to different positions on screen
+function moveWindow(direction) {
+  if (!mainWindow) return;
+
+  const currentPosition = mainWindow.getBounds();
+  const display = screen.getDisplayNearestPoint({ x: currentPosition.x, y: currentPosition.y });
+  const workArea = display.workArea;
+
+  // Calculate the amount to move (30% of workarea width/height)
+  const moveX = Math.floor(workArea.width * 0.3);
+  const moveY = Math.floor(workArea.height * 0.3);
+
+  let newPosition = { ...currentPosition };
+
+  switch (direction) {
+    case "left":
+      newPosition.x = Math.max(workArea.x, currentPosition.x - moveX);
+      break;
+    case "right":
+      newPosition.x = Math.min(workArea.x + workArea.width - currentPosition.width, currentPosition.x + moveX);
+      break;
+    case "up":
+      newPosition.y = Math.max(workArea.y, currentPosition.y - moveY);
+      break;
+    case "down":
+      newPosition.y = Math.min(workArea.y + workArea.height - currentPosition.height, currentPosition.y + moveY);
+      break;
+  }
+
+  mainWindow.setBounds(newPosition);
+}
+
 // Update the toggleWindowVisibility function
 function toggleWindowVisibility(forceState) {
-  isWindowVisible = typeof forceState === 'boolean' ? forceState : !isWindowVisible;
-  
+  isWindowVisible = typeof forceState === "boolean" ? forceState : !isWindowVisible;
+
   if (mainWindow) {
     if (isWindowVisible) {
       mainWindow.show();
@@ -212,12 +244,12 @@ function toggleWindowVisibility(forceState) {
         modelListWindow.setOpacity(0);
       }
     }
-    
+
     // Update hotkeys based on visibility
     updateHotkeys(isWindowVisible);
-    
+
     // Notify renderer about visibility change
-    mainWindow.webContents.send('update-visibility', isWindowVisible);
+    mainWindow.webContents.send("update-visibility", isWindowVisible);
   }
 }
 
@@ -1517,7 +1549,7 @@ function createModelSelectionWindow() {
     width: 500,
     height: 600,
     parent: mainWindow,
-    modal: true,
+    modal: false, // Allow communication between windows
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -1528,6 +1560,10 @@ function createModelSelectionWindow() {
 
   modelListWindow.on("closed", () => {
     modelListWindow = null;
+    // Notify main window to refresh model badge
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('model-changed');
+    }
   });
 }
 
@@ -1539,6 +1575,46 @@ function resetProcess() {
   mainWindow.webContents.send("hide-content");
   updateInstruction(`Press ${modifierKey}+H to take a screenshot`);
 }
+
+// Handler for getting current settings
+ipcMain.handle('get-current-settings', () => {
+  return {
+    aiProvider,
+    currentModel,
+    ollamaUrl: OLLAMA_BASE_URL
+  };
+});
+
+// Handler for updating model settings
+ipcMain.on('update-model-settings', (event, settings) => {
+  console.log("Updating model settings:", settings);
+  
+  // Update global settings
+  aiProvider = settings.aiProvider;
+  currentModel = settings.currentModel;
+  
+  if (settings.ollamaUrl) {
+    // Ensure IPv4 compatibility
+    OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+  }
+  
+  // Save to local storage via renderer (more reliable than electron-store for simple settings)
+  if (mainWindow) {
+    mainWindow.webContents.send('model-changed');
+  }
+  
+  console.log(`Settings updated: Provider=${aiProvider}, Model=${currentModel}, Ollama URL=${OLLAMA_BASE_URL}`);
+});
+
+// Handler for Ollama models
+ipcMain.handle('get-ollama-models', async () => {
+  try {
+    return await getOllamaModels();
+  } catch (error) {
+    console.error("Error getting Ollama models:", error);
+    return [];
+  }
+});
 
 function createWindow() {
   // Get primary display dimensions for centering
@@ -1606,26 +1682,26 @@ function createWindow() {
     try {
       const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
       const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
-      
+
       // Save the image
       fs.writeFileSync(imagePath, data.buffer);
-      
+
       // Convert to base64 for processing
       const base64Image = `data:image/png;base64,${data.buffer.toString("base64")}`;
-      
+
       // Add to screenshots array and process
       screenshots.push(base64Image);
-      
+
       // Get dimensions
       const dimensions = { width: data.bounds.width, height: data.bounds.height };
-      
+
       // Notify about saved screenshot
       mainWindow.webContents.send("screenshot-saved", {
         path: imagePath,
         isArea: true,
         dimensions: dimensions,
       });
-      
+
       // Process the screenshot
       await processScreenshots(true);
     } catch (error) {
