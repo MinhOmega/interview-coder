@@ -1191,11 +1191,29 @@ Format your response in clear, well-structured Markdown with proper code blocks 
         mainWindow.webContents.send("loading", false);
         mainWindow.webContents.send("stream-start");
 
+        // Buffer chunks to reduce render frequency
+        let buffer = "";
+        let lastUpdateTime = Date.now();
+        const CHUNK_INTERVAL = 150; // ms between updates to reduce flickering
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
-            mainWindow.webContents.send("stream-chunk", content);
+            buffer += content;
+
+            // Only send updates at intervals to reduce rendering frequency
+            const now = Date.now();
+            if (now - lastUpdateTime >= CHUNK_INTERVAL) {
+              mainWindow.webContents.send("stream-chunk", buffer);
+              buffer = "";
+              lastUpdateTime = now;
+            }
           }
+        }
+
+        // Send any remaining buffer content
+        if (buffer) {
+          mainWindow.webContents.send("stream-chunk", buffer);
         }
 
         mainWindow.webContents.send("stream-end");
@@ -1231,16 +1249,30 @@ Format your response in clear, well-structured Markdown with proper code blocks 
 
         // For Gemini, we need to handle streaming differently
         let accumulatedText = "";
+        let lastUpdateTime = Date.now();
+        const UPDATE_INTERVAL = 150; // ms between updates to reduce flickering
 
         streamingResult.emitter.on("chunk", (chunk) => {
           accumulatedText += chunk;
-          mainWindow.webContents.send("stream-update", accumulatedText);
+
+          // Only update UI at intervals to reduce flickering
+          const now = Date.now();
+          if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+            mainWindow.webContents.send("stream-update", accumulatedText);
+            lastUpdateTime = now;
+          }
         });
 
         streamingResult.emitter.on("complete", () => {
-          mainWindow.webContents.send("stream-end");
-          // Hide instruction banner after streaming is complete
-          mainWindow.webContents.send("hide-instruction");
+          // Send final update with complete text
+          mainWindow.webContents.send("stream-update", accumulatedText);
+
+          // Signal end of stream
+          setTimeout(() => {
+            mainWindow.webContents.send("stream-end");
+            // Hide instruction banner after streaming is complete
+            mainWindow.webContents.send("hide-instruction");
+          }, 100);
         });
 
         streamingResult.emitter.on("error", (error) => {
