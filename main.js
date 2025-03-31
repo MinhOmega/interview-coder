@@ -19,6 +19,20 @@ const axios = require("axios");
 const Screenshots = require("electron-screenshots");
 require("dotenv").config();
 
+// Enable hot reload for development
+try {
+  // Only enable in development and not in production
+  if (process.env.NODE_ENV !== "production") {
+    require("electron-reloader")(module, {
+      debug: true,
+      watchRenderer: true,
+    });
+    console.log("Hot reload enabled");
+  }
+} catch (err) {
+  console.error("Error setting up hot reload:", err);
+}
+
 // Check if running on macOS
 const isMac = process.platform === "darwin";
 const modifierKey = isMac ? "Command" : "Crtl";
@@ -1022,279 +1036,15 @@ async function captureScreenshot() {
     }
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("screenshot-saved", {
-      path: imagePath,
-      isArea: false,
-      dimensions: dimensions,
+    mainWindow.webContents.send("notification", {
+      body: `Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+      type: "success",
     });
 
     console.log(`Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
     return base64Image;
   } catch (error) {
     console.error("Screenshot capture failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Capture a specific window by prompting the user to click on it
- */
-async function captureWindowScreenshot() {
-  try {
-    console.log("Preparing to capture specific window...");
-
-    // Hide our app window first
-    const wasVisible = mainWindow.isVisible();
-    if (wasVisible) {
-      mainWindow.hide();
-    }
-
-    // Show instruction in notification
-    mainWindow.webContents.send("notification", {
-      title: "Screenshot",
-      body: "Please click on the window you want to capture.",
-    });
-
-    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-    const imagePath = path.join(app.getPath("pictures"), `window-screenshot-${timestamp}.png`);
-
-    let success = false;
-
-    // Use platform-specific approach for window capture
-    if (process.platform === "darwin") {
-      try {
-        console.log("Using native macOS window capture");
-        // -w flag captures the window the user clicks on
-        await new Promise((resolve, reject) => {
-          const { exec } = require("child_process");
-          exec(`screencapture -w "${imagePath}"`, (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              success = true;
-              resolve();
-            }
-          });
-        });
-      } catch (macOSError) {
-        console.error("macOS window capture failed:", macOSError);
-        if (wasVisible) mainWindow.show();
-        throw macOSError;
-      }
-    } else {
-      // For other platforms, just use regular screenshot as there's no easy native way
-      // to capture a specific window without additional dependencies
-      if (wasVisible) mainWindow.show();
-      return await captureScreenshot();
-    }
-
-    // Show the main window again
-    if (wasVisible) {
-      mainWindow.show();
-    }
-
-    // Verify the screenshot was taken (user might have canceled)
-    if (!fs.existsSync(imagePath)) {
-      console.log("Window capture was canceled or failed");
-      throw new Error("Window capture was canceled");
-    }
-
-    const stats = fs.statSync(imagePath);
-    if (stats.size < 1000) {
-      throw new Error("Window screenshot file is too small, likely empty");
-    }
-
-    // Read the image and convert to base64
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-
-    // Get image dimensions
-    const dimensions = { width: 0, height: 0 };
-    try {
-      const sizeOf = require("image-size");
-      const imageDimensions = sizeOf(imagePath);
-      dimensions.width = imageDimensions.width;
-      dimensions.height = imageDimensions.height;
-    } catch (dimError) {
-      console.error("Error getting image dimensions:", dimError);
-    }
-
-    // Notify about saved screenshot
-    mainWindow.webContents.send("screenshot-saved", {
-      path: imagePath,
-      isArea: false,
-      dimensions: dimensions,
-    });
-
-    console.log(`Window screenshot saved to ${imagePath}`);
-    return base64Image;
-  } catch (error) {
-    console.error("Window screenshot capture failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Captures a screenshot of a selected area
- */
-async function captureAreaScreenshot() {
-  // Hide the main window
-  mainWindow.hide();
-  console.log("Waiting for window to hide...");
-
-  await new Promise((resolve) => setTimeout(resolve, 300)); // Wait for window to hide
-
-  try {
-    console.log("Preparing to capture area...");
-
-    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-    const imagePath = path.join(app.getPath("pictures"), `area-screenshot-${timestamp}.png`);
-
-    // Use platform-specific approach for area capture
-    if (process.platform === "darwin") {
-      try {
-        console.log("Using native macOS area selection");
-        // -s flag allows user to select an area
-        await new Promise((resolve, reject) => {
-          const { exec } = require("child_process");
-          exec(`screencapture -s "${imagePath}"`, (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve();
-            }
-          });
-        });
-      } catch (macOSError) {
-        console.error("macOS area capture failed:", macOSError);
-        mainWindow.show();
-        throw macOSError;
-      }
-    } else {
-      // For Windows and Linux, use the existing area selection implementation
-      // Simplified for brevity - would need to be implemented based on platform
-
-      // Create a window for the screenshot area selection
-      let captureWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        frame: false,
-        fullscreen: true,
-        transparent: true,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false,
-        },
-      });
-
-      // Load the capture-helper.html from the file system
-      await captureWindow.loadFile("capture-helper.html");
-
-      return new Promise((resolve, reject) => {
-        ipcMain.once("area-selected", async (event, { x, y, width, height, imageData }) => {
-          console.log("Area selected:", x, y, width, height);
-
-          try {
-            if (width < 10 || height < 10) {
-              captureWindow.close();
-              mainWindow.show();
-              reject(new Error("Selected area is too small"));
-              return;
-            }
-
-            // If we received image data directly from the renderer
-            if (imageData) {
-              console.log("Using image data from renderer");
-              captureWindow.close();
-              mainWindow.show();
-
-              try {
-                const buffer = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ""), "base64");
-                fs.writeFileSync(imagePath, buffer);
-
-                // Get dimensions for notification
-                const dimensions = { width, height };
-
-                // Notify about saved screenshot
-                mainWindow.webContents.send("screenshot-saved", {
-                  path: imagePath,
-                  isArea: true,
-                  dimensions,
-                });
-
-                console.log(`Area screenshot saved to ${imagePath}`);
-                resolve(imageData);
-              } catch (error) {
-                console.error("Error saving area screenshot:", error);
-                reject(error);
-              }
-            } else {
-              // No image data, fallback to full screen
-              captureWindow.close();
-              mainWindow.show();
-              const fullScreenshot = await captureScreenshot();
-              resolve(fullScreenshot);
-            }
-          } catch (error) {
-            console.error("Error processing area selection:", error);
-            captureWindow.close();
-            mainWindow.show();
-            reject(error);
-          }
-        });
-
-        ipcMain.once("area-selection-cancelled", () => {
-          console.log("Area selection cancelled by user");
-          captureWindow.close();
-          mainWindow.show();
-          reject(new Error("Area selection cancelled"));
-        });
-      });
-    }
-
-    // Check if the file exists (user might have canceled)
-    if (!fs.existsSync(imagePath)) {
-      console.log("Area capture was canceled");
-      mainWindow.show();
-      throw new Error("Area capture was canceled");
-    }
-
-    const stats = fs.statSync(imagePath);
-    if (stats.size < 1000) {
-      mainWindow.show();
-      throw new Error("Area screenshot file is too small, likely empty");
-    }
-
-    // Read the image and convert to base64
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-
-    // Get image dimensions
-    const dimensions = { width: 0, height: 0 };
-    try {
-      const sizeOf = require("image-size");
-      const imageDimensions = sizeOf(imagePath);
-      dimensions.width = imageDimensions.width;
-      dimensions.height = imageDimensions.height;
-    } catch (dimError) {
-      console.error("Error getting image dimensions:", dimError);
-    }
-
-    // Show main window again
-    mainWindow.show();
-
-    // Notify about saved screenshot
-    mainWindow.webContents.send("screenshot-saved", {
-      path: imagePath,
-      isArea: true,
-      dimensions: dimensions,
-    });
-
-    console.log(`Area screenshot saved to ${imagePath}`);
-    return base64Image;
-  } catch (error) {
-    console.error("Area screenshot failed:", error);
-    mainWindow.show();
     throw error;
   }
 }
@@ -1562,7 +1312,7 @@ function createModelSelectionWindow() {
     modelListWindow = null;
     // Notify main window to refresh model badge
     if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('model-changed');
+      mainWindow.webContents.send("model-changed");
     }
   });
 }
@@ -1577,37 +1327,37 @@ function resetProcess() {
 }
 
 // Handler for getting current settings
-ipcMain.handle('get-current-settings', () => {
+ipcMain.handle("get-current-settings", () => {
   return {
     aiProvider,
     currentModel,
-    ollamaUrl: OLLAMA_BASE_URL
+    ollamaUrl: OLLAMA_BASE_URL,
   };
 });
 
 // Handler for updating model settings
-ipcMain.on('update-model-settings', (event, settings) => {
+ipcMain.on("update-model-settings", (event, settings) => {
   console.log("Updating model settings:", settings);
-  
+
   // Update global settings
   aiProvider = settings.aiProvider;
   currentModel = settings.currentModel;
-  
+
   if (settings.ollamaUrl) {
     // Ensure IPv4 compatibility
     OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
   }
-  
+
   // Save to local storage via renderer (more reliable than electron-store for simple settings)
   if (mainWindow) {
-    mainWindow.webContents.send('model-changed');
+    mainWindow.webContents.send("model-changed");
   }
-  
+
   console.log(`Settings updated: Provider=${aiProvider}, Model=${currentModel}, Ollama URL=${OLLAMA_BASE_URL}`);
 });
 
 // Handler for Ollama models
-ipcMain.handle('get-ollama-models', async () => {
+ipcMain.handle("get-ollama-models", async () => {
   try {
     return await getOllamaModels();
   } catch (error) {
@@ -1658,6 +1408,20 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
 
+  // Enable DevTools keyboard shortcut (will only work when called from renderer)
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    // Allow Cmd+Opt+I or Ctrl+Shift+I to open dev tools directly
+    const cmdOrCtrl = process.platform === "darwin" ? input.meta : input.control;
+    if (
+      (cmdOrCtrl && input.alt && input.key.toLowerCase() === "i") ||
+      (cmdOrCtrl && input.shift && input.key.toLowerCase() === "i")
+    ) {
+      mainWindow.webContents.openDevTools();
+      mainWindow.webContents.send("devtools-toggled", true);
+      event.preventDefault();
+    }
+  });
+
   // Initialize electron-screenshots
   screenshotInstance = new Screenshots({
     singleWindow: true,
@@ -1696,10 +1460,9 @@ function createWindow() {
       const dimensions = { width: data.bounds.width, height: data.bounds.height };
 
       // Notify about saved screenshot
-      mainWindow.webContents.send("screenshot-saved", {
-        path: imagePath,
-        isArea: true,
-        dimensions: dimensions,
+      mainWindow.webContents.send("notification", {
+        body: `Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+        type: "success",
       });
 
       // Process the screenshot
@@ -1791,80 +1554,6 @@ function createWindow() {
   setTimeout(() => {
     updateInstruction(getDefaultInstructions());
   }, 1000);
-
-  // Make sure window control handlers exist even if buttons are removed
-  ipcMain.on("minimize-window", () => {
-    if (mainWindow) {
-      mainWindow.minimize();
-    }
-  });
-
-  ipcMain.on("maximize-window", () => {
-    if (mainWindow) {
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      } else {
-        mainWindow.maximize();
-      }
-    }
-  });
-
-  ipcMain.on("close-window", () => {
-    if (mainWindow) {
-      mainWindow.close();
-    }
-  });
-
-  // Add compatibility handling for both area-selector.html and capture-helper.html
-  ipcMain.on("area-cancelled", () => {
-    console.log("Received deprecated area-cancelled event - for backward compatibility");
-    mainWindow.show();
-  });
-
-  ipcMain.on("area-selected", async (event, rect) => {
-    console.log("Received deprecated area-selected event - for backward compatibility");
-    try {
-      // Handle the old format from area-selector.html
-      const timestamp = Date.now();
-      const fileName = `area_screenshot_${timestamp}.png`;
-      const picturesDir = app.getPath("pictures");
-      const imagePath = path.join(picturesDir, fileName);
-
-      try {
-        // Take a full screenshot with screenshot-desktop
-        await screenshot({ filename: imagePath });
-
-        // Read the image file to base64
-        const imageBuffer = fs.readFileSync(imagePath);
-        const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-
-        // Notify user about saved screenshot
-        mainWindow.webContents.send("screenshot-saved", {
-          path: imagePath,
-          fileName: fileName,
-          isArea: true,
-          dimensions: { width: Math.round(rect.width), height: Math.round(rect.height) },
-        });
-
-        mainWindow.webContents.send("warning", "Using full screenshot instead of area selection");
-
-        console.log(`Fallback screenshot saved to: ${imagePath}`);
-
-        // Process with AI
-        updateInstruction("Processing area screenshot with AI...");
-        screenshots.push(base64Image);
-        await processScreenshots(true);
-      } catch (err) {
-        console.error("Error handling backward compatibility screenshot:", err);
-        mainWindow.webContents.send("error", `Failed to capture area: ${err.message}`);
-        updateInstruction(getDefaultInstructions());
-      }
-    } catch (err) {
-      console.error("Error in backward compatibility area-selected handler:", err);
-      mainWindow.webContents.send("error", `Failed to process area selection: ${err.message}`);
-      updateInstruction(getDefaultInstructions());
-    }
-  });
 }
 
 // Get default instructions based on app state
@@ -1873,7 +1562,7 @@ function getDefaultInstructions() {
     return `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`;
   }
 
-  return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
+  return `${modifierKey}+B: Toggle visibility \n ${modifierKey}+H: Take screenshot \n ${modifierKey}+R: Reset \n`;
 }
 
 // Process screenshots based on current mode
@@ -1906,4 +1595,58 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+ipcMain.on("add-context-screenshot", async () => {
+  try {
+    updateInstruction("Taking additional screenshot for context...");
+    const img = await captureScreenshot();
+    screenshots.push(img);
+    updateInstruction("Processing with new context...");
+    await processScreenshots(true);
+  } catch (error) {
+    console.error("Error adding context screenshot:", error);
+    mainWindow.webContents.send("error", `Error processing: ${error.message}`);
+    updateInstruction(getDefaultInstructions());
+  }
+});
+
+// Toggle DevTools when requested
+ipcMain.on("toggle-devtools", () => {
+  if (mainWindow) {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+      mainWindow.webContents.send("devtools-toggled", false);
+    } else {
+      mainWindow.webContents.openDevTools();
+      mainWindow.webContents.send("devtools-toggled", true);
+    }
+  }
+});
+
+// Show context menu for inspection
+ipcMain.on("show-context-menu", () => {
+  if (mainWindow) {
+    const template = [
+      {
+        label: "Inspect Element",
+        click: () => {
+          mainWindow.webContents.openDevTools();
+          mainWindow.webContents.send("devtools-toggled", true);
+        },
+      },
+      { type: "separator" },
+      { label: "Reload", click: () => mainWindow.reload() },
+      { type: "separator" },
+      { label: "Copy", role: "copy" },
+      { label: "Paste", role: "paste" },
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup(BrowserWindow.fromWebContents(mainWindow.webContents));
+  }
+});
+
+ipcMain.on("report-solution-error", async (event, errorDescription) => {
+  // ... existing code ...
 });

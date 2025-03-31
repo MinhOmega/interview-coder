@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dev": "cross-env NODE_ENV=development electron ."
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
@@ -17,5 +18,9 @@
     "remark-gfm": "^4.0.1",
     "remark-html": "^16.0.1",
     "screenshot-desktop": "^1.15.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron-reloader": "^1.2.3"
   }
 }
