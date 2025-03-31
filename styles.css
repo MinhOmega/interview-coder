@@ -588,7 +588,7 @@ body.invisible-mode:hover {
 #content-container {
   padding-top: 60px;
   width: 100%;
-  height: calc(100vh - 50px);
+  height: 100vh;
   /* Ensure it fills the available height */
   box-sizing: border-box;
   position: relative;
@@ -610,13 +610,11 @@ body.invisible-mode:hover {
 #main-content {
   padding: 20px;
   margin: 0 auto;
-  max-width: 900px;
   width: 100%;
   /* Take up full width of container up to max-width */
   color: rgba(255, 255, 255, 0.9);
   /* Improved text color */
   position: relative;
-  padding-bottom: 80px;
   box-sizing: border-box;
   /* Include padding in width calculations */
 }
