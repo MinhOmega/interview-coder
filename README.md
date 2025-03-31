@@ -96,7 +96,6 @@ If you encounter connection issues with Ollama:
     - Command+Q: Quit the application.
     - Command+B: Toggle visibility of all application windows (both main window and settings).
     - Command+Arrow keys: Move the window in the specified direction.
-    - Command+Shift+Arrow keys: Scroll the content after AI response (Up/Down for vertical scrolling, Left/Right for horizontal scrolling).
 
     On Windows/Linux:
     - Ctrl+H: Capture a window screenshot and process it immediately.
@@ -108,7 +107,6 @@ If you encounter connection issues with Ollama:
     - Ctrl+Q: Quit the application.
     - Ctrl+B: Toggle visibility of all application windows (both main window and settings).
     - Ctrl+Arrow keys: Move the window in the specified direction.
-    - Ctrl+Shift+Arrow keys: Scroll the content after AI response (Up/Down for vertical scrolling, Left/Right for horizontal scrolling).
 
 ## Supported Models
 

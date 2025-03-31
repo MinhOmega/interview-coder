@@ -220,52 +220,6 @@
       ipcRenderer.send('show-context-menu');
     });
 
-    // Handle scroll-content event from main process
-    ipcRenderer.on('scroll-content', (event, direction) => {
-      const contentContainer = document.getElementById('content-container');
-      const scrollAmount = 300; // Pixels to scroll in horizontal or vertical direction
-      
-      // Add a class to reduce rendering during programmatic scrolling
-      contentContainer.classList.add('scrolling');
-      
-      // Temporarily disable smooth scrolling for better performance
-      const currentScrollBehavior = contentContainer.style.scrollBehavior;
-      contentContainer.style.scrollBehavior = 'auto';
-      
-      switch(direction) {
-        case 'up':
-          contentContainer.scrollBy({
-            top: -scrollAmount,
-            behavior: 'auto'
-          });
-          break;
-        case 'down':
-          contentContainer.scrollBy({
-            top: scrollAmount,
-            behavior: 'auto'
-          });
-          break;
-        case 'left':
-          contentContainer.scrollBy({
-            left: -scrollAmount,
-            behavior: 'auto'
-          });
-          break;
-        case 'right':
-          contentContainer.scrollBy({
-            left: scrollAmount,
-            behavior: 'auto'
-          });
-          break;
-      }
-      
-      // Restore smooth scrolling after a delay
-      setTimeout(() => {
-        contentContainer.style.scrollBehavior = currentScrollBehavior;
-        contentContainer.classList.remove('scrolling');
-      }, 100);
-    });
-
     // Register keyboard shortcut for DevTools (Cmd/Ctrl+Shift+I)
     document.addEventListener('keydown', (e) => {
       if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === 'I') {
@@ -307,29 +261,47 @@
     ipcRenderer.on('analysis-result', async (event, markdown) => {
       const html = await processMarkdown(markdown);
       
-      // Use optimized DOM updates
+      // Use optimized DOM updates with double requestAnimationFrame for smoother rendering
       requestAnimationFrame(() => {
-        document.getElementById('result-content').innerHTML = html;
+        requestAnimationFrame(() => {
+          document.getElementById('result-content').innerHTML = html;
 
-        // Show context actions 
-        document.getElementById('context-actions').style.display = 'flex';
+          // Show context actions 
+          document.getElementById('context-actions').style.display = 'flex';
 
-        // Setup code copy buttons after content is added
-        setupCodeCopyButtons();
+          // Setup code copy buttons after content is added
+          setupCodeCopyButtons();
 
-        // Optimize scroll performance after new content is loaded
-        optimizeScrollPerformance();
+          // Optimize scroll performance after new content is loaded
+          optimizeScrollPerformance();
+        });
       });
 
-      // Scroll to top using optimized method
+      // Improved scroll to top using optimized method
+      const contentContainer = document.getElementById('content-container');
+      
+      // Apply scrolling optimization class
+      contentContainer.classList.add('scrolling');
+      
+      // Use double RAF for smoother rendering
       requestAnimationFrame(() => {
-        const contentContainer = document.getElementById('content-container');
-        contentContainer.classList.add('scrolling');
-        contentContainer.scrollTo(0, 0);
-        
-        setTimeout(() => {
-          contentContainer.classList.remove('scrolling');
-        }, 100);
+        requestAnimationFrame(() => {
+          // Disable smooth scrolling temporarily for better performance
+          const currentScrollBehavior = contentContainer.style.scrollBehavior;
+          contentContainer.style.scrollBehavior = 'auto';
+          
+          // Scroll to top with auto behavior
+          contentContainer.scrollTo({
+            top: 0,
+            behavior: 'auto'
+          });
+          
+          // Restore settings after scroll completes
+          setTimeout(() => {
+            contentContainer.style.scrollBehavior = currentScrollBehavior;
+            contentContainer.classList.remove('scrolling');
+          }, 100);
+        });
       });
     });
 
@@ -352,15 +324,17 @@
         // Process the full accumulated text to ensure proper markdown rendering
         const html = await processMarkdown(streamBuffer);
         
-        // Use optimized DOM updates
+        // Use double requestAnimationFrame for smoother DOM updates
         requestAnimationFrame(() => {
-          document.getElementById('result-content').innerHTML = html;
-        
-          // Setup code copy buttons
-          setupCodeCopyButtons();
-        
-          // Use optimized scrolling that prevents flickering
-          safeScrollToBottom();
+          requestAnimationFrame(() => {
+            document.getElementById('result-content').innerHTML = html;
+          
+            // Setup code copy buttons
+            setupCodeCopyButtons();
+          
+            // Use optimized scrolling that prevents flickering
+            safeScrollToBottom();
+          });
         });
       } catch (error) {
         console.error("Error processing stream chunk:", error);
@@ -833,17 +807,21 @@
       const resultContent = document.getElementById('result-content');
       
       if (contentContainer) {
-        // Use requestAnimationFrame for smoother compositing and reduce flickering
+        // Use double requestAnimationFrame for smoother compositing
         requestAnimationFrame(() => {
-          // Add stable compositing layer
-          contentContainer.style.transform = 'translateZ(0)';
-          
-          // Prevent unnecessary repaints during scroll
-          if (resultContent) {
-            // Optimize content for static rendering
-            resultContent.style.transform = 'translate3d(0,0,0)';
-            resultContent.style.contain = 'paint';
-          }
+          requestAnimationFrame(() => {
+            // Add GPU acceleration and containment
+            contentContainer.style.transform = 'translateZ(0)';
+            contentContainer.style.contain = 'content';
+            
+            // Prevent unnecessary repaints during scroll
+            if (resultContent) {
+              // Optimize content for static rendering
+              resultContent.style.transform = 'translate3d(0,0,0)';
+              resultContent.style.contain = 'paint layout';
+              resultContent.style.willChange = 'transform';
+            }
+          });
         });
       }
     }
@@ -991,21 +969,28 @@
       const isNearBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100;
       
       if (force || isNearBottom) {
-        // Use requestAnimationFrame to prevent flickering
+        // Use double requestAnimationFrame for smoother compositing
         requestAnimationFrame(() => {
-          // Add class to reduce rendering
-          contentContainer.classList.add('scrolling');
-          
-          // Scroll to bottom
-          contentContainer.scrollTo({
-            top: contentContainer.scrollHeight,
-            behavior: 'auto'
+          requestAnimationFrame(() => {
+            // Add class to reduce rendering
+            contentContainer.classList.add('scrolling');
+            
+            // Temporarily disable smooth scrolling for better performance
+            const currentScrollBehavior = contentContainer.style.scrollBehavior;
+            contentContainer.style.scrollBehavior = 'auto';
+            
+            // Scroll to bottom with auto behavior
+            contentContainer.scrollTo({
+              top: contentContainer.scrollHeight,
+              behavior: 'auto'
+            });
+            
+            // Remove class after scrolling completes and restore scroll behavior
+            setTimeout(() => {
+              contentContainer.style.scrollBehavior = currentScrollBehavior;
+              contentContainer.classList.remove('scrolling');
+            }, 100);
           });
-          
-          // Remove class after scrolling completes
-          setTimeout(() => {
-            contentContainer.classList.remove('scrolling');
-          }, 100);
         });
       }
     }

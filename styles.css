@@ -392,8 +392,7 @@ code {
   height: 100%;
   padding: 20px;
   box-sizing: border-box;
-  background-color: var(--bg-darker);
-  /* More solid background during loading */
+  background-color: var(--bg-transparent);
   border-radius: 8px;
 }
 
@@ -666,17 +665,17 @@ body.invisible-mode:hover {
   scrollbar-width: thin;
   /* For Firefox */
 
-  /* Fix flickering by using more precise GPU acceleration properties */
-  will-change: transform;
+  /* Enhanced GPU acceleration for smoother scrolling */
+  will-change: transform, scroll-position;
   transform: translateZ(0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Remove properties that might cause flickering */
-  backface-visibility: visible;
-  -webkit-overflow-scrolling: auto;
+  /* Better performance with compositing hints */
+  backface-visibility: hidden;
+  perspective: 1000px;
 
-  /* Add composite layer to fix flickering */
+  /* Improved compositing containment */
   contain: content;
 }
 
@@ -688,14 +687,18 @@ body.invisible-mode:hover {
   /* Optimize for scroll */
   contain: strict;
   /* Strict containment during scroll */
+  transform: translateZ(0);
+  /* Force compositing layer */
 }
 
-/* Fix for flickering - force hardware acceleration on content */
+/* Fix for flickering - force hardware acceleration on content during scrolling */
 #content-container.scrolling * {
   transition: none !important;
   /* Disable transitions during scroll */
   animation: none !important;
   /* Disable animations during scroll */
+  will-change: transform !important;
+  /* Hint to create compositing layers */
 }
 
 /* Improve scrolling performance by fixing header and footer in place */
@@ -706,6 +709,8 @@ body.invisible-mode:hover {
   /* Force GPU rendering for fixed elements */
   z-index: 9999;
   /* Ensure fixed elements stay on top */
+  backface-visibility: hidden;
+  /* Prevent flickering on fixed elements */
 }
 
 /* Fix for rendering issues in transparent containers */
@@ -721,7 +726,7 @@ body.invisible-mode:hover {
   z-index: -1;
 }
 
-/* Response overlay */
+/* Response overlay with enhanced rendering performance */
 #main-content {
   padding: 20px;
   margin: 0 auto;
@@ -733,7 +738,9 @@ body.invisible-mode:hover {
   box-sizing: border-box;
   /* Include padding in width calculations */
   /* Add composite layer for stable rendering */
-  contain: layout style;
+  contain: layout style paint;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 /* Make context action buttons sticky and more attractive */
