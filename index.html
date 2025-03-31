@@ -4,670 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Interview Coder</title>
-  <style>
-    html {
-      width: 100%;
-      height: 100%;
-      background: none;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(25, 25, 25, 0.85);
-      /* Darker, more modern semi-transparent background */
-      font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
-      overflow: hidden;
-      position: relative;
-      border-radius: 12px;
-      /* More rounded corners */
-      border: 1px solid rgba(100, 100, 100, 0.3);
-      /* Subtle border */
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-      /* Stronger shadow for depth */
-    }
-
-    /* Improved instruction banner */
-    #instruction-banner {
-      position: fixed;
-      top: 60px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(20, 20, 20, 0.9);
-      color: #fff;
-      padding: 10px 18px;
-      font-size: 14px;
-      border-radius: 8px;
-      z-index: 9999;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-      transition: opacity 0.3s ease, transform 0.3s ease;
-      user-select: none;
-      border: 1px solid rgba(120, 120, 120, 0.2);
-    }
-
-    #result-content {
-      width: 100%;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
-      box-sizing: border-box;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      max-height: calc(100vh - 180px);
-      overflow-y: auto;
-      background-color: transparent;
-    }
-
-    #result-content:empty {
-      display: none;
-    }
-
-    /* Ensure code blocks are scrollable */
-    #result-content pre {
-      max-width: 100%;
-      overflow-x: auto;
-    }
-
-    /* Code block improvements */
-    .code-block-container pre code {
-      background: transparent !important;
-      padding: 15px !important;
-      border-radius: 6px !important;
-      position: relative;
-      font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace !important;
-      overflow-x: auto !important;
-      white-space: pre !important;
-    }
-
-    /* Code block container improvements */
-    .code-block-container {
-      position: relative;
-      margin: 1.5em 0;
-      max-width: 100%;
-      overflow: hidden;
-      border-radius: 6px;
-    }
-
-    /* Ensure proper styling of pre/code in our containers */
-    .code-block-container pre {
-      margin-top: 0;
-      margin-bottom: 0;
-      padding-top: 30px;
-      /* Add space for language tag */
-    }
-
-    /* Hide default language tag that comes with our highlighter */
-    pre:before {
-      display: none !important;
-    }
-
-    /* Position the language tag correctly */
-    .code-language-tag {
-      position: absolute;
-      top: 0;
-      left: 0;
-      background: rgba(40, 40, 40, 0.9);
-      color: #ccc;
-      padding: 3px 10px;
-      border-radius: 6px 0 6px 0;
-      font-size: 12px;
-      font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-      z-index: 5;
-      border-right: 1px solid rgba(100, 100, 100, 0.3);
-      border-bottom: 1px solid rgba(100, 100, 100, 0.3);
-    }
-
-    /* Enhanced scrollbar styles for code blocks */
-    #result-content pre::-webkit-scrollbar {
-      height: 10px;
-      background: transparent;
-      border-radius: 5px;
-    }
-
-    #result-content pre::-webkit-scrollbar-thumb {
-      background: rgba(100, 100, 100, 0.7);
-      border-radius: 5px;
-    }
-
-    #result-content pre::-webkit-scrollbar-thumb:hover {
-      background: rgba(120, 120, 120, 0.9);
-    }
-
-    /* Make long code lines wrap to be helpful on mobile */
-    @media (max-width: 768px) {
-
-      #result-content pre,
-      code {
-        white-space: pre-wrap !important;
-      }
-    }
-
-    /* Scrollbar for result content */
-    #result-content::-webkit-scrollbar {
-      width: 10px;
-      background: rgba(30, 30, 30, 0.5);
-      border-radius: 5px;
-    }
-
-    #result-content::-webkit-scrollbar-thumb {
-      background: rgba(100, 100, 100, 0.7);
-      border-radius: 5px;
-    }
-
-    #result-content::-webkit-scrollbar-thumb:hover {
-      background: rgba(120, 120, 120, 0.9);
-    }
-
-    /* Code block copy button */
-    .copy-code-button {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      padding: 5px 8px;
-      border-radius: 4px;
-      background-color: rgba(60, 60, 60, 0.7);
-      color: #ffffff;
-      border: none;
-      cursor: pointer;
-      font-size: 12px;
-      transition: background-color 0.2s;
-      z-index: 10;
-    }
-
-    pre:hover .copy-code-button {
-      opacity: 1;
-    }
-
-    .copy-code-button:hover {
-      background-color: rgba(80, 80, 80, 0.9);
-    }
-
-    .copy-code-button.copied {
-      background-color: #4CAF50;
-    }
-
-    /* Markdown content table styling */
-    #result-content table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 15px 0;
-      font-size: 0.9em;
-    }
-
-    #result-content th,
-    #result-content td {
-      padding: 8px 12px;
-      border: 1px solid rgba(100, 100, 100, 0.3);
-    }
-
-    #result-content th {
-      background-color: rgba(40, 40, 40, 0.8);
-      text-align: left;
-    }
-
-    #result-content tr:nth-child(even) {
-      background-color: rgba(40, 40, 40, 0.4);
-    }
-
-    /* Make content have more breathing room */
-    #result-content h1,
-    #result-content h2,
-    #result-content h3 {
-      margin-top: 24px;
-      margin-bottom: 16px;
-      font-weight: 600;
-      line-height: 1.25;
-    }
-
-    #result-content h1 {
-      font-size: 1.8em;
-      border-bottom: 1px solid rgba(100, 100, 100, 0.3);
-      padding-bottom: 8px;
-    }
-
-    #result-content h2 {
-      font-size: 1.5em;
-      border-bottom: 1px solid rgba(100, 100, 100, 0.3);
-      padding-bottom: 6px;
-    }
-
-    #result-content h3 {
-      font-size: 1.2em;
-    }
-
-    /* Improved list styling */
-    #result-content ul,
-    #result-content ol {
-      padding-left: 2em;
-      margin: 1em 0;
-    }
-
-    #result-content li {
-      margin-bottom: 0.5em;
-    }
-
-    #result-content ol li {
-      padding-left: 0.5em;
-    }
-
-    /* Blockquote styling */
-    #result-content blockquote {
-      border-left: 4px solid rgba(120, 120, 120, 0.5);
-      padding-left: 1em;
-      margin: 1em 0;
-      color: rgba(255, 255, 255, 0.8);
-      font-style: italic;
-    }
-
-    /* Link styling */
-    #result-content a {
-      color: #5e9eff;
-      text-decoration: none;
-      border-bottom: 1px dotted #5e9eff;
-    }
-
-    #result-content a:hover {
-      text-decoration: none;
-      border-bottom: 1px solid #5e9eff;
-    }
-
-    pre {
-      background: transparent;
-      color: #f0f0f0;
-      padding: 16px;
-      border-radius: 8px;
-      white-space: pre;
-      overflow-x: auto;
-      margin: 1.2em 0;
-      border: 1px solid rgba(100, 100, 100, 0.2);
-      font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-      font-size: 0.9em;
-    }
-
-    code {
-      font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-      background: rgba(60, 60, 60, 0.95);
-      color: #fff;
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-
-    .error-message {
-      color: #ff4d4d;
-      background: rgba(255, 77, 77, 0.08);
-      padding: 16px;
-      border-radius: 8px;
-      border-left: 4px solid #ff4d4d;
-      margin: 15px 0;
-    }
-
-    .warning-message {
-      color: #ffcc33;
-      background: rgba(255, 204, 51, 0.08);
-      padding: 16px;
-      border-radius: 8px;
-      border-left: 4px solid #ffcc33;
-      margin: 15px 0;
-    }
-
-    /* Improved loading container with skeleton UI */
-    .loading-container {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-      height: 100%;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-
-    /* Skeleton loading styles */
-    .skeleton-section {
-      width: 100%;
-      margin-bottom: 30px;
-      animation: pulse 1.5s infinite;
-    }
-
-    .skeleton-header {
-      height: 28px;
-      width: 50%;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 4px;
-      margin-bottom: 20px;
-    }
-
-    .skeleton-text {
-      height: 16px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      margin-bottom: 12px;
-    }
-
-    .skeleton-text.line-90 {
-      width: 90%;
-    }
-
-    .skeleton-text.line-80 {
-      width: 80%;
-    }
-
-    .skeleton-text.line-70 {
-      width: 70%;
-    }
-
-    .skeleton-code {
-      height: 120px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 6px;
-      margin: 20px 0;
-    }
-
-    @keyframes pulse {
-      0% {
-        opacity: 0.6;
-      }
-
-      50% {
-        opacity: 0.8;
-      }
-
-      100% {
-        opacity: 0.6;
-      }
-    }
-
-    .model-badge {
-      position: fixed;
-      bottom: 12px;
-      right: 12px;
-      background: rgba(30, 30, 30, 0.8);
-      color: #fff;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      user-select: none;
-      max-width: 300px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      z-index: 8000;
-      border: 1px solid rgba(100, 100, 100, 0.3);
-    }
-
-    .screenshot-notification {
-      position: fixed;
-      bottom: 50px;
-      right: 12px;
-      background: rgba(20, 130, 20, 0.9);
-      color: #fff;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      z-index: 9000;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-      opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.3s ease, transform 0.3s ease;
-      max-width: 400px;
-      border: 1px solid rgba(120, 180, 120, 0.3);
-    }
-
-    .screenshot-notification.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .screenshot-notification .file-path {
-      font-size: 11px;
-      opacity: 0.8;
-      word-break: break-all;
-      margin-top: 5px;
-    }
-
-    /* Updated Notification styles */
-    #notification-container {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 100000;
-      max-width: 400px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: flex-end;
-    }
-
-    .notification {
-      padding: 14px 20px;
-      color: white;
-      border-radius: 8px;
-      font-size: 14px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-      max-width: 400px;
-      word-break: break-word;
-      pointer-events: auto;
-      opacity: 0;
-      transform: translateX(50px);
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-
-    .notification.success {
-      background-color: #4CAF50;
-      border: 1px solid rgba(120, 180, 120, 0.3);
-    }
-
-    .notification.warning {
-      background-color: #FF9800;
-      border: 1px solid rgba(180, 130, 20, 0.3);
-    }
-
-    .notification.error {
-      background-color: #F44336;
-      border: 1px solid rgba(180, 70, 70, 0.3);
-    }
-
-    .notification.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-
-    /* For making the window invisible during screen sharing */
-    body.invisible-mode {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-
-    body.invisible-mode:hover {
-      opacity: 0.8;
-    }
-
-    /* Updated top toolbar styles */
-    #top-toolbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      background: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
-      border-bottom: 1px solid rgba(100, 100, 100, 0.3);
-      padding: 8px 15px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 9500;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      -webkit-app-region: drag;
-      border-radius: 12px 12px 0 0;
-      box-sizing: border-box;
-      height: 50px;
-      cursor: move;
-      overflow-x: auto;
-      white-space: nowrap;
-      scrollbar-width: thin;
-    }
-
-    #top-toolbar::-webkit-scrollbar {
-      height: 6px;
-    }
-
-    #top-toolbar::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.1);
-    }
-
-    #top-toolbar::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 3px;
-    }
-
-    /* Toolbar buttons */
-    .toolbar-button {
-      display: flex;
-      align-items: center;
-      padding: 6px 12px;
-      border-radius: 6px;
-      background: rgba(60, 60, 60, 0.7);
-      color: white;
-      cursor: pointer;
-      transition: background 0.2s;
-      font-size: 13px;
-      white-space: nowrap;
-      -webkit-app-region: no-drag;
-      /* Make buttons clickable */
-      border: 1px solid rgba(80, 80, 80, 0.3);
-    }
-
-    .toolbar-button:hover {
-      background: rgba(80, 80, 80, 0.9);
-    }
-
-    .toolbar-button .icon {
-      font-size: 14px;
-      margin-right: 8px;
-      min-width: 14px;
-      text-align: center;
-    }
-
-    .toolbar-button .shortcut {
-      font-size: 10px;
-      margin-left: 6px;
-      background: rgba(40, 40, 40, 0.7);
-      padding: 2px 5px;
-      border-radius: 4px;
-    }
-
-    /* Window control buttons */
-    .window-controls {
-      display: none;
-      /* Hide window controls - removing completely */
-    }
-
-    .window-control {
-      display: none;
-      /* Hide window controls - removing completely */
-    }
-
-    .close-btn,
-    .minimize-btn,
-    .maximize-btn {
-      display: none;
-      /* Hide window controls - removing completely */
-    }
-
-    /* Additional styles to completely hide any macOS window controls */
-    :root {
-      --electron-titlebar-height: 0;
-    }
-
-    .window-controls,
-    .window-control,
-    .close-btn,
-    .minimize-btn,
-    .maximize-btn,
-    :host(.platform-darwin) .titlebar-button,
-    :host(.platform-darwin) .titlebar-close,
-    :host(.platform-darwin) .titlebar-minimize,
-    :host(.platform-darwin) .titlebar-maximize,
-    :host(.platform-darwin) .titlebar-fullscreen {
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-      width: 0 !important;
-      height: 0 !important;
-      position: absolute !important;
-      left: -9999px !important;
-      pointer-events: none !important;
-    }
-
-    /* Content container */
-    #content-container {
-      padding-top: 60px;
-      width: 100%;
-      height: calc(100% - 50px);
-      box-sizing: border-box;
-      position: relative;
-    }
-
-    /* Response overlay */
-    #main-content {
-      padding: 20px;
-      margin: 60px auto 20px auto;
-      max-width: 900px;
-      color: #f0f0f0;
-      position: relative;
-      padding-bottom: 80px;
-      /* Add extra padding at the bottom for the sticky buttons */
-    }
-
-    /* Make context action buttons sticky and more attractive */
-    #context-actions {
-      position: sticky;
-      bottom: 0;
-      padding: 15px;
-      margin-top: 30px;
-      text-align: center;
-      z-index: 100;
-      border-top: 1px solid rgba(100, 100, 100, 0.3);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.2);
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-    }
-
-    /* Improved button styling for context actions */
-    #context-actions .toolbar-button {
-      padding: 8px 15px;
-      border-radius: 8px;
-      background: rgba(50, 50, 50, 0.8);
-      transition: all 0.2s ease;
-      border: 1px solid rgba(100, 100, 100, 0.4);
-    }
-
-    #context-actions .toolbar-button:hover {
-      background: rgba(70, 70, 70, 0.9);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    #btn-add-context {
-      background: rgba(40, 90, 40, 0.6) !important;
-    }
-
-    #btn-add-context:hover {
-      background: rgba(50, 120, 50, 0.8) !important;
-    }
-
-    #btn-report-error {
-      background: rgba(90, 40, 40, 0.6) !important;
-    }
-
-    #btn-report-error:hover {
-      background: rgba(120, 50, 50, 0.8) !important;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -739,17 +76,6 @@
       <!-- Result content -->
       <div id="result-content"></div>
 
-      <!-- Continue with context button section -->
-      <!-- <div id="context-actions" style="display: none;">
-        <div class="toolbar-button" id="btn-add-context">
-          <span class="icon">📷</span>
-          <span>Add screenshot to continue</span>
-        </div>
-        <div class="toolbar-button" id="btn-report-error">
-          <span class="icon">🔄</span>
-          <span>Report error in solution</span>
-        </div>
-      </div> -->
     </div>
 
     <div id="model-badge" class="model-badge"></div>
@@ -761,26 +87,94 @@
     const { ipcRenderer } = require('electron');
 
     // Import remark and related packages
-    let remark = null;
+    let unified = null;
+    let remarkParse = null;
     let remarkGfm = null;
-    let remarkHtml = null;
-    let remarkProcessor = null;
+    let remarkRehype = null;
+    let rehypeStringify = null;
+    let processor = null;
 
     try {
-      remark = require('remark');
-      remarkGfm = require('remark-gfm');
-      remarkHtml = require('remark-html');
+      // Use the Node.js require to import the installed packages
 
-      // Initialize remark processor
-      remarkProcessor = remark()
-        .use(remarkGfm)  // Add GitHub Flavored Markdown support
-        .use(remarkHtml, {
-          sanitize: false  // Allow HTML in the markdown
-        });
+      try {
+        const unifiedModule = require('unified');
+        unified = unifiedModule.unified;
+      } catch (err) {
+        console.error("Failed to load unified:", err.message);
+        throw err;
+      }
 
-      console.log("Remark initialized successfully");
+      try {
+        remarkParse = require('remark-parse').default;
+        // If default is undefined, try using the module directly
+        if (!remarkParse) {
+          remarkParse = require('remark-parse');
+        }
+      } catch (err) {
+        console.error("Failed to load remark-parse:", err.message);
+        throw err;
+      }
+
+      try {
+        remarkGfm = require('remark-gfm').default;
+        // If default is undefined, try using the module directly
+        if (!remarkGfm) {
+          remarkGfm = require('remark-gfm');
+        }
+      } catch (err) {
+        console.error("Failed to load remark-gfm:", err.message);
+        throw err;
+      }
+
+      try {
+        remarkRehype = require('remark-rehype').default;
+        // If default is undefined, try using the module directly
+        if (!remarkRehype) {
+          remarkRehype = require('remark-rehype');
+        }
+      } catch (err) {
+        console.error("Failed to load remark-rehype:", err.message);
+        throw err;
+      }
+
+      try {
+        rehypeStringify = require('rehype-stringify').default;
+        // If default is undefined, try using the module directly
+        if (!rehypeStringify) {
+          rehypeStringify = require('rehype-stringify');
+        }
+      } catch (err) {
+        console.error("Failed to load rehype-stringify:", err.message);
+        throw err;
+      }
+
+      // Initialize unified processor pipeline
+      processor = unified()
+        .use(remarkParse)
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeStringify);
+
+
+      // Test with a small markdown string
     } catch (e) {
-      console.error("Error initializing Remark:", e.message);
+      console.error("Error initializing unified processor:", e.message);
+      console.error("Stack trace:", e.stack);
+
+      // Create a very basic fallback processor
+      processor = {
+        process: async (markdown) => {
+          // Very basic markdown processing as fallback
+          console.warn("Using fallback markdown processor");
+          const html = basicMarkdownProcess(markdown);
+          // Return an object with a toString method to match unified's API
+          return {
+            toString: () => html,
+            valueOf: () => html
+          };
+        }
+      };
     }
 
     // Detect platform for correct key labels
@@ -789,7 +183,7 @@
 
     // Application state
     let isWindowVisible = true;
-    let debugMode = true; // Set to true for debugging
+    let debugMode = false; // Set to true for debugging
 
     // Toggle window visibility
     function toggleWindowVisibility() {
@@ -803,8 +197,21 @@
     // Listen for main process messages
     ipcRenderer.on('update-instruction', (event, instruction) => {
       const banner = document.getElementById('instruction-banner');
-      banner.textContent = instruction;
+      banner.innerHTML = instruction.replace(/\n/g, '<br>');
       banner.style.opacity = '1';
+    });
+
+    // Initialize context menu for element inspection
+    document.addEventListener('contextmenu', (e) => {
+      ipcRenderer.send('show-context-menu');
+    });
+
+    // Register keyboard shortcut for DevTools (Cmd/Ctrl+Shift+I)
+    document.addEventListener('keydown', (e) => {
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === 'I') {
+        ipcRenderer.send('toggle-devtools');
+        e.preventDefault();
+      }
     });
 
     ipcRenderer.on('hide-instruction', () => {
@@ -830,25 +237,86 @@
     });
 
     ipcRenderer.on('loading', (event, isLoading) => {
-      document.getElementById('loading-content').style.display = isLoading ? 'flex' : 'none';
-      document.getElementById('result-content').style.display = isLoading ? 'none' : 'block';
+      // Use direct references to avoid repeated DOM lookups
+      const loadingContent = document.getElementById('loading-content');
+      const resultContent = document.getElementById('result-content');
+      const contextActions = document.getElementById('context-actions');
 
-      // Show/hide context actions when not loading
-      document.getElementById('context-actions').style.display = isLoading ? 'none' : 'flex';
+      // Handle loading state changes
+      if (isLoading) {
+        // Clear any existing content first to prevent duplicate rendering
+        if (resultContent) {
+          resultContent.innerHTML = '';
+          resultContent.style.display = 'none';
+        }
+
+        // Show loading content
+        if (loadingContent) {
+          loadingContent.style.display = 'flex';
+        }
+
+        // Hide context actions
+        if (contextActions) {
+          contextActions.style.display = 'none';
+        }
+      } else {
+        // Hide loading content
+        if (loadingContent) {
+          loadingContent.style.display = 'none';
+        }
+
+        // Show result content
+        if (resultContent) {
+          resultContent.style.display = 'block';
+        }
+
+        // Show context actions if there's content
+        if (contextActions && resultContent && resultContent.innerHTML.trim() !== '') {
+          contextActions.style.display = 'flex';
+        } else if (contextActions) {
+          contextActions.style.display = 'none';
+        }
+      }
     });
 
     ipcRenderer.on('analysis-result', async (event, markdown) => {
-      const html = await processMarkdown(markdown);
-      document.getElementById('result-content').innerHTML = html;
+      // Prevent concurrent updates
+      if (isUpdatingContent) return;
+      isUpdatingContent = true;
 
-      // Show context actions 
-      document.getElementById('context-actions').style.display = 'flex';
+      try {
+        // Process markdown to HTML
+        const html = await processMarkdown(markdown);
 
-      // Setup code copy buttons after content is added
-      setupCodeCopyButtons();
+        // Get DOM elements once
+        const resultContent = document.getElementById('result-content');
+        const contextActions = document.getElementById('context-actions');
 
-      // Scroll to top
-      window.scrollTo(0, 0);
+        // Prevent rendering if there's no content
+        if (!html || html.trim() === '') {
+          isUpdatingContent = false;
+          return;
+        }
+
+        // Create new element instead of modifying existing one
+        const parent = resultContent.parentNode;
+        const newContent = document.createElement('div');
+        newContent.id = 'result-content';
+        newContent.innerHTML = html;
+
+        // Replace the old content with the new content
+        parent.replaceChild(newContent, resultContent);
+
+        // Show context actions 
+        contextActions.style.display = 'flex';
+
+        // Setup code copy buttons after content is added
+        setupCodeCopyButtons();
+      } catch (error) {
+        console.error("Error processing analysis result:", error);
+      } finally {
+        isUpdatingContent = false;
+      }
     });
 
     // Setup for streaming results
@@ -861,87 +329,166 @@
     let streamBuffer = '';
     let codeBlockType = null;
     let insideCodeBlock = false;
+    let isUpdatingContent = false; // New flag to prevent concurrent updates
+    let contentUpdateQueue = []; // Queue for pending updates
+    let isRenderPending = false; // Flag to track if a render is pending
 
     ipcRenderer.on('stream-chunk', async (event, chunk) => {
+      // Add chunk to buffer immediately
+      streamBuffer += chunk;
+
+      // Queue the update instead of processing immediately
+      scheduleContentUpdate();
+    });
+
+    // Function to schedule content update with debouncing
+    function scheduleContentUpdate() {
+      if (isRenderPending) return;
+
+      isRenderPending = true;
+
+      // Use requestAnimationFrame for smoother rendering
+      requestAnimationFrame(() => {
+        // Process after a short delay to batch updates
+        setTimeout(async () => {
+          try {
+            await updateContentFromBuffer();
+          } finally {
+            isRenderPending = false;
+          }
+        }, 100); // 100ms debounce time
+      });
+    }
+
+    // Function to update content from buffer
+    async function updateContentFromBuffer() {
+      // Prevent multiple concurrent updates
+      if (isUpdatingContent) return;
+      isUpdatingContent = true;
+
       try {
-        // Add chunk to buffer
-        streamBuffer += chunk;
-
-        // Process the full accumulated text to ensure proper markdown rendering
+        // Process the full accumulated text
         const html = await processMarkdown(streamBuffer);
-        document.getElementById('result-content').innerHTML = html;
 
-        // Setup code copy buttons
-        setupCodeCopyButtons();
+        // Only update if there's actual content to render
+        if (html && html.trim() !== '') {
+          // Use double buffering technique - create a new element off-screen
+          const offscreenContainer = document.createElement('div');
+          offscreenContainer.style.position = 'absolute';
+          offscreenContainer.style.visibility = 'hidden';
+          offscreenContainer.innerHTML = html;
 
-        // Auto-scroll to the bottom if user is already at the bottom
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100) {
-          window.scrollTo(0, document.body.scrollHeight);
+          // Get the current result content and its parent
+          const resultContent = document.getElementById('result-content');
+          const parent = resultContent.parentNode;
+
+          // Create the new content element
+          const newContent = document.createElement('div');
+          newContent.id = 'result-content';
+          newContent.innerHTML = html;
+
+          // Replace with new content in a single DOM operation
+          parent.replaceChild(newContent, resultContent);
+
+          // Setup code copy buttons
+          setupCodeCopyButtons();
         }
       } catch (error) {
         console.error("Error processing stream chunk:", error);
-        // Display error but continue operation
-        document.getElementById('result-content').innerHTML += `<p class="error-message">Error rendering chunk: ${error.message}</p>`;
+        showNotification("Error rendering content: " + error.message, "error");
+      } finally {
+        isUpdatingContent = false;
       }
-    });
+    }
 
     ipcRenderer.on('stream-update', async (event, fullText) => {
-      // Replace the content with the full updated text (better for Gemini streaming)
-      try {
-        console.log("Received stream update, length:", fullText.length);
-        // Update the stream buffer
-        streamBuffer = fullText;
+      // Update the buffer content
+      streamBuffer = fullText;
 
-        // If the text is empty, don't process it
-        if (!fullText || fullText.trim() === '') {
-          return;
-        }
-
-        const html = await processMarkdown(fullText);
-        document.getElementById('result-content').innerHTML = html;
-
-        // Setup code copy buttons after content is updated
-        setupCodeCopyButtons();
-
-        // Auto-scroll to the bottom if user is already at the bottom
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100) {
-          window.scrollTo(0, document.body.scrollHeight);
-        }
-      } catch (error) {
-        console.error("Error processing stream update:", error);
-        // Provide better error visualization
-        document.getElementById('result-content').innerHTML = `
-          <p class="error-message">Error rendering content: ${error.message}</p>
-          <pre>${fullText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
-        `;
-      }
+      // Schedule an update
+      scheduleContentUpdate();
     });
 
+    // Function to finalize stream content with proper rendering
+    function finalizeStreamContent() {
+      return new Promise(async (resolve, reject) => {
+        try {
+          // Process the final content
+          const html = await processMarkdown(streamBuffer);
+          
+          if (html && html.trim() !== '') {
+            // Get the current content element
+            const resultContent = document.getElementById('result-content');
+            const parent = resultContent.parentNode;
+            
+            // Create new element without transforms to avoid blurry text
+            const newContent = document.createElement('div');
+            newContent.id = 'result-content';
+            newContent.innerHTML = html;
+            
+            // Replace the content
+            parent.replaceChild(newContent, resultContent);
+            
+            // Setup code copy buttons
+            setupCodeCopyButtons();
+            
+            // Force layout recalculation - this helps prevent rendering artifacts
+            newContent.getBoundingClientRect();
+            
+            // Scroll to where user was last viewing - improves user experience
+            if (window._lastScrollPosition) {
+              setTimeout(() => {
+                window.scrollTo({
+                  top: window._lastScrollPosition,
+                  behavior: 'auto'
+                });
+              }, 10);
+            }
+          }
+          
+          // Show context actions
+          document.getElementById('context-actions').style.display = 'flex';
+          
+          // Success
+          resolve();
+        } catch (error) {
+          console.error("Error in finalizeStreamContent:", error);
+          reject(error);
+        }
+      });
+    }
+
     ipcRenderer.on('stream-end', () => {
-      // Streaming is complete, reset buffer
-      console.log("Stream ended");
-      streamBuffer = '';
-
-      // Make sure all code blocks have copy buttons
-      setupCodeCopyButtons();
-
-      // Show context actions when streaming is complete
-      document.getElementById('context-actions').style.display = 'flex';
-
-      // Hide instruction banner when streaming is complete
-      const banner = document.getElementById('instruction-banner');
-      banner.style.opacity = '0';
-
-      // Add a small scroll to ensure visible buttons if needed
-      const resultContent = document.getElementById('result-content');
-      if (resultContent.scrollHeight > resultContent.clientHeight) {
-        resultContent.scrollBy({ top: 1, behavior: 'smooth' });
+      // Store current scroll position for restoration
+      window._lastScrollPosition = window.scrollY;
+      
+      // Flush any pending updates
+      if (isRenderPending) {
+        updateContentFromBuffer();
       }
+      
+      // Finalize content with improved rendering
+      requestAnimationFrame(() => {
+        finalizeStreamContent()
+          .then(() => {
+            // Reset state
+            streamBuffer = '';
+            isUpdatingContent = false;
+            isRenderPending = false;
+            
+            // Hide instruction banner
+            const banner = document.getElementById('instruction-banner');
+            banner.style.opacity = '0';
+          })
+          .catch(error => {
+            console.error("Error finalizing stream content:", error);
+            showNotification("Error rendering final content", "error");
+          });
+      });
     });
 
     ipcRenderer.on('clear-result', () => {
       document.getElementById('result-content').innerHTML = '';
-      document.getElementById('context-actions').style.display = 'none';
     });
 
     // Update AI provider/model badge display
@@ -959,50 +506,21 @@
       showTemporaryNotification('Screen sharing detected - window hidden. Press ' + modifierKey + '+B to show.', 'warning');
     });
 
-    // Screenshot notification
-    ipcRenderer.on('screenshot-saved', (event, data) => {
-      const { path, dimensions, isArea } = data;
-      const notification = document.createElement('div');
-      notification.className = 'screenshot-notification';
-
-      notification.innerHTML = `
-        <div><strong>${isArea ? 'Area' : 'Screen'} Screenshot Saved</strong></div>
-        ${dimensions ? `<div>Size: ${dimensions.width}×${dimensions.height}px</div>` : ''}
-        <div class="file-path">${path}</div>
-      `;
-
-      document.body.appendChild(notification);
-
-      // Animate in
-      setTimeout(() => {
-        notification.classList.add('visible');
-      }, 10);
-
-      // Remove after a few seconds
-      setTimeout(() => {
-        notification.classList.remove('visible');
-        setTimeout(() => {
-          notification.remove();
-        }, 300);
-      }, 5000);
-    });
-
     // Update the model badge with current settings
     async function updateModelBadge() {
       try {
         let settings;
-        
+
         try {
           settings = await ipcRenderer.invoke('get-current-settings');
         } catch (error) {
           console.error('Error getting model settings from main process:', error);
-          
+
           // Try to get settings from localStorage as fallback
           try {
             const savedSettings = localStorage.getItem('model-settings');
             if (savedSettings) {
               settings = JSON.parse(savedSettings);
-              console.log('Retrieved settings from localStorage:', settings);
             } else {
               // Fallback to default settings
               settings = {
@@ -1019,7 +537,7 @@
             };
           }
         }
-        
+
         const badge = document.getElementById('model-badge');
 
         let providerName = '';
@@ -1032,7 +550,7 @@
 
         const modelName = settings.currentModel || 'Default Model';
         badge.textContent = `${providerName}: ${modelName}`;
-        
+
         // Save current settings to localStorage for persistence
         try {
           localStorage.setItem('model-settings', JSON.stringify(settings));
@@ -1047,7 +565,7 @@
       }
     }
 
-    // Process markdown content to HTML using Remark
+    // Process markdown content to HTML using unified processor
     async function processMarkdown(markdown) {
       try {
         // Check if we have any content to process
@@ -1055,75 +573,55 @@
           return '';
         }
 
-        // Debug logging
-        if (debugMode) {
-          console.log("Processing markdown input:", markdown);
-        } else {
-          console.log("Processing markdown, length:", markdown.length);
+        // Cache the input to avoid redundant processing
+        const cacheKey = String(markdown).substring(0, 100); // Use first 100 chars as key
+        if (window._mdCache && window._mdCache[cacheKey] === markdown) {
+          return window._mdCache.html;
         }
 
-        // Pre-process the markdown for better rendering
-        let processedMarkdown = markdown;
         let html = '';
 
-        if (remarkProcessor) {
-          // Use Remark to process markdown
+        if (processor) {
+          // Use unified processor to process markdown
           try {
-            const vFile = await remarkProcessor.process(processedMarkdown);
-            html = String(vFile);
-            console.log("Successfully processed with Remark");
-          } catch (remarkError) {
-            console.error("Remark processing error:", remarkError);
-            throw remarkError;
+            const file = await processor.process(markdown);
+            html = String(file);
+          } catch (processingError) {
+            console.error("Markdown processing error:", processingError);
+            // Attempt to fall back to basic processing
+            html = basicMarkdownProcess(markdown);
           }
         } else {
-          console.log("Fallback: Using basic markdown processing");
           // Basic fallback markdown processing
-          html = processedMarkdown
-            // Escape HTML
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            // Code blocks
-            .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-              return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
-            })
-            // Headers
-            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-            // Bold and italic
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Lists
-            .replace(/^\* (.+)/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)\n/g, '<ul>$1</ul>')
-            // Links
-            .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
-            // Paragraphs
-            .replace(/\n\n/g, '</p><p>');
-
-          // Wrap in paragraphs if not already wrapped
-          if (!html.startsWith('<')) {
-            html = '<p>' + html + '</p>';
-          }
+          html = basicMarkdownProcess(markdown);
         }
 
         // If debug mode is on, add raw markdown visibility
         if (debugMode) {
-          return `
+          html = `
             <div style="background: rgba(0,0,0,0.8); padding: 10px; margin-bottom: 10px; border-radius: 5px;">
               <details>
                 <summary style="cursor: pointer; color: #ffcc00;">Debug: Raw Markdown (Click to expand)</summary>
-                <pre style="max-height: 200px; overflow: auto; background: #222; padding: 10px; margin-top: 10px;">${processedMarkdown.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                <pre style="max-height: 200px; overflow: auto; background: #222; padding: 10px; margin-top: 10px;">${markdown.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
               </details>
             </div>
             ${html}
           `;
         }
 
-        // Add copy buttons to code blocks and language tags
+        // Create wrapper in memory to avoid DOM reflows
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;
+
+        // Apply anti-flicker optimizations to elements
+        wrapper.querySelectorAll('img').forEach(img => {
+          img.loading = 'lazy';
+          // Set dimensions to prevent layout shifts
+          if (!img.width && !img.height) {
+            img.width = 600;
+            img.height = 400;
+          }
+        });
 
         // Find all pre > code elements and wrap them with copy button and language tag
         wrapper.querySelectorAll('pre > code').forEach(codeBlock => {
@@ -1135,6 +633,7 @@
           const copyButton = document.createElement('button');
           copyButton.className = 'copy-code-button';
           copyButton.textContent = 'Copy';
+          copyButton.setAttribute('data-has-listener', 'true');
 
           // Extract language from class
           let language = '';
@@ -1157,10 +656,15 @@
           container.appendChild(pre);
         });
 
+        // Cache the result for future calls with the same input
+        window._mdCache = {
+          [cacheKey]: markdown,
+          html: wrapper.innerHTML
+        };
+
         return wrapper.innerHTML;
       } catch (err) {
         console.error('Error processing markdown:', err);
-        console.error('Input was:', markdown.substring(0, 100) + '...');
 
         if (debugMode) {
           return `
@@ -1177,82 +681,154 @@
       }
     }
 
-    // Add copy code functionality
+    // Helper function for basic markdown processing
+    function basicMarkdownProcess(markdown) {
+      return markdown
+        // Escape HTML
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        // Code blocks
+        .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+          return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
+        })
+        // Headers
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        // Bold and italic
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Lists
+        .replace(/^\* (.+)/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)\n/g, '<ul>$1</ul>')
+        // Links
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
+        // Paragraphs
+        .replace(/\n\n/g, '</p><p>');
+    }
+
+    // Modify the setupCodeCopyButtons function to add rendering optimizations
     function setupCodeCopyButtons() {
       try {
+        // Remove existing listener if it exists to prevent duplicates
+        document.removeEventListener('click', handleCopyButtonClick);
+
+        // Add a single event listener to handle all copy button clicks
+        document.addEventListener('click', handleCopyButtonClick);
+
+        // Find all code blocks and optimize their rendering
+        const codeBlocks = document.querySelectorAll('pre, code, .code-block-container');
+
         // Find all copy buttons
         const copyButtons = document.querySelectorAll('.copy-code-button');
 
+        // If there are no buttons, just exit
         if (copyButtons.length === 0) {
-          // No code blocks found yet
           return;
         }
 
-        console.log(`Setting up ${copyButtons.length} code copy buttons`);
-
+        // Mark buttons as having a listener (for reference)
         copyButtons.forEach(button => {
-          // Skip if the button already has a listener (check for data attribute)
-          if (button.getAttribute('data-has-listener') === 'true') {
-            return;
+          if (!button.getAttribute('data-has-listener')) {
+            button.setAttribute('data-has-listener', 'true');
           }
-
-          // Add the click event listener
-          button.addEventListener('click', function () {
-            try {
-              // Find the code element within the container
-              const pre = this.nextElementSibling;
-              if (!pre || !pre.tagName || pre.tagName.toLowerCase() !== 'pre') {
-                console.error('No pre element found');
-                return;
-              }
-
-              const codeElement = pre.querySelector('code');
-              if (!codeElement) {
-                console.error('No code element found');
-                return;
-              }
-
-              let codeText = codeElement.textContent;
-
-              // Make sure we have a string
-              if (typeof codeText !== 'string') {
-                codeText = String(codeText);
-              }
-
-              // Copy the code to clipboard
-              navigator.clipboard.writeText(codeText).then(() => {
-                // Visual feedback
-                this.textContent = 'Copied!';
-                this.classList.add('copied');
-
-                // Reset after a short delay
-                setTimeout(() => {
-                  this.textContent = 'Copy';
-                  this.classList.remove('copied');
-                }, 2000);
-              }).catch(err => {
-                console.error('Failed to copy code: ', err);
-                this.textContent = 'Error';
-
-                setTimeout(() => {
-                  this.textContent = 'Copy';
-                }, 2000);
-              });
-            } catch (err) {
-              console.error('Error in copy button handler:', err);
-              // Try to recover
-              this.textContent = 'Error';
-              setTimeout(() => {
-                this.textContent = 'Copy';
-              }, 2000);
-            }
-          });
-
-          // Mark the button as having a listener
-          button.setAttribute('data-has-listener', 'true');
         });
       } catch (err) {
         console.error('Error setting up code copy buttons:', err);
+      }
+    }
+
+    // Handler function for copy button clicks
+    function handleCopyButtonClick(event) {
+      // Check if the clicked element is a copy button
+      if (!event.target.classList.contains('copy-code-button')) return;
+
+      try {
+        const button = event.target;
+        // Find the code element within the container
+        const pre = button.nextElementSibling;
+        if (!pre || !pre.tagName || pre.tagName.toLowerCase() !== 'pre') {
+          console.error('No pre element found');
+          return;
+        }
+
+        const codeElement = pre.querySelector('code');
+        if (!codeElement) {
+          console.error('No code element found');
+          return;
+        }
+
+        let codeText = codeElement.textContent;
+
+        // Make sure we have a string
+        if (typeof codeText !== 'string') {
+          codeText = String(codeText);
+        }
+
+        // Copy the code to clipboard using a more reliable method
+        try {
+          navigator.clipboard.writeText(codeText).then(() => {
+            // Visual feedback
+            button.textContent = 'Copied!';
+            button.classList.add('copied');
+
+            // Reset after a short delay
+            setTimeout(() => {
+              button.textContent = 'Copy';
+              button.classList.remove('copied');
+            }, 2000);
+          }).catch(err => {
+            console.error('Failed to copy code: ', err);
+            button.textContent = 'Error';
+
+            setTimeout(() => {
+              button.textContent = 'Copy';
+            }, 2000);
+          });
+        } catch (clipboardErr) {
+          // Fallback for older browsers
+          console.error('Clipboard API failed, trying fallback:', clipboardErr);
+
+          // Create temporary element
+          const textArea = document.createElement('textarea');
+          textArea.value = codeText;
+          textArea.style.position = 'fixed';
+          textArea.style.opacity = '0';
+          document.body.appendChild(textArea);
+          textArea.select();
+
+          try {
+            // Execute copy command
+            const successful = document.execCommand('copy');
+            if (successful) {
+              button.textContent = 'Copied!';
+              button.classList.add('copied');
+            } else {
+              button.textContent = 'Error';
+            }
+          } catch (e) {
+            console.error('Fallback copy failed:', e);
+            button.textContent = 'Error';
+          }
+
+          // Clean up
+          document.body.removeChild(textArea);
+
+          // Reset after a short delay
+          setTimeout(() => {
+            button.textContent = 'Copy';
+            button.classList.remove('copied');
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('Error in copy button handler:', err);
+        // Try to recover
+        if (event.target) {
+          event.target.textContent = 'Error';
+          setTimeout(() => {
+            event.target.textContent = 'Copy';
+          }, 2000);
+        }
       }
     }
 
@@ -1270,14 +846,10 @@
       const offset = (notifications.length - 1) * 10; // Stack effect
 
       // Position the new notification
-      notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
-
-      // Trigger reflow to ensure animation works
-      void notification.offsetWidth;
-      notification.classList.add('visible');
       notification.style.transform = `translateX(0) translateY(-${offset}px)`;
+      notification.classList.add('visible');
 
-      // Hide after 1 second
+      // Hide after 5 seconds
       setTimeout(() => {
         notification.classList.remove('visible');
         notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
@@ -1290,7 +862,7 @@
             n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
           });
         }, 300);
-      }, 1000);
+      }, 5000);
     }
 
     // Show temporary notification that disappears faster
@@ -1305,9 +877,6 @@
       }
 
       container.appendChild(notification);
-
-      // Trigger reflow to ensure animation works
-      void notification.offsetWidth;
       notification.classList.add('visible');
 
       // Hide after 2 seconds (faster than regular notifications)
@@ -1321,91 +890,25 @@
       }, 2000);
     }
 
-    // Register for keyboard events to handle shortcuts
-    document.addEventListener('keydown', (e) => {
-      // Allow event to propagate to text fields
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      // Don't process if some modifier keys are pressed (to avoid conflicts)
-      if (e.altKey) return;
-
-      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
-
-      // If Ctrl/Cmd key is pressed
-      if (ctrlOrCmd) {
-        // When window is invisible, only handle Command/Ctrl + B
-        if (!isWindowVisible) {
-          if (e.key === 'b') {
-            toggleWindowVisibility();
-            e.preventDefault();
-          }
-          return;
-        }
-
-        // Handle all shortcuts when window is visible
-        switch (e.key) {
-          case 'b': // Toggle visibility
-            toggleWindowVisibility();
-            e.preventDefault();
-            break;
-
-          case 'Enter': // Process screenshots
-            ipcRenderer.send('process-screenshots');
-            e.preventDefault();
-            break;
-
-          case 'r': // Reset
-            ipcRenderer.send('reset-process');
-            e.preventDefault();
-            break;
-
-          case 'q': // Quit
-            ipcRenderer.send('quit-app');
-            e.preventDefault();
-            break;
-        }
-      }
-    });
-
     // Initialize
     updateModelBadge();
 
+    // Update shortcut labels based on platform
+    document.querySelectorAll('.shortcut').forEach(el => {
+      const text = el.textContent;
+      el.textContent = text.replace('⌘', isMac ? '⌘' : 'Ctrl');
+    });
+
     // Refresh model badge whenever focus returns to window
-    // (e.g., after closing model-selector)
     window.addEventListener('focus', () => {
-      console.log('Window focused, refreshing model badge');
       updateModelBadge();
     });
-    
+
     // Listen for postMessage from model-selector window
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'model-settings-updated') {
-        console.log('Received settings update from model selector:', event.data.settings);
         updateModelBadge();
       }
-    });
-
-    // Setup toolbar button handlers
-    document.getElementById('btn-toggle-visibility').addEventListener('click', () => {
-      toggleWindowVisibility();
-    });
-
-    document.getElementById('btn-process').addEventListener('click', () => {
-      ipcRenderer.send('process-screenshots');
-    });
-
-    document.getElementById('btn-auto-screenshot').addEventListener('click', () => {
-      ipcRenderer.send('auto-screenshot');
-    });
-
-    document.getElementById('btn-reset').addEventListener('click', () => {
-      ipcRenderer.send('reset-process');
-    });
-
-    document.getElementById('btn-settings').addEventListener('click', () => {
-      ipcRenderer.send('open-settings');
     });
 
     // Handler for continuing with context (add screenshot)
@@ -1423,16 +926,101 @@
       }
     });
 
-    // Update shortcut labels based on platform
-    document.querySelectorAll('.shortcut').forEach(el => {
-      const text = el.textContent;
-      el.textContent = text.replace('⌘', isMac ? '⌘' : 'Ctrl');
-    });
-
     // Handle content container visibility
     ipcRenderer.on('hide-content', () => {
       const contentContainer = document.getElementById('content-container');
-      contentContainer.style.display = 'none';
+
+      // Save references to important elements before clearing
+      const banner = document.getElementById('instruction-banner');
+      const modelBadge = document.getElementById('model-badge');
+      const notificationContainer = document.getElementById('notification-container');
+
+      // Clear the container
+      contentContainer.innerHTML = '';
+
+      // Add back the instruction banner
+      contentContainer.appendChild(banner);
+
+      // Recreate the main-content structure
+      const mainContent = document.createElement('div');
+      mainContent.id = 'main-content';
+
+      // Recreate the loading content
+      const loadingContent = document.createElement('div');
+      loadingContent.id = 'loading-content';
+      loadingContent.className = 'loading-container';
+      loadingContent.style.display = 'none';
+
+      // Add skeleton sections
+      for (let i = 0; i < 3; i++) {
+        const section = document.createElement('div');
+        section.className = 'skeleton-section';
+
+        const header = document.createElement('div');
+        header.className = 'skeleton-header';
+        section.appendChild(header);
+
+        // Add some skeleton text lines
+        for (let j = 0; j < 3; j++) {
+          const textLine = document.createElement('div');
+          textLine.className = `skeleton-text line-${Math.floor(70 + Math.random() * 30)}`;
+          section.appendChild(textLine);
+        }
+
+        // Add a code block to the second section
+        if (i === 1) {
+          const codeBlock = document.createElement('div');
+          codeBlock.className = 'skeleton-code';
+          section.appendChild(codeBlock);
+        }
+
+        loadingContent.appendChild(section);
+      }
+
+      // Add the loading content to main content
+      mainContent.appendChild(loadingContent);
+
+      // Create empty result content
+      const resultContent = document.createElement('div');
+      resultContent.id = 'result-content';
+      mainContent.appendChild(resultContent);
+
+      // Recreate context actions container
+      const contextActions = document.createElement('div');
+      contextActions.id = 'context-actions';
+      contextActions.style.display = 'none';
+
+      // Add the buttons
+      const addContextBtn = document.createElement('div');
+      addContextBtn.className = 'toolbar-button';
+      addContextBtn.id = 'btn-add-context';
+      addContextBtn.innerHTML = '<span class="icon">📷</span><span>Add screenshot to continue</span>';
+
+      const reportErrorBtn = document.createElement('div');
+      reportErrorBtn.className = 'toolbar-button';
+      reportErrorBtn.id = 'btn-report-error';
+      reportErrorBtn.innerHTML = '<span class="icon">🔄</span><span>Report error in solution</span>';
+
+      contextActions.appendChild(addContextBtn);
+      contextActions.appendChild(reportErrorBtn);
+      mainContent.appendChild(contextActions);
+
+      // Add everything back to the container
+      contentContainer.appendChild(mainContent);
+      contentContainer.appendChild(modelBadge);
+      contentContainer.appendChild(notificationContainer);
+
+      // Re-attach event listeners
+      document.getElementById('btn-add-context').addEventListener('click', () => {
+        ipcRenderer.send('add-context-screenshot');
+      });
+
+      document.getElementById('btn-report-error').addEventListener('click', () => {
+        const errorDescription = prompt('Please describe the error in the solution:');
+        if (errorDescription && errorDescription.trim() !== '') {
+          ipcRenderer.send('report-solution-error', errorDescription);
+        }
+      });
     });
   </script>
 </body>

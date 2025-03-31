@@ -1,0 +1,770 @@
+:root {
+  /* Background colors */
+  --bg-transparent: transparent;
+  --bg-main: rgba(128, 128, 128, 0.15);
+  --bg-content: rgba(128, 128, 128, 0.15);
+  --bg-dark: rgba(25, 25, 25, 0.97);
+  --bg-darker: rgba(20, 20, 20, 0.98);
+  --bg-code: rgba(25, 25, 25, 0.97);
+  --bg-toolbar: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
+  --bg-button: rgba(60, 60, 60, 0.7);
+  --bg-button-hover: rgba(80, 80, 80, 0.9);
+  --bg-button-shortcut: rgba(40, 40, 40, 0.7);
+  --bg-inline-code: rgba(40, 40, 40, 0.7);
+  --bg-table-header: rgba(40, 40, 40, 0.8);
+  --bg-table-even: rgba(40, 40, 40, 0.4);
+  --bg-language-tag: rgba(50, 50, 50, 0.95);
+  --bg-notification-success: rgba(76, 175, 80, 0.95);
+  --bg-notification-warning: rgba(255, 152, 0, 0.95);
+  --bg-notification-error: rgba(244, 67, 54, 0.95);
+  --bg-error: rgba(255, 77, 77, 0.08);
+  --bg-warning: rgba(255, 204, 51, 0.08);
+  --bg-scrollbar: rgba(30, 30, 30, 0.95);
+  --bg-scrollbar-thumb: rgba(120, 120, 120, 0.7);
+  --bg-scrollbar-thumb-hover: rgba(120, 120, 120, 0.9);
+  --bg-code-scrollbar-thumb: rgba(140, 140, 140, 0.7);
+  --bg-code-scrollbar-thumb-hover: rgba(160, 160, 160, 0.95);
+  --bg-context-actions: rgba(30, 30, 30, 0.9);
+  --bg-context-button: rgba(50, 50, 50, 0.8);
+  --bg-context-button-hover: rgba(70, 70, 70, 0.9);
+  --bg-add-context: rgba(40, 90, 40, 0.6);
+  --bg-add-context-hover: rgba(50, 120, 50, 0.8);
+  --bg-report-error: rgba(90, 40, 40, 0.6);
+  --bg-report-error-hover: rgba(120, 50, 50, 0.8);
+  --bg-model-badge: rgba(30, 30, 30, 0.8);
+
+  /* Text colors */
+  --text-main: rgba(255, 255, 255, 0.9);
+  --text-code: rgba(255, 255, 255, 0.95);
+  --text-blockquote: rgba(255, 255, 255, 0.8);
+  --text-link: #5e9eff;
+  --text-error: #ff4d4d;
+  --text-warning: #ffcc33;
+
+  /* Border colors */
+  --border-light: rgba(120, 120, 120, 0.2);
+  --border-medium: rgba(120, 120, 120, 0.3);
+  --border-dark: rgba(100, 100, 100, 0.3);
+  --border-code: rgba(120, 120, 120, 0.3);
+  --border-table: rgba(100, 100, 100, 0.3);
+  --border-language-tag: rgba(120, 120, 120, 0.4);
+  --border-error: #ff4d4d;
+  --border-warning: #ffcc33;
+  --border-success: #2E7D32;
+  --border-warning-notification: #E65100;
+  --border-error-notification: #C62828;
+  --border-button: rgba(80, 80, 80, 0.3);
+  --border-context-button: rgba(100, 100, 100, 0.4);
+}
+
+html {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-transparent);
+  overflow: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-main);
+  font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
+  overflow: hidden;
+  position: relative;
+  border-radius: 12px;
+  color: var(--text-main);
+  /* Prevent text rendering artifacts */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Improved instruction banner */
+#instruction-banner {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-darker);
+  /* More opaque for better visibility */
+  color: #fff;
+  padding: 10px 18px;
+  font-size: 14px;
+  border-radius: 8px;
+  z-index: 9999;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  user-select: none;
+  border: 1px solid var(--border-medium);
+  max-width: 100%;
+  /* Limit width to avoid overlapping with edges */
+  text-align: center;
+  /* Center text */
+}
+
+#result-content {
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  box-sizing: border-box;
+  border-radius: 8px;
+  max-height: none;
+  overflow-x: hidden;
+  padding-bottom: 100px;
+  /* Fix text rendering issues during scrolling */
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#result-content:empty {
+  display: none;
+}
+
+/* Code block improvements */
+.code-block-container pre code {
+  background: var(--bg-transparent) !important;
+  /* Improved background for code blocks */
+  padding: 16px !important;
+  border-radius: 6px !important;
+  position: relative;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace !important;
+  overflow-x: auto !important;
+  white-space: pre !important;
+  color: var(--text-code) !important;
+  /* Brighter text for better readability */
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
+  /* Subtle text shadow for better contrast */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Code block container improvements */
+.code-block-container {
+  position: relative;
+  margin: 1.8em 0;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-code);
+}
+
+/* Ensure proper styling of pre/code in our containers */
+.code-block-container pre {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 36px;
+  /* Increased space for language tag */
+  background: var(--bg-transparent);
+  border: none;
+  /* Remove border since container has it */
+}
+
+/* Hide default language tag that comes with our highlighter */
+pre:before {
+  display: none !important;
+}
+
+/* Position the language tag correctly */
+.code-language-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--bg-language-tag);
+  color: var(--text-main);
+  padding: 4px 12px;
+  border-radius: 8px 0 8px 0;
+  font-size: 13px;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  z-index: 5;
+  border-right: 1px solid var(--border-language-tag);
+  border-bottom: 1px solid var(--border-language-tag);
+  font-weight: 500;
+}
+
+/* Enhanced scrollbar styles for code blocks */
+#result-content pre::-webkit-scrollbar {
+  height: 10px;
+  background: var(--bg-scrollbar);
+  border-radius: 5px;
+}
+
+#result-content pre::-webkit-scrollbar-thumb {
+  background: var(--bg-code-scrollbar-thumb);
+  /* Brighter scrollbar for better visibility */
+  border-radius: 5px;
+}
+
+#result-content pre::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-code-scrollbar-thumb-hover);
+}
+
+/* Make long code lines wrap to be helpful on mobile */
+@media (max-width: 768px) {
+
+  #result-content pre,
+  code {
+    white-space: pre-wrap !important;
+  }
+}
+
+/* Scrollbar for result content */
+#result-content::-webkit-scrollbar {
+  width: 10px;
+  background: var(--bg-scrollbar);
+  border-radius: 5px;
+}
+
+#result-content::-webkit-scrollbar-thumb {
+  background: var(--bg-scrollbar-thumb);
+  border-radius: 5px;
+}
+
+#result-content::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-scrollbar-thumb-hover);
+}
+
+/* Code block copy button */
+.copy-code-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background-color: rgba(70, 70, 70, 0.8);
+  color: #ffffff;
+  border: 1px solid var(--border-medium);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  z-index: 10;
+  font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
+  opacity: 0.7;
+}
+
+.code-block-container:hover .copy-code-button {
+  opacity: 1;
+}
+
+.copy-code-button:hover {
+  background-color: rgba(90, 90, 90, 0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.copy-code-button.copied {
+  background-color: #4CAF50;
+}
+
+/* Markdown content table styling */
+#result-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 15px 0;
+  font-size: 0.9em;
+}
+
+#result-content th,
+#result-content td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-table);
+}
+
+#result-content th {
+  background-color: var(--bg-table-header);
+  text-align: left;
+}
+
+#result-content tr:nth-child(even) {
+  background-color: var(--bg-table-even);
+}
+
+/* Make content have more breathing room */
+#result-content h1,
+#result-content h2,
+#result-content h3 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+#result-content h1 {
+  font-size: 1.8em;
+  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+  padding-bottom: 8px;
+}
+
+#result-content h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+  padding-bottom: 6px;
+}
+
+#result-content h3 {
+  font-size: 1.2em;
+}
+
+/* Improved list styling */
+#result-content ul,
+#result-content ol {
+  padding-left: 2em;
+  margin: 1em 0;
+}
+
+#result-content li {
+  margin-bottom: 0.5em;
+}
+
+#result-content ol li {
+  padding-left: 0.5em;
+}
+
+/* Blockquote styling */
+#result-content blockquote {
+  border-left: 4px solid var(--border-medium);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--text-blockquote);
+  font-style: italic;
+}
+
+/* Link styling */
+#result-content a {
+  color: var(--text-link);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-link);
+}
+
+#result-content a:hover {
+  text-decoration: none;
+  border-bottom: 1px solid var(--text-link);
+}
+
+/* General pre/code styling outside of containers */
+pre {
+  background: var(--bg-transparent);
+  /* More visible background for code blocks */
+  color: var(--text-code);
+  padding: 16px;
+  border-radius: 8px;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 1.2em 0;
+  border: 1px solid var(--border-light);
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+code {
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  color: var(--text-code);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background: var(--bg-inline-code);
+}
+
+.error-message {
+  color: var(--text-error);
+  background: var(--bg-error);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--border-error);
+  margin: 15px 0;
+}
+
+.warning-message {
+  color: var(--text-warning);
+  background: var(--bg-warning);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--border-warning);
+  margin: 15px 0;
+}
+
+/* Improved loading container with skeleton UI */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: var(--bg-transparent);
+  border-radius: 8px;
+}
+
+/* Skeleton loading styles */
+.skeleton-section {
+  width: 100%;
+  margin-bottom: 30px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeleton-header {
+  height: 28px;
+  width: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.skeleton-text {
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.skeleton-text.line-90 {
+  width: 90%;
+}
+
+.skeleton-text.line-80 {
+  width: 80%;
+}
+
+.skeleton-text.line-70 {
+  width: 70%;
+}
+
+.skeleton-code {
+  height: 120px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.model-badge {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  background: var(--bg-model-badge);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  user-select: none;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 9000;
+  border: 1px solid var(--border-dark);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Updated Notification styles */
+#notification-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100000;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.notification {
+  padding: 14px 20px;
+  color: white;
+  border-radius: 10px;
+  font-size: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  max-width: 400px;
+  word-break: break-word;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(50px);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border-left: 4px solid transparent;
+}
+
+.notification.success {
+  background-color: var(--bg-notification-success);
+  border-left-color: var(--border-success);
+}
+
+.notification.warning {
+  background-color: var(--bg-notification-warning);
+  border-left-color: var(--border-warning-notification);
+}
+
+.notification.error {
+  background-color: var(--bg-notification-error);
+  border-left-color: var(--border-error-notification);
+}
+
+.notification.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* For making the window invisible during screen sharing */
+body.invisible-mode {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+body.invisible-mode:hover {
+  opacity: 0.8;
+}
+
+/* Updated top toolbar styles */
+#top-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border-dark);
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  -webkit-app-region: drag;
+  border-radius: 12px 12px 0 0;
+  box-sizing: border-box;
+  height: 50px;
+  cursor: move;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+#top-toolbar::-webkit-scrollbar {
+  height: 6px;
+}
+
+#top-toolbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+#top-toolbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+/* Toolbar buttons */
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-button);
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 13px;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  /* Make buttons clickable */
+  border: 1px solid var(--border-button);
+}
+
+.toolbar-button:hover {
+  background: var(--bg-button-hover);
+}
+
+.toolbar-button .icon {
+  font-size: 14px;
+  margin-right: 8px;
+  min-width: 14px;
+  text-align: center;
+}
+
+.toolbar-button .shortcut {
+  font-size: 10px;
+  margin-left: 6px;
+  background: var(--bg-button-shortcut);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* Window control buttons */
+.window-controls {
+  display: none;
+  /* Hide window controls - removing completely */
+}
+
+.window-control {
+  display: none;
+  /* Hide window controls - removing completely */
+}
+
+.close-btn,
+.minimize-btn,
+.maximize-btn {
+  display: none;
+  /* Hide window controls - removing completely */
+}
+
+/* Additional styles to completely hide any macOS window controls */
+:root {
+  --electron-titlebar-height: 0;
+}
+
+.window-controls,
+.window-control,
+.close-btn,
+.minimize-btn,
+.maximize-btn,
+:host(.platform-darwin) .titlebar-button,
+:host(.platform-darwin) .titlebar-close,
+:host(.platform-darwin) .titlebar-minimize,
+:host(.platform-darwin) .titlebar-maximize,
+:host(.platform-darwin) .titlebar-fullscreen {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  pointer-events: none !important;
+}
+
+/* Content container */
+#content-container {
+  padding-top: 60px;
+  width: 100%;
+  height: 100vh;
+  box-sizing: border-box;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Disable smooth scrolling to prevent artifacts */
+  scroll-behavior: auto;
+  /* Prevent animation/transition flickering on child elements during scroll */
+  -webkit-transform-style: flat;
+  transform-style: flat;
+  /* Fix text rendering issues */
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Improve scrolling performance by fixing header and footer in place */
+#top-toolbar,
+.model-badge {
+  z-index: 9999;
+  /* Ensure fixed elements stay on top */
+}
+
+/* Fix for rendering issues in transparent containers */
+#content-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  /* Match html background */
+  z-index: -1;
+}
+
+/* Response overlay with enhanced rendering performance */
+#main-content {
+  padding: 20px;
+  margin: 0 auto;
+  width: 100%;
+  /* Take up full width of container up to max-width */
+  color: rgba(255, 255, 255, 0.9);
+  /* Improved text color */
+  position: relative;
+  box-sizing: border-box;
+  /* Include padding in width calculations */
+  /* Prevent layout shifts during content changes */
+  min-height: 300px;
+}
+
+/* Make context action buttons sticky and more attractive */
+#context-actions {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 15px;
+  margin-top: 30px;
+  text-align: center;
+  z-index: 100;
+  border-top: 1px solid var(--border-medium);
+  /* Slightly more visible border */
+  backdrop-filter: blur(8px);
+  /* Enhanced blur effect */
+  -webkit-backdrop-filter: blur(8px);
+  background-color: var(--bg-context-actions);
+  /* Increased opacity for better visibility */
+  box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
+  /* Enhanced shadow */
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+/* Improved button styling for context actions */
+#context-actions .toolbar-button {
+  padding: 8px 15px;
+  border-radius: 8px;
+  background: var(--bg-context-button);
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-context-button);
+}
+
+#context-actions .toolbar-button:hover {
+  background: var(--bg-context-button-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+#btn-add-context {
+  background: var(--bg-add-context) !important;
+}
+
+#btn-add-context:hover {
+  background: var(--bg-add-context-hover) !important;
+}
+
+#btn-report-error {
+  background: var(--bg-report-error) !important;
+}
+
+#btn-report-error:hover {
+  background: var(--bg-report-error-hover) !important;
+}
