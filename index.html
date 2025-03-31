@@ -269,7 +269,7 @@
       setupCodeCopyButtons();
 
       // Scroll to top
-      window.scrollTo(0, 0);
+      document.getElementById('content-container').scrollTo(0, 0);
     });
 
     // Setup for streaming results
@@ -351,10 +351,14 @@
       const banner = document.getElementById('instruction-banner');
       banner.style.opacity = '0';
 
-      // Add a small scroll to ensure visible buttons if needed
-      const resultContent = document.getElementById('result-content');
-      if (resultContent.scrollHeight > resultContent.clientHeight) {
-        resultContent.scrollBy({ top: 1, behavior: 'smooth' });
+      // Ensure visible content
+      const contentContainer = document.getElementById('content-container');
+      if (contentContainer.scrollHeight > contentContainer.clientHeight) {
+        // Add a small delay to ensure DOM is ready
+        setTimeout(() => {
+          // If there's something to scroll to, add a small offset to ensure top content is visible
+          contentContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
       }
     });
 
