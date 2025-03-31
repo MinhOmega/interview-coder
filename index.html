@@ -220,6 +220,52 @@
       ipcRenderer.send('show-context-menu');
     });
 
+    // Handle scroll-content event from main process
+    ipcRenderer.on('scroll-content', (event, direction) => {
+      const contentContainer = document.getElementById('content-container');
+      const scrollAmount = 300; // Pixels to scroll in horizontal or vertical direction
+      
+      // Add a class to reduce rendering during programmatic scrolling
+      contentContainer.classList.add('scrolling');
+      
+      // Temporarily disable smooth scrolling for better performance
+      const currentScrollBehavior = contentContainer.style.scrollBehavior;
+      contentContainer.style.scrollBehavior = 'auto';
+      
+      switch(direction) {
+        case 'up':
+          contentContainer.scrollBy({
+            top: -scrollAmount,
+            behavior: 'auto'
+          });
+          break;
+        case 'down':
+          contentContainer.scrollBy({
+            top: scrollAmount,
+            behavior: 'auto'
+          });
+          break;
+        case 'left':
+          contentContainer.scrollBy({
+            left: -scrollAmount,
+            behavior: 'auto'
+          });
+          break;
+        case 'right':
+          contentContainer.scrollBy({
+            left: scrollAmount,
+            behavior: 'auto'
+          });
+          break;
+      }
+      
+      // Restore smooth scrolling after a delay
+      setTimeout(() => {
+        contentContainer.style.scrollBehavior = currentScrollBehavior;
+        contentContainer.classList.remove('scrolling');
+      }, 100);
+    });
+
     // Register keyboard shortcut for DevTools (Cmd/Ctrl+Shift+I)
     document.addEventListener('keydown', (e) => {
       if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === 'I') {
@@ -260,16 +306,31 @@
 
     ipcRenderer.on('analysis-result', async (event, markdown) => {
       const html = await processMarkdown(markdown);
-      document.getElementById('result-content').innerHTML = html;
+      
+      // Use optimized DOM updates
+      requestAnimationFrame(() => {
+        document.getElementById('result-content').innerHTML = html;
 
-      // Show context actions 
-      document.getElementById('context-actions').style.display = 'flex';
+        // Show context actions 
+        document.getElementById('context-actions').style.display = 'flex';
 
-      // Setup code copy buttons after content is added
-      setupCodeCopyButtons();
+        // Setup code copy buttons after content is added
+        setupCodeCopyButtons();
 
-      // Scroll to top
-      document.getElementById('content-container').scrollTo(0, 0);
+        // Optimize scroll performance after new content is loaded
+        optimizeScrollPerformance();
+      });
+
+      // Scroll to top using optimized method
+      requestAnimationFrame(() => {
+        const contentContainer = document.getElementById('content-container');
+        contentContainer.classList.add('scrolling');
+        contentContainer.scrollTo(0, 0);
+        
+        setTimeout(() => {
+          contentContainer.classList.remove('scrolling');
+        }, 100);
+      });
     });
 
     // Setup for streaming results
@@ -290,15 +351,17 @@
 
         // Process the full accumulated text to ensure proper markdown rendering
         const html = await processMarkdown(streamBuffer);
-        document.getElementById('result-content').innerHTML = html;
-
-        // Setup code copy buttons
-        setupCodeCopyButtons();
-
-        // Auto-scroll to the bottom if user is already at the bottom
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100) {
-          window.scrollTo(0, document.body.scrollHeight);
-        }
+        
+        // Use optimized DOM updates
+        requestAnimationFrame(() => {
+          document.getElementById('result-content').innerHTML = html;
+        
+          // Setup code copy buttons
+          setupCodeCopyButtons();
+        
+          // Use optimized scrolling that prevents flickering
+          safeScrollToBottom();
+        });
       } catch (error) {
         console.error("Error processing stream chunk:", error);
         // Display error but continue operation
@@ -318,15 +381,17 @@
         }
 
         const html = await processMarkdown(fullText);
-        document.getElementById('result-content').innerHTML = html;
-
-        // Setup code copy buttons after content is updated
-        setupCodeCopyButtons();
-
-        // Auto-scroll to the bottom if user is already at the bottom
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100) {
-          window.scrollTo(0, document.body.scrollHeight);
-        }
+        
+        // Use optimized DOM updates to prevent flickering
+        requestAnimationFrame(() => {
+          document.getElementById('result-content').innerHTML = html;
+          
+          // Setup code copy buttons after content is updated
+          setupCodeCopyButtons();
+          
+          // Use optimized scrolling that prevents flickering
+          safeScrollToBottom();
+        });
       } catch (error) {
         console.error("Error processing stream update:", error);
         // Provide better error visualization
@@ -481,20 +546,41 @@
           `;
         }
 
-        // Add copy buttons to code blocks and language tags
+        // Create wrapper in memory to avoid DOM reflows
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;
+        
+        // Apply anti-flicker optimizations to elements
+        wrapper.querySelectorAll('img').forEach(img => {
+          img.style.transform = 'translateZ(0)';
+          img.loading = 'lazy';
+          // Set dimensions to prevent layout shifts
+          if (!img.width && !img.height) {
+            img.width = 600;
+            img.height = 400;
+          }
+        });
+
+        // Add compositing hints to headings
+        wrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+          heading.style.transform = 'translateZ(0)';
+        });
 
         // Find all pre > code elements and wrap them with copy button and language tag
         wrapper.querySelectorAll('pre > code').forEach(codeBlock => {
           const pre = codeBlock.parentNode;
           const container = document.createElement('div');
           container.className = 'code-block-container';
+          
+          // Apply compositing optimization
+          container.style.transform = 'translateZ(0)';
+          container.style.contain = 'content';
 
           // Create copy button
           const copyButton = document.createElement('button');
           copyButton.className = 'copy-code-button';
           copyButton.textContent = 'Copy';
+          copyButton.setAttribute('data-has-listener', 'true');
 
           // Extract language from class
           let language = '';
@@ -574,69 +660,79 @@
           return;
         }
 
+        // Use event delegation for better performance
+        // Remove existing listeners first to prevent duplicates
+        document.removeEventListener('click', handleCopyButtonClick);
+        
+        // Add a single event listener to handle all copy button clicks
+        document.addEventListener('click', handleCopyButtonClick);
+        
+        // Mark buttons as having a listener (for reference)
         copyButtons.forEach(button => {
-          // Skip if the button already has a listener (check for data attribute)
-          if (button.getAttribute('data-has-listener') === 'true') {
-            return;
+          if (!button.getAttribute('data-has-listener')) {
+            button.setAttribute('data-has-listener', 'true');
           }
-
-          // Add the click event listener
-          button.addEventListener('click', function () {
-            try {
-              // Find the code element within the container
-              const pre = this.nextElementSibling;
-              if (!pre || !pre.tagName || pre.tagName.toLowerCase() !== 'pre') {
-                console.error('No pre element found');
-                return;
-              }
-
-              const codeElement = pre.querySelector('code');
-              if (!codeElement) {
-                console.error('No code element found');
-                return;
-              }
-
-              let codeText = codeElement.textContent;
-
-              // Make sure we have a string
-              if (typeof codeText !== 'string') {
-                codeText = String(codeText);
-              }
-
-              // Copy the code to clipboard
-              navigator.clipboard.writeText(codeText).then(() => {
-                // Visual feedback
-                this.textContent = 'Copied!';
-                this.classList.add('copied');
-
-                // Reset after a short delay
-                setTimeout(() => {
-                  this.textContent = 'Copy';
-                  this.classList.remove('copied');
-                }, 2000);
-              }).catch(err => {
-                console.error('Failed to copy code: ', err);
-                this.textContent = 'Error';
-
-                setTimeout(() => {
-                  this.textContent = 'Copy';
-                }, 2000);
-              });
-            } catch (err) {
-              console.error('Error in copy button handler:', err);
-              // Try to recover
-              this.textContent = 'Error';
-              setTimeout(() => {
-                this.textContent = 'Copy';
-              }, 2000);
-            }
-          });
-
-          // Mark the button as having a listener
-          button.setAttribute('data-has-listener', 'true');
         });
       } catch (err) {
         console.error('Error setting up code copy buttons:', err);
+      }
+    }
+    
+    // Handler function for copy button clicks
+    function handleCopyButtonClick(event) {
+      // Check if the clicked element is a copy button
+      if (!event.target.classList.contains('copy-code-button')) return;
+      
+      try {
+        const button = event.target;
+        // Find the code element within the container
+        const pre = button.nextElementSibling;
+        if (!pre || !pre.tagName || pre.tagName.toLowerCase() !== 'pre') {
+          console.error('No pre element found');
+          return;
+        }
+
+        const codeElement = pre.querySelector('code');
+        if (!codeElement) {
+          console.error('No code element found');
+          return;
+        }
+
+        let codeText = codeElement.textContent;
+
+        // Make sure we have a string
+        if (typeof codeText !== 'string') {
+          codeText = String(codeText);
+        }
+
+        // Copy the code to clipboard
+        navigator.clipboard.writeText(codeText).then(() => {
+          // Visual feedback
+          button.textContent = 'Copied!';
+          button.classList.add('copied');
+
+          // Reset after a short delay
+          setTimeout(() => {
+            button.textContent = 'Copy';
+            button.classList.remove('copied');
+          }, 2000);
+        }).catch(err => {
+          console.error('Failed to copy code: ', err);
+          button.textContent = 'Error';
+
+          setTimeout(() => {
+            button.textContent = 'Copy';
+          }, 2000);
+        });
+      } catch (err) {
+        console.error('Error in copy button handler:', err);
+        // Try to recover
+        if (event.target) {
+          event.target.textContent = 'Error';
+          setTimeout(() => {
+            event.target.textContent = 'Copy';
+          }, 2000);
+        }
       }
     }
 
@@ -656,10 +752,11 @@
       // Position the new notification
       notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
-      // Trigger reflow to ensure animation works
-      void notification.offsetWidth;
-      notification.classList.add('visible');
-      notification.style.transform = `translateX(0) translateY(-${offset}px)`;
+      // Use requestAnimationFrame for smoother animations
+      requestAnimationFrame(() => {
+        notification.classList.add('visible');
+        notification.style.transform = `translateX(0) translateY(-${offset}px)`;
+      });
 
       // Hide after 1 second
       setTimeout(() => {
@@ -690,9 +787,10 @@
 
       container.appendChild(notification);
 
-      // Trigger reflow to ensure animation works
-      void notification.offsetWidth;
-      notification.classList.add('visible');
+      // Use requestAnimationFrame for smoother animations
+      requestAnimationFrame(() => {
+        notification.classList.add('visible');
+      });
 
       // Hide after 2 seconds (faster than regular notifications)
       setTimeout(() => {
@@ -708,12 +806,57 @@
     // Initialize
     updateModelBadge();
 
+    // Add passive event listeners for better scrolling performance
+    const contentContainer = document.getElementById('content-container');
+    if (contentContainer) {
+      // Throttle scroll events to improve performance and reduce flickering
+      let scrollTimeout;
+      contentContainer.addEventListener('scroll', () => {
+        // Only execute code after scrolling stops
+        if (scrollTimeout) {
+          clearTimeout(scrollTimeout);
+        }
+        
+        // Temporarily add a class during scrolling to reduce rendering
+        contentContainer.classList.add('scrolling');
+        
+        scrollTimeout = setTimeout(() => {
+          // Remove the class after scrolling stops
+          contentContainer.classList.remove('scrolling');
+        }, 150);
+      }, { passive: true });
+    }
+
+    // Optimize content container for hardware acceleration
+    function optimizeScrollPerformance() {
+      const contentContainer = document.getElementById('content-container');
+      const resultContent = document.getElementById('result-content');
+      
+      if (contentContainer) {
+        // Use requestAnimationFrame for smoother compositing and reduce flickering
+        requestAnimationFrame(() => {
+          // Add stable compositing layer
+          contentContainer.style.transform = 'translateZ(0)';
+          
+          // Prevent unnecessary repaints during scroll
+          if (resultContent) {
+            // Optimize content for static rendering
+            resultContent.style.transform = 'translate3d(0,0,0)';
+            resultContent.style.contain = 'paint';
+          }
+        });
+      }
+    }
+
+    // Call the optimization function on load
+    window.addEventListener('load', optimizeScrollPerformance, { passive: true });
+    
     // Refresh model badge whenever focus returns to window
     // (e.g., after closing model-selector)
     window.addEventListener('focus', () => {
       updateModelBadge();
-    });
-
+    }, { passive: true });
+    
     // Listen for postMessage from model-selector window
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'model-settings-updated') {
@@ -751,8 +894,10 @@
       const modelBadge = document.getElementById('model-badge');
       const notificationContainer = document.getElementById('notification-container');
 
-      // Clear the container
-      contentContainer.innerHTML = '';
+      // Clear the container using more performance-optimized method
+      while (contentContainer.firstChild) {
+        contentContainer.removeChild(contentContainer.firstChild);
+      }
 
       // Add back the instruction banner
       contentContainer.appendChild(banner);
@@ -839,6 +984,31 @@
         }
       });
     });
+
+    // Auto-scroll handling with flicker prevention
+    function safeScrollToBottom(force = false) {
+      const contentContainer = document.getElementById('content-container');
+      const isNearBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100;
+      
+      if (force || isNearBottom) {
+        // Use requestAnimationFrame to prevent flickering
+        requestAnimationFrame(() => {
+          // Add class to reduce rendering
+          contentContainer.classList.add('scrolling');
+          
+          // Scroll to bottom
+          contentContainer.scrollTo({
+            top: contentContainer.scrollHeight,
+            behavior: 'auto'
+          });
+          
+          // Remove class after scrolling completes
+          setTimeout(() => {
+            contentContainer.classList.remove('scrolling');
+          }, 100);
+        });
+      }
+    }
   </script>
 </body>
 

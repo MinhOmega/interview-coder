@@ -125,6 +125,22 @@ const SHORTCUTS = {
     key: `${modifierKey}+Down`,
     handler: () => moveWindow("down"),
   },
+  SCROLL_LEFT: {
+    key: `${modifierKey}+Shift+Left`,
+    handler: () => scrollContent("left"),
+  },
+  SCROLL_RIGHT: {
+    key: `${modifierKey}+Shift+Right`,
+    handler: () => scrollContent("right"),
+  },
+  SCROLL_UP: {
+    key: `${modifierKey}+Shift+Up`,
+    handler: () => scrollContent("up"),
+  },
+  SCROLL_DOWN: {
+    key: `${modifierKey}+Shift+Down`,
+    handler: () => scrollContent("down"),
+  },
   TAKE_SCREENSHOT: {
     key: `${modifierKey}+H`,
     handler: async () => {
@@ -1642,3 +1658,13 @@ ipcMain.on("show-context-menu", () => {
 ipcMain.on("report-solution-error", async (event, errorDescription) => {
   // ... existing code ...
 });
+
+// Function to scroll content in the renderer
+function scrollContent(direction) {
+  if (!mainWindow) return;
+  
+  console.log(`Scrolling content: ${direction}`);
+  
+  // Send a message to renderer to scroll the content
+  mainWindow.webContents.send("scroll-content", direction);
+}

@@ -1,9 +1,67 @@
+:root {
+  /* Background colors */
+  --bg-transparent: transparent;
+  --bg-main: rgba(128, 128, 128, 0.15);
+  --bg-content: rgba(128, 128, 128, 0.15);
+  --bg-dark: rgba(25, 25, 25, 0.97);
+  --bg-darker: rgba(20, 20, 20, 0.98);
+  --bg-code: rgba(25, 25, 25, 0.97);
+  --bg-toolbar: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
+  --bg-button: rgba(60, 60, 60, 0.7);
+  --bg-button-hover: rgba(80, 80, 80, 0.9);
+  --bg-button-shortcut: rgba(40, 40, 40, 0.7);
+  --bg-inline-code: rgba(40, 40, 40, 0.7);
+  --bg-table-header: rgba(40, 40, 40, 0.8);
+  --bg-table-even: rgba(40, 40, 40, 0.4);
+  --bg-language-tag: rgba(50, 50, 50, 0.95);
+  --bg-notification-success: rgba(76, 175, 80, 0.95);
+  --bg-notification-warning: rgba(255, 152, 0, 0.95);
+  --bg-notification-error: rgba(244, 67, 54, 0.95);
+  --bg-error: rgba(255, 77, 77, 0.08);
+  --bg-warning: rgba(255, 204, 51, 0.08);
+  --bg-scrollbar: rgba(30, 30, 30, 0.95);
+  --bg-scrollbar-thumb: rgba(120, 120, 120, 0.7);
+  --bg-scrollbar-thumb-hover: rgba(120, 120, 120, 0.9);
+  --bg-code-scrollbar-thumb: rgba(140, 140, 140, 0.7);
+  --bg-code-scrollbar-thumb-hover: rgba(160, 160, 160, 0.95);
+  --bg-context-actions: rgba(30, 30, 30, 0.9);
+  --bg-context-button: rgba(50, 50, 50, 0.8);
+  --bg-context-button-hover: rgba(70, 70, 70, 0.9);
+  --bg-add-context: rgba(40, 90, 40, 0.6);
+  --bg-add-context-hover: rgba(50, 120, 50, 0.8);
+  --bg-report-error: rgba(90, 40, 40, 0.6);
+  --bg-report-error-hover: rgba(120, 50, 50, 0.8);
+  --bg-model-badge: rgba(30, 30, 30, 0.8);
+  
+  /* Text colors */
+  --text-main: rgba(255, 255, 255, 0.9);
+  --text-code: rgba(255, 255, 255, 0.95);
+  --text-blockquote: rgba(255, 255, 255, 0.8);
+  --text-link: #5e9eff;
+  --text-error: #ff4d4d;
+  --text-warning: #ffcc33;
+  
+  /* Border colors */
+  --border-light: rgba(120, 120, 120, 0.2);
+  --border-medium: rgba(120, 120, 120, 0.3);
+  --border-dark: rgba(100, 100, 100, 0.3);
+  --border-code: rgba(120, 120, 120, 0.3);
+  --border-table: rgba(100, 100, 100, 0.3);
+  --border-language-tag: rgba(120, 120, 120, 0.4);
+  --border-error: #ff4d4d;
+  --border-warning: #ffcc33;
+  --border-success: #2E7D32;
+  --border-warning-notification: #E65100;
+  --border-error-notification: #C62828;
+  --border-button: rgba(80, 80, 80, 0.3);
+  --border-context-button: rgba(100, 100, 100, 0.4);
+}
+
 html {
   width: 100%;
   height: 100%;
-  background: none;
+  background: var(--bg-transparent);
   overflow: hidden;
-  /* Prevent outer scrollbars */
 }
 
 body {
@@ -11,15 +69,12 @@ body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background: rgba(25, 25, 25, 0.92);
-  /* Increased opacity for better visibility */
-  /* Darker, more modern semi-transparent background */
+  background: var(--bg-main);
   font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
   overflow: hidden;
   position: relative;
   border-radius: 12px;
-  color: rgba(255, 255, 255, 0.9);
-  /* Improved text color for readability */
+  color: var(--text-main);
 }
 
 /* Improved instruction banner */
@@ -28,7 +83,7 @@ body {
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--bg-darker);
   /* More opaque for better visibility */
   color: #fff;
   padding: 10px 18px;
@@ -38,8 +93,8 @@ body {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   transition: opacity 0.3s ease, transform 0.3s ease;
   user-select: none;
-  border: 1px solid rgba(120, 120, 120, 0.2);
-  max-width: 80%;
+  border: 1px solid var(--border-medium);
+  max-width: 100%;
   /* Limit width to avoid overlapping with edges */
   text-align: center;
   /* Center text */
@@ -52,11 +107,14 @@ body {
   padding: 20px;
   box-sizing: border-box;
   border-radius: 8px;
-  box-shadow: var(--card-shadow);
   max-height: none;
   overflow-y: visible;
-  background-color: transparent;
+  background-color: var(--bg-content);
   padding-bottom: 100px;
+  /* Fix flickering by removing GPU acceleration from individual content */
+  will-change: auto;
+  transform: none;
+  backface-visibility: visible;
 }
 
 #result-content:empty {
@@ -65,7 +123,7 @@ body {
 
 /* Code block improvements */
 .code-block-container pre code {
-  background: transparent !important;
+  background: var(--bg-transparent) !important;
   /* Improved background for code blocks */
   padding: 16px !important;
   border-radius: 6px !important;
@@ -73,7 +131,7 @@ body {
   font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace !important;
   overflow-x: auto !important;
   white-space: pre !important;
-  color: rgba(255, 255, 255, 0.95) !important;
+  color: var(--text-code) !important;
   /* Brighter text for better readability */
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
   /* Subtle text shadow for better contrast */
@@ -87,9 +145,9 @@ body {
   overflow: hidden;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(120, 120, 120, 0.3);
-  background: rgba(25, 25, 25, 0.6);
-  /* Subtle container background */
+  border: 1px solid var(--border-code);
+  background: var(--bg-code);
+  /* Darker container background */
 }
 
 /* Ensure proper styling of pre/code in our containers */
@@ -98,7 +156,7 @@ body {
   margin-bottom: 0;
   padding-top: 36px;
   /* Increased space for language tag */
-  background: transparent;
+  background: var(--bg-transparent);
   border: none;
   /* Remove border since container has it */
 }
@@ -113,33 +171,33 @@ pre:before {
   position: absolute;
   top: 0;
   left: 0;
-  background: rgba(50, 50, 50, 0.95);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-language-tag);
+  color: var(--text-main);
   padding: 4px 12px;
   border-radius: 8px 0 8px 0;
   font-size: 13px;
   font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
   z-index: 5;
-  border-right: 1px solid rgba(120, 120, 120, 0.4);
-  border-bottom: 1px solid rgba(120, 120, 120, 0.4);
+  border-right: 1px solid var(--border-language-tag);
+  border-bottom: 1px solid var(--border-language-tag);
   font-weight: 500;
 }
 
 /* Enhanced scrollbar styles for code blocks */
 #result-content pre::-webkit-scrollbar {
   height: 10px;
-  background: rgba(30, 30, 30, 0.6);
+  background: var(--bg-scrollbar);
   border-radius: 5px;
 }
 
 #result-content pre::-webkit-scrollbar-thumb {
-  background: rgba(140, 140, 140, 0.7);
+  background: var(--bg-code-scrollbar-thumb);
   /* Brighter scrollbar for better visibility */
   border-radius: 5px;
 }
 
 #result-content pre::-webkit-scrollbar-thumb:hover {
-  background: rgba(160, 160, 160, 0.9);
+  background: var(--bg-code-scrollbar-thumb-hover);
 }
 
 /* Make long code lines wrap to be helpful on mobile */
@@ -154,17 +212,17 @@ pre:before {
 /* Scrollbar for result content */
 #result-content::-webkit-scrollbar {
   width: 10px;
-  background: rgba(30, 30, 30, 0.5);
+  background: var(--bg-scrollbar);
   border-radius: 5px;
 }
 
 #result-content::-webkit-scrollbar-thumb {
-  background: rgba(120, 120, 120, 0.7);
+  background: var(--bg-scrollbar-thumb);
   border-radius: 5px;
 }
 
 #result-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(120, 120, 120, 0.9);
+  background: var(--bg-scrollbar-thumb-hover);
 }
 
 /* Code block copy button */
@@ -176,7 +234,7 @@ pre:before {
   border-radius: 6px;
   background-color: rgba(70, 70, 70, 0.8);
   color: #ffffff;
-  border: 1px solid rgba(120, 120, 120, 0.3);
+  border: 1px solid var(--border-medium);
   cursor: pointer;
   font-size: 12px;
   transition: all 0.2s ease;
@@ -210,16 +268,16 @@ pre:before {
 #result-content th,
 #result-content td {
   padding: 8px 12px;
-  border: 1px solid rgba(100, 100, 100, 0.3);
+  border: 1px solid var(--border-table);
 }
 
 #result-content th {
-  background-color: rgba(40, 40, 40, 0.8);
+  background-color: var(--bg-table-header);
   text-align: left;
 }
 
 #result-content tr:nth-child(even) {
-  background-color: rgba(40, 40, 40, 0.4);
+  background-color: var(--bg-table-even);
 }
 
 /* Make content have more breathing room */
@@ -265,64 +323,64 @@ pre:before {
 
 /* Blockquote styling */
 #result-content blockquote {
-  border-left: 4px solid rgba(120, 120, 120, 0.5);
+  border-left: 4px solid var(--border-medium);
   padding-left: 1em;
   margin: 1em 0;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-blockquote);
   font-style: italic;
 }
 
 /* Link styling */
 #result-content a {
-  color: #5e9eff;
+  color: var(--text-link);
   text-decoration: none;
-  border-bottom: 1px dotted #5e9eff;
+  border-bottom: 1px dotted var(--text-link);
 }
 
 #result-content a:hover {
   text-decoration: none;
-  border-bottom: 1px solid #5e9eff;
+  border-bottom: 1px solid var(--text-link);
 }
 
 /* General pre/code styling outside of containers */
 pre {
-  background: transparent;
+  background: var(--bg-transparent);
   /* More visible background for code blocks */
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-code);
   padding: 16px;
   border-radius: 8px;
   white-space: pre;
   overflow-x: auto;
   margin: 1.2em 0;
-  border: 1px solid rgba(100, 100, 100, 0.2);
+  border: 1px solid var(--border-light);
   font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
   font-size: 0.9rem;
 }
 
 code {
   font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-code);
   padding: 3px 6px;
   border-radius: 4px;
   font-size: 0.9em;
-  background: rgba(40, 40, 40, 0.7);
+  background: var(--bg-inline-code);
 }
 
 .error-message {
-  color: #ff4d4d;
-  background: rgba(255, 77, 77, 0.08);
+  color: var(--text-error);
+  background: var(--bg-error);
   padding: 16px;
   border-radius: 8px;
-  border-left: 4px solid #ff4d4d;
+  border-left: 4px solid var(--border-error);
   margin: 15px 0;
 }
 
 .warning-message {
-  color: #ffcc33;
-  background: rgba(255, 204, 51, 0.08);
+  color: var(--text-warning);
+  background: var(--bg-warning);
   padding: 16px;
   border-radius: 8px;
-  border-left: 4px solid #ffcc33;
+  border-left: 4px solid var(--border-warning);
   margin: 15px 0;
 }
 
@@ -334,6 +392,9 @@ code {
   height: 100%;
   padding: 20px;
   box-sizing: border-box;
+  background-color: var(--bg-darker);
+  /* More solid background during loading */
+  border-radius: 8px;
 }
 
 /* Skeleton loading styles */
@@ -395,7 +456,7 @@ code {
   position: fixed;
   bottom: 12px;
   right: 12px;
-  background: rgba(30, 30, 30, 0.8);
+  background: var(--bg-model-badge);
   color: #fff;
   padding: 6px 12px;
   border-radius: 6px;
@@ -406,7 +467,7 @@ code {
   text-overflow: ellipsis;
   white-space: nowrap;
   z-index: 8000;
-  border: 1px solid rgba(100, 100, 100, 0.3);
+  border: 1px solid var(--border-dark);
 }
 
 /* Updated Notification styles */
@@ -438,18 +499,18 @@ code {
 }
 
 .notification.success {
-  background-color: rgba(76, 175, 80, 0.95);
-  border-left-color: #2E7D32;
+  background-color: var(--bg-notification-success);
+  border-left-color: var(--border-success);
 }
 
 .notification.warning {
-  background-color: rgba(255, 152, 0, 0.95);
-  border-left-color: #E65100;
+  background-color: var(--bg-notification-warning);
+  border-left-color: var(--border-warning-notification);
 }
 
 .notification.error {
-  background-color: rgba(244, 67, 54, 0.95);
-  border-left-color: #C62828;
+  background-color: var(--bg-notification-error);
+  border-left-color: var(--border-error-notification);
 }
 
 .notification.visible {
@@ -474,8 +535,8 @@ body.invisible-mode:hover {
   top: 0;
   left: 0;
   width: 100%;
-  background: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
-  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border-dark);
   padding: 8px 15px;
   display: flex;
   align-items: center;
@@ -511,7 +572,7 @@ body.invisible-mode:hover {
   align-items: center;
   padding: 6px 12px;
   border-radius: 6px;
-  background: rgba(60, 60, 60, 0.7);
+  background: var(--bg-button);
   color: white;
   cursor: pointer;
   transition: background 0.2s;
@@ -519,11 +580,11 @@ body.invisible-mode:hover {
   white-space: nowrap;
   -webkit-app-region: no-drag;
   /* Make buttons clickable */
-  border: 1px solid rgba(80, 80, 80, 0.3);
+  border: 1px solid var(--border-button);
 }
 
 .toolbar-button:hover {
-  background: rgba(80, 80, 80, 0.9);
+  background: var(--bg-button-hover);
 }
 
 .toolbar-button .icon {
@@ -536,7 +597,7 @@ body.invisible-mode:hover {
 .toolbar-button .shortcut {
   font-size: 10px;
   margin-left: 6px;
-  background: rgba(40, 40, 40, 0.7);
+  background: var(--bg-button-shortcut);
   padding: 2px 5px;
   border-radius: 4px;
 }
@@ -604,6 +665,60 @@ body.invisible-mode:hover {
   /* Center content horizontally */
   scrollbar-width: thin;
   /* For Firefox */
+
+  /* Fix flickering by using more precise GPU acceleration properties */
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Remove properties that might cause flickering */
+  backface-visibility: visible;
+  -webkit-overflow-scrolling: auto;
+
+  /* Add composite layer to fix flickering */
+  contain: content;
+}
+
+/* Add scrolling class to prevent flickering during scrolling */
+#content-container.scrolling {
+  pointer-events: none;
+  /* Prevent interaction during scroll */
+  will-change: scroll-position;
+  /* Optimize for scroll */
+  contain: strict;
+  /* Strict containment during scroll */
+}
+
+/* Fix for flickering - force hardware acceleration on content */
+#content-container.scrolling * {
+  transition: none !important;
+  /* Disable transitions during scroll */
+  animation: none !important;
+  /* Disable animations during scroll */
+}
+
+/* Improve scrolling performance by fixing header and footer in place */
+#top-toolbar,
+.model-badge {
+  will-change: transform;
+  transform: translateZ(0);
+  /* Force GPU rendering for fixed elements */
+  z-index: 9999;
+  /* Ensure fixed elements stay on top */
+}
+
+/* Fix for rendering issues in transparent containers */
+#content-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  /* Match html background */
+  z-index: -1;
 }
 
 /* Response overlay */
@@ -617,6 +732,8 @@ body.invisible-mode:hover {
   position: relative;
   box-sizing: border-box;
   /* Include padding in width calculations */
+  /* Add composite layer for stable rendering */
+  contain: layout style;
 }
 
 /* Make context action buttons sticky and more attractive */
@@ -629,13 +746,13 @@ body.invisible-mode:hover {
   margin-top: 30px;
   text-align: center;
   z-index: 100;
-  border-top: 1px solid rgba(120, 120, 120, 0.3);
+  border-top: 1px solid var(--border-medium);
   /* Slightly more visible border */
   backdrop-filter: blur(8px);
   /* Enhanced blur effect */
   -webkit-backdrop-filter: blur(8px);
-  background-color: rgba(30, 30, 30, 0.7);
-  /* Added background color with blur */
+  background-color: var(--bg-context-actions);
+  /* Increased opacity for better visibility */
   box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
   /* Enhanced shadow */
   display: flex;
@@ -647,39 +764,29 @@ body.invisible-mode:hover {
 #context-actions .toolbar-button {
   padding: 8px 15px;
   border-radius: 8px;
-  background: rgba(50, 50, 50, 0.8);
+  background: var(--bg-context-button);
   transition: all 0.2s ease;
-  border: 1px solid rgba(100, 100, 100, 0.4);
+  border: 1px solid var(--border-context-button);
 }
 
 #context-actions .toolbar-button:hover {
-  background: rgba(70, 70, 70, 0.9);
+  background: var(--bg-context-button-hover);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 #btn-add-context {
-  background: rgba(40, 90, 40, 0.6) !important;
+  background: var(--bg-add-context) !important;
 }
 
 #btn-add-context:hover {
-  background: rgba(50, 120, 50, 0.8) !important;
+  background: var(--bg-add-context-hover) !important;
 }
 
 #btn-report-error {
-  background: rgba(90, 40, 40, 0.6) !important;
+  background: var(--bg-report-error) !important;
 }
 
 #btn-report-error:hover {
-  background: rgba(120, 50, 50, 0.8) !important;
-}
-
-/* Hot reload test - comment or modify this to test hot-reload */
-.hot-reload-test {
-  background-color: #e0f7fa;
-  color: #00796b;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: var(--bg-report-error-hover) !important;
 }
