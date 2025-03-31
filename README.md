@@ -1,131 +1,80 @@
 # Interview Coder
 
-Interview Coder is an Electron application that captures screenshots and leverages AI APIs to analyze them. It can solve questions, generate code, or provide detailed answers based on screenshots. The app supports both single screenshot processing and multi-page mode for capturing multiple images before analysis.
+A specialized tool for coding interviews that allows you to take screenshots of coding problems and get AI-powered analysis and solutions.
 
 ## Features
 
-- **Screenshot Capture:** Use global keyboard shortcuts to capture the screen.
-- **AI Integration:** Send captured screenshots to OpenAI, Google Gemini, or Ollama for automated analysis.
-- **Multi-Page Mode:** Combine multiple screenshots for questions spanning several pages.
-- **Customizable UI:** Transparent, always-on-top window with an instruction banner and markdown-rendered responses.
-- **Global Shortcuts:** Easily control the application using keyboard shortcuts.
-- **Platform-Aware:** Automatically uses Command key on macOS and Control key on Windows/Linux.
-- **Local AI Options:** Support for local Ollama models, including multimodal vision models.
-- **Streaming Responses:** View AI responses as they're generated in real-time.
+- **Screenshot Capture**: Capture your screen to analyze coding problems
+- **AI Analysis**: Process screenshots with AI to get detailed explanations and solutions
+- **Streaming Responses**: Get real-time streaming AI responses
+- **Todo App**: A simple Todo application to demonstrate functionality
+- **Context Awareness**: Add multiple screenshots to continue the conversation
 
-## Prerequisites
+## Project Structure
 
-- [Node.js](https://nodejs.org/) (v18 or later recommended)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- An OpenAI API key (if using OpenAI) OR
-- A Google Gemini API key (if using Gemini) OR
-- [Ollama](https://ollama.ai/) installed and running locally (if using local models)
+```
+src/
+├── components/               # React components
+│   ├── ui/                   # Reusable UI components
+│   │   ├── TopToolbar.tsx    # App toolbar with actions
+│   │   ├── LoadingContent.tsx# Loading skeleton UI
+│   │   ├── ResultContent.tsx # Markdown renderer for AI responses
+│   │   ├── ModelBadge.tsx    # Shows current AI model info
+│   │   └── ...
+│   ├── Todo.tsx              # Todo app component
+│   └── AppContainer.tsx      # Container for the Todo app
+├── services/                 # Business logic services
+│   ├── ScreenshotService.ts  # Handles screenshot operations
+│   └── AIService.ts          # Manages AI interactions
+├── hooks/                    # Custom React hooks
+│   └── useElectron.ts        # Hook for Electron IPC communication
+├── electron/                 # Electron main process code
+│   ├── screenshot-handler.ts # Screenshot capture and processing
+│   └── main-process-bridge.ts# Main process initialization
+├── styles/                   # CSS styles
+├── App.tsx                   # Main application component
+└── preload.ts                # Electron preload script for secure IPC
+```
 
-## Installation
+## Technology Stack
 
-1. **Clone the repository:**
+- **React**: UI framework
+- **TypeScript**: Type-safe JavaScript
+- **Electron**: Cross-platform desktop app framework
+- **OpenAI API**: AI-powered code analysis
 
-   ```
-   git clone https://github.com/MinhOmega/interview-coder.git
-   cd interview-coder
-   ```
+## Key Components
 
-2. **Install the dependencies:**
-   ```
-   npm install
-   ```
+### UI Components
 
-3. **Configure the application:**
-   Create a `.env` file in the project root with your settings. For example:
-    ```
-    OPENAI_API_KEY=YOUR_OPENAI_API_KEY
-    OPENAI_MODEL=gpt-4o-mini
-    GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-    GEMINI_MODEL=gemini-2.0-flash
-    AI_PROVIDER=openai
-    OLLAMA_BASE_URL=http://127.0.0.1:11434
-    OLLAMA_MODEL=deepseek-r1:14b
-    ```
-  - Note: If the `OPENAI_MODEL` value is omitted, the application defaults to "gpt-4o-mini".
-  - `AI_PROVIDER` can be set to `openai`, `gemini`, or `ollama`. 
-  - Always use `127.0.0.1` instead of `localhost` for Ollama to avoid IPv6 connection issues.
-  - If using Ollama, make sure you have it installed and running with vision-capable models.
+- **TopToolbar**: Contains buttons for taking screenshots, processing images, and accessing settings
+- **LoadingContent**: Shows a skeleton UI while waiting for AI responses
+- **ResultContent**: Renders markdown responses from the AI with syntax highlighting
+- **InstructionBanner**: Displays instructions to the user
+- **ModelBadge**: Shows current AI model information
+- **NotificationContainer**: Displays notifications to the user
+- **ContextActions**: Provides actions for continuing the conversation
 
-## Using with Ollama
+### Services
 
-To use Interview Coder with Ollama:
+- **ScreenshotService**: Handles taking screenshots and processing them with AI
+- **AIService**: Manages AI interaction and model settings
 
-1. Install Ollama from https://ollama.ai/
-2. Run Ollama
-3. Pull a vision-capable model such as `deepseek-r1:14b` by running:
-   ```
-   ollama pull deepseek-r1:14b
-   ```
-4. Start Interview Coder
-5. Press `Command+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
-6. Select "Ollama" as your AI provider and choose your model from the dropdown
-7. Click "Save Settings"
+### Electron Integration
 
-### Troubleshooting Ollama Connection
+- **useElectron**: Hook to safely access Electron's IPC functionality
+- **screenshot-handler.ts**: Manages screenshot capture and AI processing in the main process
+- **main-process-bridge.ts**: Initializes all main process handlers
 
-If you encounter connection issues with Ollama:
+## Setup and Installation
 
-1. Make sure Ollama is running by checking its status in your system tray or task manager
-2. Verify that you're using `http://127.0.0.1:11434` instead of `localhost` in the Ollama URL settings
-3. Use the "Test Connection" button in the model selector to check if Interview Coder can connect to Ollama
-4. Check that your firewall is not blocking connections to port 11434
-5. If you've configured Ollama to use a different port or host, update the URL accordingly
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Start the development server: `npm run dev`
 
 ## Usage
 
-1. **Start the Application:**
-    Run the following command to launch Interview Coder:
-    ```
-    npm start
-    ```
-
-2. **Global Keyboard Shortcuts:**
-
-    On macOS:
-    - Command+H: Capture a window screenshot and process it immediately.
-    - Command+D: Capture a screenshot of a selected area and process it.
-    - Command+A: Capture an additional screenshot in multi-page mode.
-    - Command+Enter: Process all captured screenshots.
-    - Command+R: Reset the current process, clearing all captured screenshots and any displayed results.
-    - Command+M: Open the model selector to switch between OpenAI, Gemini, and Ollama models.
-    - Command+Q: Quit the application.
-    - Command+B: Toggle visibility of all application windows (both main window and settings).
-    - Command+Arrow keys: Move the window in the specified direction.
-
-    On Windows/Linux:
-    - Ctrl+H: Capture a window screenshot and process it immediately.
-    - Ctrl+D: Capture a screenshot of a selected area and process it.
-    - Ctrl+A: Capture an additional screenshot in multi-page mode.
-    - Ctrl+Enter: Process all captured screenshots.
-    - Ctrl+R: Reset the current process, clearing all captured screenshots and any displayed results.
-    - Ctrl+M: Open the model selector to switch between OpenAI, Gemini, and Ollama models.
-    - Ctrl+Q: Quit the application.
-    - Ctrl+B: Toggle visibility of all application windows (both main window and settings).
-    - Ctrl+Arrow keys: Move the window in the specified direction.
-
-## Supported Models
-
-### OpenAI Models
-- gpt-4o-mini
-- gpt-4o
-- gpt-4-vision-preview
-- gpt-4-turbo
-
-### Google Gemini Models
-- gemini-2.0-flash
-
-### Ollama Models
-Any Ollama model that supports vision capabilities, including:
-- deepseek-r1:14b (recommended)
-
-## Status
-
-This program is still under development. Some features may not be fully implemented, and there might be bugs or incomplete functionality. Your feedback and contributions are welcome as we work towards a more stable release.
-
-
-**Personal Thoughts**: Inspired by interviewcoder.co but didn't like the idea of gatekeeping **cheating** softwares behind paywalls. Like you're literally cheating wtf man? And this might help incompetent software engineers join the company and eat it from the inside forcing companies to realise that Leetcode isn't the only way people should get hired and there are other alternative ways to assess a candidate's abilities.
+- Press **Cmd+T** (or Ctrl+T) to show the Todo app
+- Press **Cmd+H** (or Ctrl+H) to take a screenshot and process it with AI
+- Press **Cmd+B** (or Ctrl+B) to show/hide the app window
+- Press **Cmd+Enter** (or Ctrl+Enter) to process existing screenshots
