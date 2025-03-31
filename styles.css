@@ -15,11 +15,6 @@ body {
   overflow: hidden;
   position: relative;
   border-radius: 12px;
-  /* More rounded corners */
-  border: 1px solid rgba(100, 100, 100, 0.3);
-  /* Subtle border */
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  /* Stronger shadow for depth */
 }
 
 /* Improved instruction banner */
@@ -56,12 +51,6 @@ body {
 
 #result-content:empty {
   display: none;
-}
-
-/* Ensure code blocks are scrollable */
-#result-content pre {
-  max-width: 100%;
-  overflow-x: auto;
 }
 
 /* Code block improvements */

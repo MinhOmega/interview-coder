@@ -77,7 +77,7 @@
       <div id="result-content"></div>
 
       <!-- Continue with context button section -->
-      <!-- <div id="context-actions" style="display: none;">
+      <div id="context-actions" style="display: none;">
         <div class="toolbar-button" id="btn-add-context">
           <span class="icon">📷</span>
           <span>Add screenshot to continue</span>
@@ -86,7 +86,7 @@
           <span class="icon">🔄</span>
           <span>Report error in solution</span>
         </div>
-      </div> -->
+      </div>
     </div>
 
     <div id="model-badge" class="model-badge"></div>
@@ -98,26 +98,97 @@
     const { ipcRenderer } = require('electron');
 
     // Import remark and related packages
-    let remark = null;
+    let unified = null;
+    let remarkParse = null;
     let remarkGfm = null;
-    let remarkHtml = null;
-    let remarkProcessor = null;
+    let remarkRehype = null;
+    let rehypeStringify = null;
+    let processor = null;
 
     try {
-      remark = require('remark');
-      remarkGfm = require('remark-gfm');
-      remarkHtml = require('remark-html');
+      // Use the Node.js require to import the installed packages
 
-      // Initialize remark processor
-      remarkProcessor = remark()
-        .use(remarkGfm)  // Add GitHub Flavored Markdown support
-        .use(remarkHtml, {
-          sanitize: false  // Allow HTML in the markdown
-        });
+      try {
+        const unifiedModule = require('unified');
+        unified = unifiedModule.unified;
+      } catch (err) {
+        console.error("Failed to load unified:", err.message);
+        throw err;
+      }
 
-      console.log("Remark initialized successfully");
+      try {
+        remarkParse = require('remark-parse').default;
+        // If default is undefined, try using the module directly
+        if (!remarkParse) {
+          remarkParse = require('remark-parse');
+        }
+      } catch (err) {
+        console.error("Failed to load remark-parse:", err.message);
+        throw err;
+      }
+
+      try {
+        remarkGfm = require('remark-gfm').default;
+        // If default is undefined, try using the module directly
+        if (!remarkGfm) {
+          remarkGfm = require('remark-gfm');
+        }
+      } catch (err) {
+        console.error("Failed to load remark-gfm:", err.message);
+        throw err;
+      }
+
+      try {
+        remarkRehype = require('remark-rehype').default;
+        // If default is undefined, try using the module directly
+        if (!remarkRehype) {
+          remarkRehype = require('remark-rehype');
+        }
+      } catch (err) {
+        console.error("Failed to load remark-rehype:", err.message);
+        throw err;
+      }
+
+      try {
+        rehypeStringify = require('rehype-stringify').default;
+        // If default is undefined, try using the module directly
+        if (!rehypeStringify) {
+          rehypeStringify = require('rehype-stringify');
+        }
+      } catch (err) {
+        console.error("Failed to load rehype-stringify:", err.message);
+        throw err;
+      }
+
+      // Initialize unified processor pipeline
+      processor = unified()
+        .use(remarkParse)
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeStringify);
+
+
+      // Test with a small markdown string
+      const testMarkdown = "# Test\n\nThis is a **test**";
+      processor.process(testMarkdown)
+        .catch(err => console.error("Test markdown processing failed:", err.message));
     } catch (e) {
-      console.error("Error initializing Remark:", e.message);
+      console.error("Error initializing unified processor:", e.message);
+      console.error("Stack trace:", e.stack);
+
+      // Create a very basic fallback processor
+      processor = {
+        process: async (markdown) => {
+          // Very basic markdown processing as fallback
+          console.warn("Using fallback markdown processor");
+          const html = basicMarkdownProcess(markdown);
+          // Return an object with a toString method to match unified's API
+          return {
+            toString: () => html,
+            valueOf: () => html
+          };
+        }
+      };
     }
 
     // Detect platform for correct key labels
@@ -126,7 +197,7 @@
 
     // Application state
     let isWindowVisible = true;
-    let debugMode = true; // Set to true for debugging
+    let debugMode = false; // Set to true for debugging
 
     // Toggle window visibility
     function toggleWindowVisibility() {
@@ -238,7 +309,6 @@
     ipcRenderer.on('stream-update', async (event, fullText) => {
       // Replace the content with the full updated text (better for Gemini streaming)
       try {
-        console.log("Received stream update, length:", fullText.length);
         // Update the stream buffer
         streamBuffer = fullText;
 
@@ -269,7 +339,6 @@
 
     ipcRenderer.on('stream-end', () => {
       // Streaming is complete, reset buffer
-      console.log("Stream ended");
       streamBuffer = '';
 
       // Make sure all code blocks have copy buttons
@@ -292,15 +361,6 @@
     ipcRenderer.on('clear-result', () => {
       document.getElementById('result-content').innerHTML = '';
       document.getElementById('context-actions').style.display = 'none';
-    });
-
-    // Listen for DevTools toggle notification
-    ipcRenderer.on('devtools-toggled', (event, isOpen) => {
-      if (isOpen) {
-        showNotification('DevTools opened. Inspect elements by clicking on them.', 'success');
-      } else {
-        showNotification('DevTools closed', 'success');
-      }
     });
 
     // Update AI provider/model badge display
@@ -333,7 +393,6 @@
             const savedSettings = localStorage.getItem('model-settings');
             if (savedSettings) {
               settings = JSON.parse(savedSettings);
-              console.log('Retrieved settings from localStorage:', settings);
             } else {
               // Fallback to default settings
               settings = {
@@ -378,7 +437,7 @@
       }
     }
 
-    // Process markdown content to HTML using Remark
+    // Process markdown content to HTML using unified processor
     async function processMarkdown(markdown) {
       try {
         // Check if we have any content to process
@@ -386,57 +445,23 @@
           return '';
         }
 
-        // Debug logging
-        if (debugMode) {
-          console.log("Processing markdown input:", markdown);
-        } else {
-          console.log("Processing markdown, length:", markdown.length);
-        }
-
-        // Pre-process the markdown for better rendering
-        let processedMarkdown = markdown;
         let html = '';
 
-        if (remarkProcessor) {
-          // Use Remark to process markdown
+        if (processor) {
+          // Use unified processor to process markdown
           try {
-            const vFile = await remarkProcessor.process(processedMarkdown);
-            html = String(vFile);
-            console.log("Successfully processed with Remark");
-          } catch (remarkError) {
-            console.error("Remark processing error:", remarkError);
-            throw remarkError;
+            const file = await processor.process(markdown);
+            html = String(file);
+          } catch (processingError) {
+            console.error("Markdown processing error:", processingError);
+            console.error("Error stack:", processingError.stack);
+
+            // Attempt to fall back to basic processing
+            html = basicMarkdownProcess(markdown);
           }
         } else {
-          console.log("Fallback: Using basic markdown processing");
           // Basic fallback markdown processing
-          html = processedMarkdown
-            // Escape HTML
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            // Code blocks
-            .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-              return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
-            })
-            // Headers
-            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-            // Bold and italic
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Lists
-            .replace(/^\* (.+)/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)\n/g, '<ul>$1</ul>')
-            // Links
-            .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
-            // Paragraphs
-            .replace(/\n\n/g, '</p><p>');
-
-          // Wrap in paragraphs if not already wrapped
-          if (!html.startsWith('<')) {
-            html = '<p>' + html + '</p>';
-          }
+          html = basicMarkdownProcess(markdown);
         }
 
         // If debug mode is on, add raw markdown visibility
@@ -445,7 +470,7 @@
             <div style="background: rgba(0,0,0,0.8); padding: 10px; margin-bottom: 10px; border-radius: 5px;">
               <details>
                 <summary style="cursor: pointer; color: #ffcc00;">Debug: Raw Markdown (Click to expand)</summary>
-                <pre style="max-height: 200px; overflow: auto; background: #222; padding: 10px; margin-top: 10px;">${processedMarkdown.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                <pre style="max-height: 200px; overflow: auto; background: #222; padding: 10px; margin-top: 10px;">${markdown.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
               </details>
             </div>
             ${html}
@@ -508,6 +533,32 @@
       }
     }
 
+    // Helper function for basic markdown processing
+    function basicMarkdownProcess(markdown) {
+      return markdown
+        // Escape HTML
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        // Code blocks
+        .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+          return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
+        })
+        // Headers
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        // Bold and italic
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Lists
+        .replace(/^\* (.+)/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)\n/g, '<ul>$1</ul>')
+        // Links
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
+        // Paragraphs
+        .replace(/\n\n/g, '</p><p>');
+    }
+
     // Add copy code functionality
     function setupCodeCopyButtons() {
       try {
@@ -518,8 +569,6 @@
           // No code blocks found yet
           return;
         }
-
-        console.log(`Setting up ${copyButtons.length} code copy buttons`);
 
         copyButtons.forEach(button => {
           // Skip if the button already has a listener (check for data attribute)
@@ -652,91 +701,20 @@
       }, 2000);
     }
 
-    // Register for keyboard events to handle shortcuts
-    document.addEventListener('keydown', (e) => {
-      // Allow event to propagate to text fields
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      // Don't process if some modifier keys are pressed (to avoid conflicts)
-      if (e.altKey) return;
-
-      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
-
-      // If Ctrl/Cmd key is pressed
-      if (ctrlOrCmd) {
-        // When window is invisible, only handle Command/Ctrl + B
-        if (!isWindowVisible) {
-          if (e.key === 'b') {
-            toggleWindowVisibility();
-            e.preventDefault();
-          }
-          return;
-        }
-
-        // Handle all shortcuts when window is visible
-        switch (e.key) {
-          case 'b': // Toggle visibility
-            toggleWindowVisibility();
-            e.preventDefault();
-            break;
-
-          case 'Enter': // Process screenshots
-            ipcRenderer.send('process-screenshots');
-            e.preventDefault();
-            break;
-
-          case 'r': // Reset
-            ipcRenderer.send('reset-process');
-            e.preventDefault();
-            break;
-
-          case 'q': // Quit
-            ipcRenderer.send('quit-app');
-            e.preventDefault();
-            break;
-        }
-      }
-    });
-
     // Initialize
     updateModelBadge();
 
     // Refresh model badge whenever focus returns to window
     // (e.g., after closing model-selector)
     window.addEventListener('focus', () => {
-      console.log('Window focused, refreshing model badge');
       updateModelBadge();
     });
 
     // Listen for postMessage from model-selector window
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'model-settings-updated') {
-        console.log('Received settings update from model selector:', event.data.settings);
         updateModelBadge();
       }
-    });
-
-    // Setup toolbar button handlers
-    document.getElementById('btn-toggle-visibility').addEventListener('click', () => {
-      toggleWindowVisibility();
-    });
-
-    document.getElementById('btn-process').addEventListener('click', () => {
-      ipcRenderer.send('process-screenshots');
-    });
-
-    document.getElementById('btn-auto-screenshot').addEventListener('click', () => {
-      ipcRenderer.send('auto-screenshot');
-    });
-
-    document.getElementById('btn-reset').addEventListener('click', () => {
-      ipcRenderer.send('reset-process');
-    });
-
-    document.getElementById('btn-settings').addEventListener('click', () => {
-      ipcRenderer.send('open-settings');
     });
 
     // Handler for continuing with context (add screenshot)
@@ -763,7 +741,99 @@
     // Handle content container visibility
     ipcRenderer.on('hide-content', () => {
       const contentContainer = document.getElementById('content-container');
-      contentContainer.style.display = 'none';
+
+      // Save references to important elements before clearing
+      const banner = document.getElementById('instruction-banner');
+      const modelBadge = document.getElementById('model-badge');
+      const notificationContainer = document.getElementById('notification-container');
+
+      // Clear the container
+      contentContainer.innerHTML = '';
+
+      // Add back the instruction banner
+      contentContainer.appendChild(banner);
+
+      // Recreate the main-content structure
+      const mainContent = document.createElement('div');
+      mainContent.id = 'main-content';
+
+      // Recreate the loading content
+      const loadingContent = document.createElement('div');
+      loadingContent.id = 'loading-content';
+      loadingContent.className = 'loading-container';
+      loadingContent.style.display = 'none';
+
+      // Add skeleton sections
+      for (let i = 0; i < 3; i++) {
+        const section = document.createElement('div');
+        section.className = 'skeleton-section';
+
+        const header = document.createElement('div');
+        header.className = 'skeleton-header';
+        section.appendChild(header);
+
+        // Add some skeleton text lines
+        for (let j = 0; j < 3; j++) {
+          const textLine = document.createElement('div');
+          textLine.className = `skeleton-text line-${Math.floor(70 + Math.random() * 30)}`;
+          section.appendChild(textLine);
+        }
+
+        // Add a code block to the second section
+        if (i === 1) {
+          const codeBlock = document.createElement('div');
+          codeBlock.className = 'skeleton-code';
+          section.appendChild(codeBlock);
+        }
+
+        loadingContent.appendChild(section);
+      }
+
+      // Add the loading content to main content
+      mainContent.appendChild(loadingContent);
+
+      // Create empty result content
+      const resultContent = document.createElement('div');
+      resultContent.id = 'result-content';
+      resultContent.className = 'result-content';
+      mainContent.appendChild(resultContent);
+
+      // Recreate context actions container
+      const contextActions = document.createElement('div');
+      contextActions.id = 'context-actions';
+      contextActions.style.display = 'none';
+
+      // Add the buttons
+      const addContextBtn = document.createElement('div');
+      addContextBtn.className = 'toolbar-button';
+      addContextBtn.id = 'btn-add-context';
+      addContextBtn.innerHTML = '<span class="icon">📷</span><span>Add screenshot to continue</span>';
+
+      const reportErrorBtn = document.createElement('div');
+      reportErrorBtn.className = 'toolbar-button';
+      reportErrorBtn.id = 'btn-report-error';
+      reportErrorBtn.innerHTML = '<span class="icon">🔄</span><span>Report error in solution</span>';
+
+      contextActions.appendChild(addContextBtn);
+      contextActions.appendChild(reportErrorBtn);
+      mainContent.appendChild(contextActions);
+
+      // Add everything back to the container
+      contentContainer.appendChild(mainContent);
+      contentContainer.appendChild(modelBadge);
+      contentContainer.appendChild(notificationContainer);
+
+      // Re-attach event listeners
+      document.getElementById('btn-add-context').addEventListener('click', () => {
+        ipcRenderer.send('add-context-screenshot');
+      });
+
+      document.getElementById('btn-report-error').addEventListener('click', () => {
+        const errorDescription = prompt('Please describe the error in the solution:');
+        if (errorDescription && errorDescription.trim() !== '') {
+          ipcRenderer.send('report-solution-error', errorDescription);
+        }
+      });
     });
   </script>
 </body>

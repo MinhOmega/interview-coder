@@ -270,7 +270,6 @@ function toggleWindowVisibility(forceState) {
 // Get list of models from Ollama
 async function getOllamaModels() {
   try {
-    console.log("🚀 ~ getOllamaModels ~ OLLAMA_BASE_URL:", OLLAMA_BASE_URL);
     // Use IPv4 explicitly by replacing any remaining 'localhost' with '127.0.0.1'
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
 
@@ -279,9 +278,6 @@ async function getOllamaModels() {
       timeout: 5000,
       validateStatus: false, // Don't throw on non-2xx status
     });
-
-    console.log("🚀 ~ getOllamaModels ~ response status:", response.status);
-
     if (response.status !== 200) {
       console.error(`Error: Ollama API returned status ${response.status}`);
       return [];
@@ -1417,7 +1413,6 @@ function createWindow() {
       (cmdOrCtrl && input.shift && input.key.toLowerCase() === "i")
     ) {
       mainWindow.webContents.openDevTools();
-      mainWindow.webContents.send("devtools-toggled", true);
       event.preventDefault();
     }
   });
@@ -1616,10 +1611,8 @@ ipcMain.on("toggle-devtools", () => {
   if (mainWindow) {
     if (mainWindow.webContents.isDevToolsOpened()) {
       mainWindow.webContents.closeDevTools();
-      mainWindow.webContents.send("devtools-toggled", false);
     } else {
       mainWindow.webContents.openDevTools();
-      mainWindow.webContents.send("devtools-toggled", true);
     }
   }
 });
@@ -1632,7 +1625,6 @@ ipcMain.on("show-context-menu", () => {
         label: "Inspect Element",
         click: () => {
           mainWindow.webContents.openDevTools();
-          mainWindow.webContents.send("devtools-toggled", true);
         },
       },
       { type: "separator" },
