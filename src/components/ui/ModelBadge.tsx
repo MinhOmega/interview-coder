@@ -4,6 +4,7 @@ import { invokeIpcMethod } from '../../hooks/useElectron';
 interface ModelSettings {
   aiProvider: string;
   currentModel: string;
+  ollamaUrl?: string;
 }
 
 export const ModelBadge: React.FC = () => {
@@ -19,6 +20,9 @@ export const ModelBadge: React.FC = () => {
         const modelSettings = await invokeIpcMethod<ModelSettings>('get-current-settings');
         if (modelSettings) {
           setSettings(modelSettings);
+          
+          // Also save to localStorage as backup
+          localStorage.setItem('model-settings', JSON.stringify(modelSettings));
         }
       } catch (error) {
         console.error('Error getting model settings:', error);
@@ -38,8 +42,14 @@ export const ModelBadge: React.FC = () => {
     fetchSettings();
 
     // Listen for model change events
-    const handleModelChange = () => {
-      fetchSettings();
+    const handleModelChange = (event: Event) => {
+      const customEvent = event as CustomEvent<ModelSettings>;
+      if (customEvent.detail) {
+        setSettings(customEvent.detail);
+        localStorage.setItem('model-settings', JSON.stringify(customEvent.detail));
+      } else {
+        fetchSettings();
+      }
     };
 
     window.addEventListener('model-settings-updated', handleModelChange);

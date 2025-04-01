@@ -184,14 +184,14 @@ export const OllamaSection: React.FC<OllamaSectionProps> = ({
   };
 
   return (
-    <div className="section" id="ollama-section">
+    <>
       <h2>Ollama Models</h2>
       
       <div className="flex justify-between items-center">
         <span id="ollama-status" className={statusType}>
           {loading ? (
-            <div className="loading-text">
-              Checking for Ollama models... <span className="loading"></span>
+            <div id="ollama-loading">
+              Loading models... <span className="loading"></span>
             </div>
           ) : status}
         </span>
@@ -199,42 +199,42 @@ export const OllamaSection: React.FC<OllamaSectionProps> = ({
           id="refresh-models" 
           className="btn-primary"
           onClick={loadOllamaModels}
-          disabled={loading}
         >
-          {loading ? 'Loading...' : 'Refresh Models'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '6px'}}>
+            <path d="M20 12C20 16.4183 16.4183 20 12 20C7.58172 20 4 16.4183 4 12C4 7.58172 7.58172 4 12 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M16 4H12V8H16V4Z" fill="currentColor"/>
+          </svg>
+          Refresh Models
         </button>
       </div>
       
-      {!loading && models.length > 0 && (
-        <div className="model-cards mt-4" id="ollama-model-cards">
-          {models.map(model => (
-            <div 
-              key={model.name}
-              className={`model-card ${currentModel === model.name ? 'selected' : ''}`}
-              data-model={model.name}
-              onClick={() => onModelChange(model.name)}
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onModelChange(model.name);
-                }
-              }}
-            >
-              <div className="model-card-title">{model.name}</div>
-              <div className="model-card-description">
-                {model.details?.family 
-                  ? `${model.details.family} (${Math.round(model.size / 1024 / 1024)}MB)`
-                  : `Size: ${Math.round(model.size / 1024 / 1024)}MB`
-                }
-              </div>
-              {model.isVisionModel && (
-                <div className="model-card-badge vision">Vision</div>
-              )}
+      <div className="model-cards mt-4" id="ollama-model-cards" style={{ display: loading ? 'none' : 'grid' }}>
+        {models.map(model => (
+          <div 
+            key={model.name}
+            className={`model-card ${currentModel === model.name ? 'selected' : ''}`}
+            data-model={model.name}
+            onClick={() => onModelChange(model.name)}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onModelChange(model.name);
+              }
+            }}
+          >
+            <div className="model-card-title">{model.name}</div>
+            <div className="model-card-description">
+              {model.details && model.details.family 
+                ? `${model.details.family} (${Math.round(model.size / 1024 / 1024)}MB)`
+                : `Size: ${Math.round(model.size / 1024 / 1024)}MB`}
             </div>
-          ))}
-        </div>
-      )}
+            {model.isVisionModel && (
+              <div className="model-card-badge vision">Vision</div>
+            )}
+          </div>
+        ))}
+      </div>
       
       {hasVisionModels && (
         <div id="vision-models-note" className="helper-text mt-1 mb-2">
@@ -251,47 +251,40 @@ export const OllamaSection: React.FC<OllamaSectionProps> = ({
         value={ollamaUrl}
         onChange={(e) => onOllamaUrlChange(e.target.value)}
       />
-      <div className="helper-text">
-        Use 127.0.0.1 instead of localhost to avoid IPv6 connection issues
-      </div>
+      <div className="helper-text">Use 127.0.0.1 instead of localhost to avoid IPv6 connection issues</div>
 
-      <div className={`connection-test-result status ${statusType}`}>
+      <div id="connection-test-result" className={`status ${statusType}`}>
         {status}
       </div>
       
       <div className="flex justify-between mt-4">
-        <button 
-          id="test-connection" 
-          className="btn-primary"
-          onClick={testConnection}
-          disabled={loading}
-        >
+        <button id="test-connection" className="btn-primary" onClick={testConnection}>
           Test Connection
         </button>
         <button 
           id="pull-model-btn" 
-          className="btn-warning"
-          onClick={() => setShowPullModal(true)}
-          disabled={loading}
+          className="btn-warning" 
+          onClick={() => {
+            setModelToPull('llava:latest');
+            setPullStatus('');
+            setShowPullModal(true);
+          }}
         >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '6px'}}>
+            <path d="M12 4V16M12 16L7 11M12 16L17 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M20 20H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
           Pull Model
         </button>
       </div>
-      
-      {/* Pull model modal */}
+
+      {/* Pull model modal dialog */}
       {showPullModal && (
-        <div className="modal-overlay">
+        <div id="pull-model-modal" className="modal" style={{ display: 'block' }}>
           <div className="modal-content">
-            <button 
-              className="close-modal"
-              onClick={() => setShowPullModal(false)}
-            >
-              &times;
-            </button>
-            
+            <span className="close-modal" onClick={() => setShowPullModal(false)}>&times;</span>
             <h3>Pull Ollama Model</h3>
             <p className="mb-2">Enter the name of the model to pull:</p>
-            
             <input 
               type="text" 
               id="model-to-pull" 
@@ -300,37 +293,28 @@ export const OllamaSection: React.FC<OllamaSectionProps> = ({
               value={modelToPull}
               onChange={(e) => setModelToPull(e.target.value)}
             />
-            
-            <div className="helper-text mb-4">
-              Recommended multimodal models: llava, bakllava, deepseek-r1, moondream
-            </div>
-            
-            <div className="status">
-              {pullStatus}
-            </div>
-            
+            <div className="helper-text mb-4">Recommended multimodal models: llava, bakllava, deepseek-r1, moondream</div>
+            <div id="pull-status" className="status">{pullStatus}</div>
             <div className="flex justify-between mt-4">
               <button 
                 id="confirm-pull" 
-                className="btn-success"
+                className="btn-success" 
                 onClick={pullOllamaModel}
                 disabled={pulling}
               >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '6px'}}>
+                  <path d="M12 4V16M12 16L7 11M12 16L17 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20 20H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
                 {pulling ? 'Pulling...' : 'Pull Model'}
               </button>
-              
-              <button 
-                id="cancel-pull" 
-                className="btn"
-                onClick={() => setShowPullModal(false)}
-                disabled={pulling}
-              >
+              <button id="cancel-pull" className="btn" onClick={() => setShowPullModal(false)}>
                 Cancel
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }; 

@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useElectron, sendIpcMessage } from "../hooks/useElectron";
-import { useNotifications } from "../hooks/useNotifications";
+import { toast, ToastContainer } from "react-toastify";
 import { TopToolbar } from "./ui/TopToolbar";
 import { LoadingContent } from "./ui/LoadingContent";
 import { ResultContent } from "./ui/ResultContent";
 import { InstructionBanner } from "./ui/InstructionBanner";
 import { ModelBadge } from "./ui/ModelBadge";
-import { NotificationContainer } from "./ui/NotificationContainer";
 import { ContextActions } from "./ui/ContextActions";
 import { ModelSelector } from "./ModelSelector";
 import "../styles/AppContainer.css";
 import "../styles/ClassicApp.css";
+import "react-toastify/dist/ReactToastify.css";
 
 const AppContainer: React.FC = () => {
   // App view state
@@ -24,9 +24,6 @@ const AppContainer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasContent, setHasContent] = useState(false);
   const [view, setView] = useState<"queue" | "solutions" | "debug">("queue");
-
-  // Use the notifications hook
-  const { notifications, addNotification, cleanupNotifications } = useNotifications();
 
   // Streaming support
   const streamBufferRef = useRef("");
@@ -88,30 +85,44 @@ const AppContainer: React.FC = () => {
 
     // Screenshot events
     const screenshotTakenUnsubscribe = ipcRenderer.on("screenshot-taken", (data: { path: string; preview: string }) => {
-      addNotification(`Screenshot taken: ${data.path}`, "success");
+      toast.success(`Screenshot taken: ${data.path}`);
     });
 
     const deleteLastScreenshotUnsubscribe = ipcRenderer.on("delete-last-screenshot", () => {
-      addNotification("Last screenshot deleted", "info");
+      toast.info("Last screenshot deleted");
     });
 
     // Model selector events
     const showModelSelectorUnsubscribe = ipcRenderer.on("show-model-selector", () => {
       setShowModelSelector(true);
-      addNotification("Opening model selector", "info");
+      toast.info("Opening model selector");
     });
 
     // Notification events
     const notificationUnsubscribe = ipcRenderer.on("notification", (data: { body: string; type: string }) => {
-      addNotification(data.body, data.type);
+      switch (data.type) {
+        case "success":
+          toast.success(data.body);
+          break;
+        case "error":
+          toast.error(data.body);
+          break;
+        case "warning":
+          toast.warning(data.body);
+          break;
+        case "info":
+        default:
+          toast.info(data.body);
+          break;
+      }
     });
 
     const warningUnsubscribe = ipcRenderer.on("warning", (message: string) => {
-      addNotification(message, "warning");
+      toast.warning(message);
     });
 
     const errorUnsubscribe = ipcRenderer.on("error", (message: string) => {
-      addNotification(message, "error");
+      toast.error(message);
     });
 
     // Streaming support
@@ -145,7 +156,7 @@ const AppContainer: React.FC = () => {
       setIsAreaSelecting(true);
       // Add implementation for area selection here
       // This would typically involve creating a overlay with a selection tool
-      addNotification("Select an area to capture", "info");
+      toast.info("Select an area to capture");
     });
 
     // Just listen for ESC key to close model selector - everything else is handled by Electron
@@ -180,11 +191,8 @@ const AppContainer: React.FC = () => {
       startAreaCaptureUnsubscribe();
 
       window.removeEventListener("keydown", handleKeyDown);
-
-      // Clean up notifications timeouts
-      cleanupNotifications();
     };
-  }, [ipcRenderer, showModelSelector, addNotification, cleanupNotifications]);
+  }, [ipcRenderer, showModelSelector]);
 
   // Handlers for toolbar actions
   const handleToggleVisibility = () => {
@@ -277,8 +285,18 @@ const AppContainer: React.FC = () => {
 
           <ModelBadge />
 
-          {/* Notifications - always visible */}
-          <NotificationContainer notifications={notifications} />
+          {/* Toast notifications */}
+          <ToastContainer
+            position="top-left"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
         </div>
       </div>
     </>

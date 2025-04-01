@@ -78,6 +78,7 @@ export const ResultContent: React.FC<ResultContentProps> = ({ markdown }) => {
     .use(remarkGfm)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeSanitize)
+    // @ts-ignore - Type issue with the rehypeReact plugin, but it works correctly
     .use(rehypeReact, {
       createElement,
       components: {

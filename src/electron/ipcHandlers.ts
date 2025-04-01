@@ -139,6 +139,27 @@ export function initializeIpcHandlers(deps: IpcHandlerDeps): void {
     return await deleteScreenshot(path);
   });
 
+  // Get environment variable
+  ipcMain.handle('get-env-variable', (event, key) => {
+    // List of allowed environment variables that can be accessed
+    const ALLOWED_ENV_VARIABLES = [
+      'GEMINI_API_KEY',
+      'OPENAI_API_KEY',
+      'VITE_GEMINI_API_KEY',
+      'VITE_OPENAI_API_KEY',
+      'REACT_APP_GEMINI_API_KEY',
+      'REACT_APP_OPENAI_API_KEY'
+    ];
+    
+    // Only allow access to specified environment variables for security
+    if (ALLOWED_ENV_VARIABLES.includes(key)) {
+      return process.env[key];
+    } else {
+      console.warn(`Attempted to access unauthorized environment variable: ${key}`);
+      return undefined;
+    }
+  });
+
   // Get view
   ipcMain.handle('get-view', () => {
     return getView();

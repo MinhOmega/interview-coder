@@ -91,7 +91,8 @@ const ALLOWED_INVOKE_CHANNELS = [
   'get-screenshot-queue',
   'get-extra-screenshot-queue',
   'process-screenshots',
-  'verify-ollama-model'
+  'verify-ollama-model',
+  'get-env-variable'
 ];
 
 // Create a secure API to expose to the renderer process
