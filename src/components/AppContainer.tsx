@@ -8,6 +8,9 @@ import { InstructionBanner } from "./ui/InstructionBanner";
 import { ModelBadge } from "./ui/ModelBadge";
 import { ContextActions } from "./ui/ContextActions";
 import { ModelSelector } from "./ModelSelector";
+import { AreaSelector } from "./ui/AreaSelector";
+import { MultiScreenshotManager } from "./ui/MultiScreenshotManager";
+import screenshotService, { Screenshot } from "../services/ScreenshotService";
 import "../styles/AppContainer.css";
 import "../styles/ClassicApp.css";
 import "react-toastify/dist/ReactToastify.css";
@@ -28,8 +31,10 @@ const AppContainer: React.FC = () => {
   // Streaming support
   const streamBufferRef = useRef("");
 
-  // Add new state for area selection
+  // Screenshot states
   const [isAreaSelecting, setIsAreaSelecting] = useState(false);
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
 
   const { ipcRenderer } = useElectron();
 
@@ -57,6 +62,12 @@ const AppContainer: React.FC = () => {
       setAnalysisResult(result);
       setIsLoading(false);
       setHasContent(!!result);
+      
+      // If we were in multi-mode, exit it after processing
+      if (isMultiMode) {
+        setIsMultiMode(false);
+        screenshotService.setMultiMode(false);
+      }
     });
 
     const loadingUnsubscribe = ipcRenderer.on("loading", (isLoading: boolean) => {
@@ -70,6 +81,11 @@ const AppContainer: React.FC = () => {
     const clearResultUnsubscribe = ipcRenderer.on("clear-result", () => {
       setAnalysisResult("");
       setHasContent(false);
+      
+      // Also clear screenshots
+      setScreenshots([]);
+      screenshotService.clearAll();
+      setIsMultiMode(false);
     });
 
     // View state updates
@@ -81,15 +97,63 @@ const AppContainer: React.FC = () => {
       setView("queue");
       setAnalysisResult("");
       setHasContent(false);
+      setScreenshots([]);
+      screenshotService.clearAll();
+      setIsMultiMode(false);
     });
 
     // Screenshot events
-    const screenshotTakenUnsubscribe = ipcRenderer.on("screenshot-taken", (data: { path: string; preview: string }) => {
-      toast.success(`Screenshot taken: ${data.path}`);
+    const screenshotTakenUnsubscribe = ipcRenderer.on("screenshot-data", (data: string) => {
+      const screenshot = screenshotService.addScreenshot(data);
+      setScreenshots(screenshotService.getScreenshots());
+      toast.success(`Screenshot taken`);
+      
+      // If in multi-mode, don't auto-process
+      if (!isMultiMode) {
+        handleProcessScreenshots();
+      }
+    });
+
+    const areaScreenshotDataUnsubscribe = ipcRenderer.on("area-screenshot-data", (data: string) => {
+      const screenshot = screenshotService.addScreenshot(data);
+      setScreenshots(screenshotService.getScreenshots());
+      toast.success(`Area screenshot taken`);
+      
+      // If in multi-mode, don't auto-process
+      if (!isMultiMode) {
+        handleProcessScreenshots();
+      }
     });
 
     const deleteLastScreenshotUnsubscribe = ipcRenderer.on("delete-last-screenshot", () => {
+      // Remove the last screenshot
+      const allScreenshots = screenshotService.getScreenshots();
+      if (allScreenshots.length > 0) {
+        const lastId = allScreenshots[allScreenshots.length - 1].id;
+        screenshotService.removeScreenshot(lastId);
+        setScreenshots(screenshotService.getScreenshots());
+      }
       toast.info("Last screenshot deleted");
+    });
+
+    // Multi-mode events
+    const startMultiModeUnsubscribe = ipcRenderer.on("start-multi-mode", () => {
+      setIsMultiMode(true);
+      screenshotService.setMultiMode(true);
+      
+      // Clear existing screenshots if any
+      if (screenshotService.getCount() > 0) {
+        screenshotService.clearAll();
+        setScreenshots([]);
+      }
+      
+      toast.info("Multi-screenshot mode activated. Take multiple screenshots and process them together.");
+    });
+
+    // Area selection events
+    const startAreaCaptureUnsubscribe = ipcRenderer.on("start-area-capture", () => {
+      setIsAreaSelecting(true);
+      toast.info("Select an area to capture");
     });
 
     // Model selector events
@@ -99,21 +163,56 @@ const AppContainer: React.FC = () => {
     });
 
     // Notification events
-    const notificationUnsubscribe = ipcRenderer.on("notification", (data: { body: string; type: string }) => {
-      switch (data.type) {
-        case "success":
-          toast.success(data.body);
-          break;
-        case "error":
-          toast.error(data.body);
-          break;
-        case "warning":
-          toast.warning(data.body);
-          break;
-        case "info":
-        default:
-          toast.info(data.body);
-          break;
+    const handleNotificationAction = (actionId: string, actionData: any) => {
+      if (actionId === 'open-directory') {
+        sendIpcMessage('open-directory', actionData);
+      }
+    };
+
+    const notificationUnsubscribe = ipcRenderer.on("notification", (data: { 
+      body: string; 
+      type: string; 
+      actions?: Array<{ id: string; label: string; data: any }> 
+    }) => {
+      if (data.actions && data.actions.length > 0) {
+        // Create a custom toast with actions
+        const toastMethod = data.type === 'success' ? toast.success :
+                             data.type === 'error' ? toast.error :
+                             data.type === 'warning' ? toast.warning : toast.info;
+        
+        toastMethod(
+          <div className="notification-with-actions">
+            <div className="notification-body">{data.body}</div>
+            <div className="notification-actions">
+              {data.actions.map(action => (
+                <button 
+                  key={action.id} 
+                  className={`action-button ${action.id}`}
+                  onClick={() => handleNotificationAction(action.id, action.data)}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      } else {
+        // Regular toast without actions
+        switch (data.type) {
+          case "success":
+            toast.success(data.body);
+            break;
+          case "error":
+            toast.error(data.body);
+            break;
+          case "warning":
+            toast.warning(data.body);
+            break;
+          case "info":
+          default:
+            toast.info(data.body);
+            break;
+        }
       }
     });
 
@@ -149,20 +248,23 @@ const AppContainer: React.FC = () => {
       streamBufferRef.current = "";
       setIsInstructionVisible(false);
       setHasContent(true);
-    });
-
-    // Add a startAreaCapture event listener in the useEffect hook
-    const startAreaCaptureUnsubscribe = ipcRenderer.on("start-area-capture", () => {
-      setIsAreaSelecting(true);
-      // Add implementation for area selection here
-      // This would typically involve creating a overlay with a selection tool
-      toast.info("Select an area to capture");
+      
+      // If we were in multi-mode, exit it after processing
+      if (isMultiMode) {
+        setIsMultiMode(false);
+        screenshotService.setMultiMode(false);
+      }
     });
 
     // Just listen for ESC key to close model selector - everything else is handled by Electron
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && showModelSelector) {
-        setShowModelSelector(false);
+      if (e.key === "Escape") {
+        if (showModelSelector) {
+          setShowModelSelector(false);
+        }
+        if (isAreaSelecting) {
+          setIsAreaSelecting(false);
+        }
       }
     };
 
@@ -179,7 +281,10 @@ const AppContainer: React.FC = () => {
       updateViewUnsubscribe();
       resetViewUnsubscribe();
       screenshotTakenUnsubscribe();
+      areaScreenshotDataUnsubscribe();
       deleteLastScreenshotUnsubscribe();
+      startMultiModeUnsubscribe();
+      startAreaCaptureUnsubscribe();
       showModelSelectorUnsubscribe();
       notificationUnsubscribe();
       warningUnsubscribe();
@@ -188,11 +293,10 @@ const AppContainer: React.FC = () => {
       streamChunkUnsubscribe();
       streamUpdateUnsubscribe();
       streamEndUnsubscribe();
-      startAreaCaptureUnsubscribe();
 
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [ipcRenderer, showModelSelector]);
+  }, [ipcRenderer, showModelSelector, isAreaSelecting, isMultiMode]);
 
   // Handlers for toolbar actions
   const handleToggleVisibility = () => {
@@ -200,11 +304,33 @@ const AppContainer: React.FC = () => {
   };
 
   const handleProcessScreenshots = () => {
-    sendIpcMessage("process-screenshots");
+    if (screenshots.length === 0) {
+      toast.warning("No screenshots to process. Take a screenshot first.");
+      return;
+    }
+    
+    setIsLoading(true);
+    sendIpcMessage("process-screenshots-with-ai", screenshots.map(s => s.data));
   };
 
-  const handleTakeScreenshot = () => {
-    sendIpcMessage("take-screenshot");
+  const handleTakeScreenshot = async () => {
+    try {
+      setIsLoading(true);
+      await screenshotService.takeFullScreenshot();
+      // The event handler will update the UI
+    } catch (error) {
+      console.error("Error taking screenshot:", error);
+      toast.error("Failed to take screenshot");
+      setIsLoading(false);
+    }
+  };
+
+  const handleAreaScreenshot = () => {
+    setIsAreaSelecting(true);
+  };
+
+  const handleCancelAreaSelection = () => {
+    setIsAreaSelecting(false);
   };
 
   const handleReset = () => {
@@ -219,6 +345,56 @@ const AppContainer: React.FC = () => {
     setShowModelSelector(false);
   };
 
+  // Multi-screenshot mode handlers
+  const handleStartMultiMode = () => {
+    setIsMultiMode(true);
+    screenshotService.setMultiMode(true);
+    
+    // Clear existing screenshots if any
+    if (screenshotService.getCount() > 0) {
+      screenshotService.clearAll();
+      setScreenshots([]);
+    }
+    
+    toast.info("Multi-screenshot mode activated. Take multiple screenshots and process them together.");
+    setInstruction("Multi-mode: Take screenshots with Cmd+A, process with Cmd+Enter");
+    setIsInstructionVisible(true);
+  };
+
+  const handleExitMultiMode = () => {
+    setIsMultiMode(false);
+    screenshotService.setMultiMode(false);
+    
+    if (screenshots.length > 0) {
+      // Ask if user wants to process screenshots before exiting
+      if (window.confirm("Do you want to process the screenshots before exiting multi-mode?")) {
+        handleProcessScreenshots();
+      } else {
+        // Clear screenshots
+        screenshotService.clearAll();
+        setScreenshots([]);
+      }
+    }
+    
+    setInstruction("Use Cmd+H to take a screenshot");
+    setIsInstructionVisible(true);
+  };
+
+  const handleAddScreenshotToMultiMode = async () => {
+    try {
+      await screenshotService.takeFullScreenshot();
+      // The event handler will update the UI
+    } catch (error) {
+      console.error("Error adding screenshot to multi-mode:", error);
+      toast.error("Failed to add screenshot");
+    }
+  };
+
+  const handleRemoveScreenshot = (id: string) => {
+    screenshotService.removeScreenshot(id);
+    setScreenshots(screenshotService.getScreenshots());
+  };
+
   // Handle context actions
   const handleAddContextScreenshot = () => {
     sendIpcMessage("add-context-screenshot");
@@ -227,7 +403,7 @@ const AppContainer: React.FC = () => {
   const handleReportError = () => {
     const errorDescription = prompt("Please describe the error in the solution:");
     if (errorDescription && errorDescription.trim() !== "") {
-      sendIpcMessage("report-solution-error", errorDescription);
+      screenshotService.reportSolutionError(errorDescription);
     }
   };
 
@@ -235,6 +411,7 @@ const AppContainer: React.FC = () => {
   return (
     <>
       {showModelSelector && <ModelSelector onClose={handleCloseSettings} />}
+      {isAreaSelecting && <AreaSelector onCancel={handleCancelAreaSelection} />}
 
       <div className={`app-container ${!isWindowVisible ? "invisible-mode" : ""}`}>
         {/* Top toolbar - always visible */}
@@ -242,62 +419,61 @@ const AppContainer: React.FC = () => {
           onToggleVisibility={handleToggleVisibility}
           onProcess={handleProcessScreenshots}
           onAutoScreenshot={handleTakeScreenshot}
+          onAreaScreenshot={handleAreaScreenshot}
           onReset={handleReset}
           onSettings={handleOpenSettings}
+          onStartMultiMode={handleStartMultiMode}
+          isMultiMode={isMultiMode}
+          onExitMultiMode={handleExitMultiMode}
         />
+
+        {/* Multi-screenshot manager */}
+        {isMultiMode && (
+          <MultiScreenshotManager
+            screenshots={screenshots}
+            onRemoveScreenshot={handleRemoveScreenshot}
+            onProcessScreenshots={handleProcessScreenshots}
+            onAddMoreScreenshot={handleAddScreenshotToMultiMode}
+          />
+        )}
 
         {/* Content container */}
         <div className="content-container">
-          {/* Instructions banner */}
-          <InstructionBanner message={instruction} isVisible={isInstructionVisible} />
+          {/* Instruction banner */}
+          {isInstructionVisible && <InstructionBanner instruction={instruction} />}
 
-          {/* Main content area - shows analysis results */}
-          <div className="content-area">
-            <div className="main-content">
-              {isLoading ? (
-                <LoadingContent />
-              ) : hasContent ? (
-                <ResultContent markdown={analysisResult} />
-              ) : (
-                <div className="default-content">
-                  <h2>Interview Coder</h2>
-                  <p>Key Shortcuts:</p>
-                  <ul className="shortcut-list">
-                    <li><kbd>Cmd+H</kbd> Take screenshot</li>
-                    <li><kbd>Cmd+A</kbd> Add additional screenshot</li>
-                    <li><kbd>Cmd+D</kbd> Screenshot selected area</li>
-                    <li><kbd>Cmd+Enter</kbd> Process screenshots</li>
-                    <li><kbd>Cmd+R</kbd> Reset</li>
-                    <li><kbd>Cmd+B</kbd> Toggle visibility</li>
-                    <li><kbd>Cmd+L</kbd> Delete last screenshot</li>
-                    <li><kbd>Cmd+M</kbd> or <kbd>Cmd+,</kbd> Open model selector</li>
-                    <li><kbd>Cmd+[</kbd>/<kbd>]</kbd> Adjust opacity</li>
-                    <li><kbd>Cmd+Arrow Keys</kbd> Move window</li>
-                    <li><kbd>Cmd+Q</kbd> Quit application</li>
-                  </ul>
-                </div>
-              )}
+          {/* Loading content */}
+          {isLoading && (
+            <LoadingContent message="Processing your screenshot..." />
+          )}
+
+          {/* Result content */}
+          {hasContent && !isLoading && (
+            <div className="result-wrapper">
+              <ResultContent markdownContent={analysisResult} />
+              <ContextActions 
+                onAddContext={handleAddContextScreenshot} 
+                onReportError={handleReportError} 
+              />
             </div>
-          </div>
+          )}
 
-          {/* Bottom UI elements */}
-          {hasContent && <ContextActions onAddContext={handleAddContextScreenshot} onReportError={handleReportError} />}
-
-          <ModelBadge />
-
-          {/* Toast notifications */}
-          <ToastContainer
-            position="top-left"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-          />
+          {/* Model badge - always visible */}
+          <ModelBadge onOpenSettings={handleOpenSettings} />
         </div>
+        
+        {/* Toast container for notifications */}
+        <ToastContainer
+          position="bottom-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={true}
+          closeOnClick
+          pauseOnFocusLoss={false}
+          draggable
+          pauseOnHover
+          theme="dark"
+        />
       </div>
     </>
   );

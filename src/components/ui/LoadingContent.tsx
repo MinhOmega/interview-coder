@@ -1,8 +1,14 @@
 import React from 'react';
 
-export const LoadingContent: React.FC = () => {
+interface LoadingContentProps {
+  message?: string;
+}
+
+export const LoadingContent: React.FC<LoadingContentProps> = ({ message = "Analyzing..." }) => {
   return (
     <div className="loading-container">
+      {message && <div className="loading-message">{message}</div>}
+      
       {/* Section 1: Analyzing the Problem */}
       <div className="skeleton-section">
         <div className="skeleton-header"></div>

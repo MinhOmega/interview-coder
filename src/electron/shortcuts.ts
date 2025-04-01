@@ -29,14 +29,40 @@ export class ShortcutsHelper {
       if (mainWindow) {
         console.log("Taking screenshot...");
         try {
+          // Send notification that screenshot is being taken
+          mainWindow.webContents.send("notification", {
+            body: "Taking screenshot...",
+            type: "info"
+          });
+          
           const screenshotPath = await this.deps.takeScreenshot();
           const preview = await this.deps.getImagePreview(screenshotPath);
+          
+          // Send the screenshot data to the renderer
           mainWindow.webContents.send("screenshot-taken", {
             path: screenshotPath,
             preview
           });
-        } catch (error) {
+          
+          // Send success notification with action to open directory
+          mainWindow.webContents.send("notification", {
+            body: `Screenshot saved at ${screenshotPath}`,
+            type: "success",
+            actions: [
+              {
+                name: "Open Directory",
+                id: "open-directory",
+                data: { path: screenshotPath }
+              }
+            ]
+          });
+        } catch (error: Error | unknown) {
           console.error("Error capturing screenshot:", error);
+          // Send error notification
+          mainWindow.webContents.send("notification", {
+            body: `Failed to take screenshot: ${error instanceof Error ? error.message : String(error)}`,
+            type: "error"
+          });
         }
       }
     };
@@ -47,19 +73,41 @@ export class ShortcutsHelper {
       if (mainWindow) {
         console.log("Taking additional screenshot...");
         try {
+          // Send notification that additional screenshot is being taken
+          mainWindow.webContents.send("notification", {
+            body: "Taking additional screenshot...",
+            type: "info"
+          });
+          
           const screenshotPath = await this.deps.takeScreenshot();
           const preview = await this.deps.getImagePreview(screenshotPath);
+          
+          // Send the screenshot data to the renderer
           mainWindow.webContents.send("screenshot-taken", {
             path: screenshotPath,
             preview,
             isAdditional: true
           });
+          
+          // Send success notification with action to open directory
           mainWindow.webContents.send("notification", {
-            body: "Additional screenshot added",
-            type: "success"
+            body: `Additional screenshot saved at ${screenshotPath}`,
+            type: "success",
+            actions: [
+              {
+                name: "Open Directory",
+                id: "open-directory",
+                data: { path: screenshotPath }
+              }
+            ]
           });
-        } catch (error) {
+        } catch (error: Error | unknown) {
           console.error("Error capturing additional screenshot:", error);
+          // Send error notification
+          mainWindow.webContents.send("notification", {
+            body: `Failed to take additional screenshot: ${error instanceof Error ? error.message : String(error)}`,
+            type: "error"
+          });
         }
       }
     };

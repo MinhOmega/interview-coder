@@ -1,0 +1,143 @@
+.top-toolbar {
+  display: flex;
+  align-items: center;
+  background-color: rgba(30, 30, 30, 0.9);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  background-color: rgba(60, 60, 60, 0.7);
+  color: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-right: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 85px;
+  position: relative;
+}
+
+.toolbar-button:hover {
+  background-color: rgba(80, 80, 80, 0.9);
+  color: white;
+}
+
+.toolbar-button:last-child {
+  margin-right: 0;
+}
+
+.toolbar-button .icon {
+  margin-right: 6px;
+  font-size: 16px;
+}
+
+.toolbar-button .shortcut {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 6px;
+  color: #bbb;
+  background-color: rgba(0, 0, 0, 0.15);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+/* Special button styling */
+#btn-auto-screenshot {
+  background-color: rgba(33, 150, 243, 0.3);
+}
+
+#btn-auto-screenshot:hover {
+  background-color: rgba(33, 150, 243, 0.5);
+}
+
+#btn-process {
+  background-color: rgba(76, 175, 80, 0.3);
+}
+
+#btn-process:hover {
+  background-color: rgba(76, 175, 80, 0.5);
+}
+
+#btn-area-screenshot {
+  background-color: rgba(156, 39, 176, 0.3);
+}
+
+#btn-area-screenshot:hover {
+  background-color: rgba(156, 39, 176, 0.5);
+}
+
+#btn-start-multi {
+  background-color: rgba(255, 152, 0, 0.3);
+}
+
+#btn-start-multi:hover {
+  background-color: rgba(255, 152, 0, 0.5);
+}
+
+#btn-exit-multi {
+  background-color: rgba(244, 67, 54, 0.3);
+}
+
+#btn-exit-multi:hover {
+  background-color: rgba(244, 67, 54, 0.5);
+}
+
+/* Responsive styles */
+@media (max-width: 900px) {
+  .toolbar-button {
+    padding: 7px 10px;
+    font-size: 12px;
+    min-width: 75px;
+  }
+  
+  .toolbar-button .shortcut {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .top-toolbar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  
+  .toolbar-button {
+    margin-right: 4px;
+    padding: 6px 8px;
+    font-size: 11px;
+    min-width: 0;
+    flex: 1;
+  }
+  
+  .toolbar-button span:not(.icon) {
+    display: none;
+  }
+  
+  .toolbar-button .icon {
+    margin-right: 0;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-toolbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+  
+  .toolbar-button {
+    flex: 0 0 calc(20% - 5px);
+    padding: 8px 4px;
+    margin-right: 0;
+  }
+} 

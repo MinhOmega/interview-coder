@@ -106,6 +106,40 @@ export interface IIpcHandlerDeps {
   moveWindowDown: () => void;
 }
 
+// Add this function somewhere at the top of the file, after the imports
+function ensureScreenshotDirectories() {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  
+  try {
+    // Create main screenshots directory
+    const screenshotsDir = path.join(os.homedir(), 'Pictures', 'Screenshots');
+    if (!fs.existsSync(screenshotsDir)) {
+      fs.mkdirSync(screenshotsDir, { recursive: true });
+      console.log(`Created screenshots directory at ${screenshotsDir}`);
+    }
+    
+    // Create app-specific directory
+    const appScreenshotsDir = path.join(screenshotsDir, 'InterviewCoder');
+    if (!fs.existsSync(appScreenshotsDir)) {
+      fs.mkdirSync(appScreenshotsDir, { recursive: true });
+      console.log(`Created app-specific screenshots directory at ${appScreenshotsDir}`);
+    }
+    
+    return {
+      mainDir: screenshotsDir,
+      appDir: appScreenshotsDir
+    };
+  } catch (error) {
+    console.error('Error creating screenshot directories:', error);
+    return {
+      mainDir: os.homedir(),
+      appDir: os.homedir()
+    };
+  }
+}
+
 // Initialize helpers
 function initializeHelpers() {
   state.screenshotHelper = new ScreenshotHelper(state.view);
@@ -520,6 +554,10 @@ async function initializeApp() {
       moveWindowDown: () => moveWindowVertical((y) => y + state.step),
     });
 
+    // Create screenshot directories
+    const dirs = ensureScreenshotDirectories();
+    
+    // Then create the window and other initialization
     await createWindow();
 
     // Register global shortcuts based on initial visibility state
@@ -611,12 +649,30 @@ function clearQueues(): void {
 
 async function takeScreenshot(): Promise<string> {
   if (!state.mainWindow) throw new Error("No main window available");
-  return (
-    state.screenshotHelper?.takeScreenshot(
-      () => hideMainWindow(),
-      () => showMainWindow(),
-    ) || ""
-  );
+  
+  // Create a properly formatted timestamp for the filename
+  const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+  
+  try {
+    // Use the screenshot helper to take the screenshot
+    // Pass the callbacks to hide/show the window during screenshot process
+    const screenshotPath = await state.screenshotHelper?.takeScreenshot(
+      () => hideMainWindow(), // Hide window before taking screenshot
+      () => showMainWindow()  // Show window after taking screenshot
+    );
+    
+    if (!screenshotPath) {
+      throw new Error("Screenshot helper failed to return a path");
+    }
+    
+    console.log(`Screenshot successfully taken at ${screenshotPath}`);
+    return screenshotPath;
+  } catch (error) {
+    console.error("Error taking screenshot:", error);
+    // Make sure window is shown even on error
+    showMainWindow();
+    throw error;
+  }
 }
 
 async function getImagePreview(filepath: string): Promise<string> {

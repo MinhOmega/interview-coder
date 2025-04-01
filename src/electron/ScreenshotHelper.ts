@@ -90,38 +90,52 @@ export class ScreenshotHelper {
    * Take a screenshot
    */
   async takeScreenshot(
-    beforeScreenshot?: () => void,
-    afterScreenshot?: () => void
+    onBeforeCapture?: () => void,
+    onAfterCapture?: () => void
   ): Promise<string> {
     try {
-      // Call pre-screenshot callback (e.g., hide window)
-      if (beforeScreenshot) beforeScreenshot();
+      // Call the before capture callback (e.g., to hide the window)
+      if (onBeforeCapture) {
+        onBeforeCapture();
+        // Add a small delay to ensure window is hidden
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
+      // Generate timestamp and filename
+      const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+      const os = require("os");
+      const path = require("path");
+      const screenshotDir = path.join(os.homedir(), "Pictures", "Screenshots", "InterviewCoder");
       
-      // Delay to ensure window is hidden
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Create directory if it doesn't exist
+      const fs = require("fs");
+      if (!fs.existsSync(screenshotDir)) {
+        fs.mkdirSync(screenshotDir, { recursive: true });
+      }
       
-      // Take a screenshot
-      const timestamp = Date.now();
-      const filename = `screenshot_${timestamp}.png`;
-      const filePath = path.join(this.screenshotDir, filename);
-      
-      // Use screenshot-desktop to take a screenshot
-      const img = await screenshotDesktop();
-      fs.writeFileSync(filePath, img);
-      
-      // Add to appropriate queue
-      this.screenshotQueue.push(filePath);
-      
-      // Call post-screenshot callback (e.g., show window)
-      if (afterScreenshot) afterScreenshot();
-      
+      const filename = `screenshot-${timestamp}.png`;
+      const filePath = path.join(screenshotDir, filename);
+
+      // Take screenshot using screenshot-desktop
+      const screenshot = require("screenshot-desktop");
+      await screenshot({ filename: filePath });
+
+      // Add to queue based on current view
+      if (this.view === "queue") {
+        this.screenshotQueue.push(filePath);
+      } else {
+        this.extraScreenshotQueue.push(filePath);
+      }
+
+      // Call the after capture callback (e.g., to show the window)
+      if (onAfterCapture) {
+        onAfterCapture();
+      }
+
+      console.log(`Screenshot saved to ${filePath}`);
       return filePath;
     } catch (error) {
-      console.error('Error taking screenshot:', error);
-      
-      // Call post-screenshot callback to restore window
-      if (afterScreenshot) afterScreenshot();
-      
+      console.error("Error taking screenshot:", error);
       throw error;
     }
   }

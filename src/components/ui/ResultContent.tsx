@@ -9,11 +9,11 @@ import rehypeSanitize from 'rehype-sanitize';
 import { unified } from 'unified';
 import { createElement } from 'react';
 
-interface ResultContentProps {
-  markdown: string;
+export interface ResultContentProps {
+  markdownContent: string;
 }
 
-export const ResultContent: React.FC<ResultContentProps> = ({ markdown }) => {
+export const ResultContent: React.FC<ResultContentProps> = ({ markdownContent }) => {
   const resultContentRef = useRef<HTMLDivElement>(null);
 
   // Function to render code blocks with syntax highlighting
@@ -98,24 +98,24 @@ export const ResultContent: React.FC<ResultContentProps> = ({ markdown }) => {
       const element = resultContentRef.current;
       element.scrollTop = element.scrollHeight;
     }
-  }, [markdown]);
+  }, [markdownContent]);
 
   // Render the markdown content
   const renderContent = () => {
-    if (!markdown || markdown.trim() === '') {
+    if (!markdownContent || markdownContent.trim() === '') {
       return null;
     }
 
     try {
       // Process the markdown with our unified processor
-      const content = processor.processSync(markdown).result;
+      const content = processor.processSync(markdownContent).result;
       return content;
     } catch (error) {
       console.error('Error rendering markdown:', error);
       return (
         <>
           <div className="error-message">Error rendering content: {String(error)}</div>
-          <pre>{markdown}</pre>
+          <pre>{markdownContent}</pre>
         </>
       );
     }

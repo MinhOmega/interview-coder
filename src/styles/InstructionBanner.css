@@ -1,0 +1,74 @@
+.instruction-banner {
+  position: relative;
+  background-color: rgba(30, 30, 30, 0.85);
+  color: white;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+  max-width: 100%;
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+  border-left: 4px solid #4caf50;
+}
+
+.instruction-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.instruction-line {
+  position: relative;
+  padding-left: 20px;
+}
+
+.instruction-line::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #4caf50;
+  font-weight: bold;
+}
+
+/* Single-line instructions won't have bullets */
+.instruction-content:only-child .instruction-line:only-child::before {
+  content: none;
+  padding-left: 0;
+}
+
+/* Make it responsive */
+@media (max-width: 768px) {
+  .instruction-banner {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .instruction-banner {
+    padding: 8px 10px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .instruction-line {
+    padding-left: 16px;
+  }
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

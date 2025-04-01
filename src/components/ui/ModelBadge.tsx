@@ -7,7 +7,11 @@ interface ModelSettings {
   ollamaUrl?: string;
 }
 
-export const ModelBadge: React.FC = () => {
+export interface ModelBadgeProps {
+  onOpenSettings?: () => void;
+}
+
+export const ModelBadge: React.FC<ModelBadgeProps> = ({ onOpenSettings }) => {
   const [settings, setSettings] = useState<ModelSettings>({
     aiProvider: 'openai',
     currentModel: 'gpt-4o-mini'
@@ -69,8 +73,14 @@ export const ModelBadge: React.FC = () => {
     }
   };
 
+  const handleClick = () => {
+    if (onOpenSettings) {
+      onOpenSettings();
+    }
+  };
+
   return (
-    <div className="model-badge">
+    <div className="model-badge" onClick={handleClick} title="Click to change model">
       {getProviderName()}: {settings.currentModel || 'Default Model'}
     </div>
   );

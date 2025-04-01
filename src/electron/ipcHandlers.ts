@@ -108,20 +108,84 @@ export function initializeIpcHandlers(deps: IpcHandlerDeps): void {
     if (!mainWindow) return;
 
     try {
-      const screenshotPath = await takeScreenshot();
-      const preview = await getImagePreview(screenshotPath);
+      // Show a notification that we're taking a screenshot
+      mainWindow.webContents.send('update-instruction', "Taking screenshot...");
       
-      mainWindow.webContents.send('screenshot-taken', {
-        path: screenshotPath,
-        preview
+      // Temporarily hide the window for a cleaner screenshot
+      const wasVisible = mainWindow.isVisible();
+      if (wasVisible) {
+        mainWindow.hide();
+        // Wait a bit for the window to hide
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
+      const screenshotPath = await takeScreenshot();
+      
+      // Get directory path for open button
+      const path = require('path');
+      const dirPath = path.dirname(screenshotPath);
+      
+      // Read the file as base64 for sending to the renderer
+      const fs = require('fs');
+      const imageBuffer = fs.readFileSync(screenshotPath);
+      const base64Data = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+      
+      // Restore window visibility
+      if (wasVisible) {
+        mainWindow.show();
+      }
+
+      // Send the screenshot data to the renderer
+      mainWindow.webContents.send('screenshot-data', base64Data);
+      
+      // Log success
+      console.log(`Screenshot saved to ${screenshotPath}`);
+      
+      // Notify the user about the saved screenshot with a directory button
+      mainWindow.webContents.send('notification', {
+        body: `Screenshot saved to ${screenshotPath}`,
+        type: 'success',
+        actions: [
+          {
+            id: 'open-directory',
+            label: 'Open Directory',
+            data: dirPath
+          }
+        ]
       });
+
+      // Clear the instruction
+      setTimeout(() => {
+        mainWindow.webContents.send('hide-instruction');
+      }, 1500);
     } catch (error) {
       console.error('Error taking screenshot:', error);
       mainWindow.webContents.send('notification', {
-        body: 'Failed to take screenshot',
+        body: `Failed to take screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
         type: 'error'
       });
+      
+      // Restore window visibility on error
+      mainWindow.show();
+      
+      // Clear the instruction
+      mainWindow.webContents.send('hide-instruction');
     }
+  });
+
+  // Open screenshot directory
+  ipcMain.on('open-directory', (event, dirPath) => {
+    const { shell } = require('electron');
+    shell.openPath(dirPath).catch((err: Error) => {
+      console.error('Failed to open directory:', err);
+      const mainWindow = getMainWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send('notification', {
+          body: `Failed to open directory: ${err.message}`,
+          type: 'error'
+        });
+      }
+    });
   });
 
   // Get screenshot queue
@@ -243,5 +307,179 @@ export function initializeIpcHandlers(deps: IpcHandlerDeps): void {
         type: 'error'
       });
     }
+  });
+
+  // Process screenshots with AI
+  ipcMain.on('process-screenshots-with-ai', (event, screenshotsData) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return;
+
+    if (!Array.isArray(screenshotsData) || screenshotsData.length === 0) {
+      mainWindow.webContents.send('notification', {
+        body: 'No screenshots to process',
+        type: 'warning'
+      });
+      return;
+    }
+
+    // Show loading state
+    mainWindow.webContents.send('loading', true);
+
+    // Process the screenshots with AI
+    if (processingHelper) {
+      try {
+        // Instead of using a global variable, directly pass to the main process
+        // and let it handle the screenshots data
+        mainWindow.webContents.send('set-screenshots-data', screenshotsData);
+        processingHelper.processScreenshots();
+      } catch (error) {
+        console.error('Error processing screenshots with AI:', error);
+        mainWindow.webContents.send('error', 
+          `Failed to process screenshots: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        mainWindow.webContents.send('loading', false);
+      }
+    } else {
+      // For demo, simulate processing
+      console.log(`Processing ${screenshotsData.length} screenshots (demo mode)`);
+      
+      setTimeout(() => {
+        mainWindow.webContents.send('analysis-result', 
+          `# Analysis of ${screenshotsData.length} Screenshots\n\n` +
+          `I've analyzed the ${screenshotsData.length} screenshot${screenshotsData.length > 1 ? 's' : ''} you provided.\n\n` +
+          `## Observations\n\n` +
+          `- The screenshots appear to contain code and/or UI elements\n` +
+          `- There ${screenshotsData.length > 1 ? 'are' : 'is'} ${screenshotsData.length} screenshot${screenshotsData.length > 1 ? 's' : ''} in total\n\n` +
+          `## Recommendations\n\n` +
+          `Based on what I see, I recommend...\n\n` +
+          `\`\`\`javascript\nconsole.log("Processing complete!");\n\`\`\``
+        );
+        mainWindow.webContents.send('loading', false);
+        mainWindow.webContents.send('hide-instruction');
+      }, 2000);
+    }
+  });
+
+  // Capture selected area
+  ipcMain.on('capture-selected-area', async (event, area) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return;
+
+    try {
+      // Check if area is valid
+      if (!area || typeof area.x !== 'number' || typeof area.y !== 'number' || 
+          typeof area.width !== 'number' || typeof area.height !== 'number') {
+        throw new Error('Invalid area specified');
+      }
+
+      // Show notification that we're capturing an area
+      mainWindow.webContents.send('update-instruction', "Capturing selected area...");
+
+      // Hide the window for a cleaner screenshot
+      const wasVisible = mainWindow.isVisible();
+      if (wasVisible) {
+        mainWindow.hide();
+        // Wait a bit for the window to hide
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
+      // Generate a timestamp for the file name
+      const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+      const path = require('path');
+      const os = require('os');
+      const fs = require('fs');
+      
+      // Create a screenshots directory if it doesn't exist
+      const screenshotsDir = path.join(os.homedir(), 'Pictures', 'Screenshots', 'InterviewCoder');
+      if (!fs.existsSync(screenshotsDir)) {
+        fs.mkdirSync(screenshotsDir, { recursive: true });
+      }
+      
+      const screenshotPath = path.join(screenshotsDir, `area-screenshot-${timestamp}.png`);
+      
+      // In a production app, you would use something like robotjs or a native module to capture a specific region
+      // For this example, we'll capture the entire screen and then crop it
+      const fullScreenPath = await takeScreenshot();
+      
+      // Read the full screenshot
+      const { createCanvas, loadImage } = require('canvas');
+      const image = await loadImage(fullScreenPath);
+      
+      // Create a canvas for cropping
+      const canvas = createCanvas(area.width, area.height);
+      const ctx = canvas.getContext('2d');
+      
+      // Draw only the selected area to the canvas
+      ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, area.width, area.height);
+      
+      // Save the cropped image
+      const buffer = canvas.toBuffer('image/png');
+      fs.writeFileSync(screenshotPath, buffer);
+      
+      // Convert to base64 for sending to the renderer
+      const base64Data = `data:image/png;base64,${buffer.toString('base64')}`;
+
+      // Restore window visibility
+      if (wasVisible) {
+        mainWindow.show();
+      }
+
+      // Notify the renderer about the area screenshot
+      mainWindow.webContents.send('area-screenshot-data', base64Data);
+      
+      console.log(`Area screenshot saved to ${screenshotPath} (${area.width}x${area.height})`);
+      
+      // Get directory path for open button
+      const dirPath = path.dirname(screenshotPath);
+      
+      mainWindow.webContents.send('notification', {
+        body: `Area screenshot saved to ${screenshotPath} (${area.width}x${area.height})`,
+        type: 'success',
+        actions: [
+          {
+            id: 'open-directory',
+            label: 'Open Directory',
+            data: dirPath
+          }
+        ]
+      });
+      
+      // Clear the instruction
+      setTimeout(() => {
+        mainWindow.webContents.send('hide-instruction');
+      }, 1500);
+    } catch (error) {
+      console.error('Error capturing area:', error);
+      mainWindow.webContents.send('notification', {
+        body: `Failed to capture area: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: 'error'
+      });
+      
+      // Show the window again on error
+      mainWindow.show();
+      
+      // Clear the instruction
+      mainWindow.webContents.send('hide-instruction');
+    }
+  });
+
+  // Start multi-screenshot mode
+  ipcMain.on('start-multi-mode', () => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return;
+
+    mainWindow.webContents.send('start-multi-mode');
+    mainWindow.webContents.send('notification', {
+      body: 'Multi-screenshot mode activated',
+      type: 'info'
+    });
+  });
+
+  // Start area capture
+  ipcMain.on('start-area-capture', () => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return;
+
+    mainWindow.webContents.send('start-area-capture');
   });
 } 

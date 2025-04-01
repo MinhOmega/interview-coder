@@ -11,6 +11,10 @@ const ALLOWED_SEND_CHANNELS = [
   'take-screenshot',
   'add-context-screenshot',
   'delete-last-screenshot',
+  'process-screenshots-with-ai',
+  'capture-selected-area',
+  'start-multi-mode',
+  'open-directory',
   
   // Content management
   'clear-result',
@@ -64,6 +68,11 @@ const ALLOWED_RECEIVE_CHANNELS = [
   // Screenshots
   'screenshot-taken',
   'delete-last-screenshot',
+  'screenshot-data',
+  'area-screenshot-data',
+  'start-area-capture',
+  'start-multi-mode',
+  'set-screenshots-data',
   
   // Model handling
   'show-model-selector',
@@ -92,7 +101,8 @@ const ALLOWED_INVOKE_CHANNELS = [
   'get-extra-screenshot-queue',
   'process-screenshots',
   'verify-ollama-model',
-  'get-env-variable'
+  'get-env-variable',
+  'capture-screenshot-and-process'
 ];
 
 // Create a secure API to expose to the renderer process
