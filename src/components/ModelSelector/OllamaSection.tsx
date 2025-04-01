@@ -193,7 +193,9 @@ export const OllamaSection: React.FC<OllamaSectionProps> = ({
             <div id="ollama-loading">
               Loading models... <span className="loading"></span>
             </div>
-          ) : status}
+          ) : (
+            <span className="helper-text">{status}</span>
+          )}
         </span>
         <button 
           id="refresh-models" 

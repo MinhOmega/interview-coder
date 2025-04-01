@@ -246,7 +246,7 @@ export const OpenAISection: React.FC<OpenAISectionProps> = ({
           {loading ? (
             <span>Loading OpenAI models... <span className="loading"></span></span>
           ) : (
-            <span>{status}</span>
+            <span className="helper-text">{status}</span>
           )}
           <button 
             className="btn-primary"

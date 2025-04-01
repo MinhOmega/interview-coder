@@ -183,10 +183,6 @@ export function initializeIpcHandlers(deps: IpcHandlerDeps): void {
     if (!mainWindow) return;
     
     mainWindow.webContents.send('model-changed', settings);
-    mainWindow.webContents.send('notification', {
-      body: 'Model settings updated successfully',
-      type: 'success'
-    });
   });
 
   // Add handler for area capture

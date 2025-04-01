@@ -36,25 +36,25 @@ declare global {
 // Function to safely get environment variables in an Electron app
 const getEnvVariable = async (key: string): Promise<string | undefined> => {
   // First try using the IPC channel to securely get variables from main process
-  if (typeof window !== 'undefined' && window.electron?.ipcRenderer) {
+  if (typeof window !== "undefined" && window.electron?.ipcRenderer) {
     try {
-      return await window.electron.ipcRenderer.invoke('get-env-variable', key);
+      return await window.electron.ipcRenderer.invoke("get-env-variable", key);
     } catch (error) {
       console.error(`Error getting environment variable via IPC: ${key}`, error);
     }
   }
-  
+
   // For direct window electron access
-  if (typeof window !== 'undefined' && window.api) {
+  if (typeof window !== "undefined" && window.api) {
     try {
-      return await window.api.invoke('get-env-variable', key);
+      return await window.api.invoke("get-env-variable", key);
     } catch (error) {
       console.error(`Error invoking get-env-variable for ${key}:`, error);
     }
   }
-  
+
   // For Vite, environment variables are prefixed with VITE_
-  if (typeof import.meta !== 'undefined') {
+  if (typeof import.meta !== "undefined") {
     try {
       // Use type assertion for Vite's import.meta.env
       const env = (import.meta as any).env;
@@ -66,7 +66,7 @@ const getEnvVariable = async (key: string): Promise<string | undefined> => {
       console.error(`Error accessing Vite env variables for ${key}:`, error);
     }
   }
-  
+
   console.warn(`Could not find environment variable: ${key}. Please ensure it's defined in your .env file.`);
   return undefined;
 };
@@ -90,7 +90,7 @@ export const GeminiSection: React.FC<GeminiSectionProps> = ({ currentModel, onMo
 
     try {
       // Get API key from environment variables
-      const geminiApiKey = await getEnvVariable('GEMINI_API_KEY');
+      const geminiApiKey = await getEnvVariable("GEMINI_API_KEY");
 
       if (!geminiApiKey) {
         setStatus("Error: No Gemini API key found. Please add it to your environment variables");
@@ -251,7 +251,7 @@ export const GeminiSection: React.FC<GeminiSectionProps> = ({ currentModel, onMo
             Loading Gemini models... <span className="loading"></span>
           </span>
         ) : (
-          <span>{status}</span>
+          <span className="helper-text">{status}</span>
         )}
         <button className="btn-primary" onClick={fetchGeminiModels} disabled={loading}>
           <svg
