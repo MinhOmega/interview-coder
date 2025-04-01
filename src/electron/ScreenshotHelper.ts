@@ -152,6 +152,31 @@ export class ScreenshotHelper {
   }
 
   /**
+   * Delete the last screenshot in the queue
+   */
+  deleteLastScreenshot(): { success: boolean; error?: string; path?: string } {
+    try {
+      if (this.screenshotQueue.length === 0) {
+        return { success: false, error: 'No screenshots in queue' };
+      }
+      
+      const lastScreenshot = this.screenshotQueue[this.screenshotQueue.length - 1];
+      const result = this.deleteScreenshot(lastScreenshot);
+      
+      return { 
+        ...result, 
+        path: result.success ? lastScreenshot : undefined 
+      };
+    } catch (error) {
+      console.error('Error deleting last screenshot:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  /**
    * Get a base64-encoded image preview
    */
   async getImagePreview(filePath: string): Promise<string> {

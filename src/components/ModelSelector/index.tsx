@@ -163,60 +163,69 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onClose }) => {
     }
   };
 
+  // Handle clicking outside to close
+  const handleOutsideClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="model-selector-container">
-      <h1>Select AI Model 1111</h1>
-      
-      <ProviderSection 
-        selectedProvider={settings.aiProvider} 
-        onProviderChange={handleProviderChange}
-      />
-      
-      {settings.aiProvider === 'openai' && (
-        <OpenAISection 
-          currentModel={settings.currentModel}
-          onModelChange={handleModelChange}
-        />
-      )}
-      
-      {settings.aiProvider === 'ollama' && (
-        <OllamaSection 
-          currentModel={settings.currentModel}
-          ollamaUrl={settings.ollamaUrl || 'http://127.0.0.1:11434'}
-          onModelChange={handleModelChange}
-          onOllamaUrlChange={handleOllamaUrlChange}
-        />
-      )}
-      
-      {settings.aiProvider === 'gemini' && (
-        <GeminiSection 
-          currentModel={settings.currentModel}
-          onModelChange={handleModelChange}
-        />
-      )}
-      
-      <div className="button-row">
-        <button 
-          className={`btn-save ${isSaving ? 'disabled' : ''}`}
-          onClick={handleSave}
-          disabled={isSaving}
-        >
-          {isSaving ? 'Saving...' : 'Save Settings'}
-        </button>
+    <div className="model-selector-container" onClick={handleOutsideClick}>
+      <div className="model-selector-content">
+        <h1>Select AI Model</h1>
         
-        <button 
-          className="btn-cancel"
-          onClick={onClose}
-        >
-          Cancel
-        </button>
-      </div>
-      
-      {statusMessage && (
-        <div className={`status ${statusType}`}>
-          {statusMessage}
+        <ProviderSection 
+          selectedProvider={settings.aiProvider} 
+          onProviderChange={handleProviderChange}
+        />
+        
+        {settings.aiProvider === 'openai' && (
+          <OpenAISection 
+            currentModel={settings.currentModel}
+            onModelChange={handleModelChange}
+          />
+        )}
+        
+        {settings.aiProvider === 'ollama' && (
+          <OllamaSection 
+            currentModel={settings.currentModel}
+            ollamaUrl={settings.ollamaUrl || 'http://127.0.0.1:11434'}
+            onModelChange={handleModelChange}
+            onOllamaUrlChange={handleOllamaUrlChange}
+          />
+        )}
+        
+        {settings.aiProvider === 'gemini' && (
+          <GeminiSection 
+            currentModel={settings.currentModel}
+            onModelChange={handleModelChange}
+          />
+        )}
+        
+        <div className="button-row">
+          <button 
+            className={`btn-save ${isSaving ? 'disabled' : ''}`}
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Saving...' : 'Save Settings'}
+          </button>
+          
+          <button 
+            className="btn-cancel"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
         </div>
-      )}
+        
+        {statusMessage && (
+          <div className={`status ${statusType}`}>
+            {statusMessage}
+          </div>
+        )}
+      </div>
     </div>
   );
 }; 

@@ -139,23 +139,21 @@
 
 /* Default content */
 .default-content {
-  text-align: center;
-  margin-top: 40px;
   padding: 20px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  max-width: 500px;
+  max-width: 700px;
+  margin: 0 auto;
 }
 
 .default-content h2 {
-  margin-bottom: 20px;
   color: #333;
+  margin-bottom: 15px;
+  text-align: center;
 }
 
 .default-content p {
-  margin: 10px 0;
-  color: #666;
+  margin-bottom: 15px;
+  font-weight: bold;
+  color: #555;
 }
 
 /* Main content area for analysis results */
@@ -220,4 +218,44 @@
 @keyframes fadeOut {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* Add styles for the shortcut list */
+.shortcut-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.shortcut-list li {
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+  padding: 6px 10px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  color: #333;
+}
+
+.shortcut-list li:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.shortcut-list kbd {
+  background-color: #f8f9fa;
+  border: 1px solid #d3d3d3;
+  border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(0,0,0,.2);
+  color: #333;
+  display: inline-block;
+  font-size: 0.85em;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  margin-right: 5px;
+  white-space: nowrap;
 } 

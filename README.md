@@ -78,3 +78,32 @@ src/
 - Press **Cmd+H** (or Ctrl+H) to take a screenshot and process it with AI
 - Press **Cmd+B** (or Ctrl+B) to show/hide the app window
 - Press **Cmd+Enter** (or Ctrl+Enter) to process existing screenshots
+
+## Key Shortcuts
+
+- **Cmd+H** (or Ctrl+H): Take a screenshot
+- **Cmd+A** (or Ctrl+A): Add additional screenshot to the current context
+- **Cmd+D** (or Ctrl+D): Take a screenshot of a selected area (area capture)
+- **Cmd+Enter** (or Ctrl+Enter): Process existing screenshots
+- **Cmd+B** (or Ctrl+B): Toggle window visibility (always active, even when hidden)
+- **Cmd+R** (or Ctrl+R): Reset and clear all screenshots
+- **Cmd+M** or **Cmd+,** (or Ctrl+M/Ctrl+,): Open model selector
+- **Cmd+L** (or Ctrl+L): Delete the last screenshot
+- **Cmd+[/]** (or Ctrl+[/]): Adjust window opacity
+- **Cmd+Arrow Keys** (or Ctrl+Arrow Keys): Move the window
+- **Cmd+Q** (or Ctrl+Q): Quit the application
+
+## Special Features
+
+### Hidden Mode Behavior
+
+When the app window is hidden (using Cmd+B or setting opacity to minimum):
+- Only the Cmd+B shortcut remains active to restore visibility
+- All other shortcuts are disabled
+- This prevents accidental interactions when the app is not visible
+
+### Opacity Control
+
+- Use Cmd+[ and Cmd+] to decrease/increase opacity
+- When opacity drops below a certain threshold, the app automatically switches to hidden mode
+- When in hidden mode, only Cmd+B works to restore visibility

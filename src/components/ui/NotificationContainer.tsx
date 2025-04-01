@@ -1,10 +1,6 @@
 import React from 'react';
-
-interface Notification {
-  id: string;
-  type: string;
-  message: string;
-}
+import { Notification } from '../../hooks/useNotifications';
+import '../../styles/Notifications.css';
 
 interface NotificationContainerProps {
   notifications: Notification[];
@@ -18,9 +14,20 @@ export const NotificationContainer: React.FC<NotificationContainerProps> = ({
       {notifications.map((notification) => (
         <div 
           key={notification.id} 
-          className={`notification ${notification.type} visible`}
+          className={`notification ${notification.type}`}
+          role="alert"
         >
-          {notification.message}
+          <div className="notification-content">
+            <div className="notification-icon">
+              {notification.type === 'success' && '✓'}
+              {notification.type === 'error' && '✕'}
+              {notification.type === 'warning' && '⚠'}
+              {notification.type === 'info' && 'ℹ'}
+            </div>
+            <div className="notification-message">
+              {notification.message}
+            </div>
+          </div>
         </div>
       ))}
     </div>
