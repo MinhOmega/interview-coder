@@ -132,6 +132,19 @@ const SHORTCUTS = {
         updateInstruction("Taking screenshot...");
         const img = await captureScreenshot();
         screenshots.push(img);
+        
+        // Send the screenshot data to the renderer
+        if (mainWindow) {
+          // Send the screenshot data to trigger storage in the service
+          mainWindow.webContents.send('screenshot-data', img);
+          
+          // Also send an explicit notification to ensure toast is shown
+          mainWindow.webContents.send('notification', {
+            body: 'Screenshot taken successfully',
+            type: 'success'
+          });
+        }
+        
         updateInstruction("Processing screenshot with AI...");
         await processScreenshots(true);
       } catch (error) {
@@ -167,6 +180,12 @@ const SHORTCUTS = {
         updateInstruction("Taking screenshot for multi-mode...");
         const img = await captureScreenshot();
         screenshots.push(img);
+        
+        // Send the screenshot data to the renderer to trigger the toast notification
+        if (mainWindow) {
+          mainWindow.webContents.send('screenshot-data', img);
+        }
+        
         updateInstruction(
           `Multi-mode: ${screenshots.length} screenshots captured. ${modifierKey}+A to add more, ${modifierKey}+Enter to analyze`,
         );

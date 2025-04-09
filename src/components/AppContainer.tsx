@@ -62,7 +62,7 @@ const AppContainer: React.FC = () => {
       setAnalysisResult(result);
       setIsLoading(false);
       setHasContent(!!result);
-      
+
       // If we were in multi-mode, exit it after processing
       if (isMultiMode) {
         setIsMultiMode(false);
@@ -81,7 +81,7 @@ const AppContainer: React.FC = () => {
     const clearResultUnsubscribe = ipcRenderer.on("clear-result", () => {
       setAnalysisResult("");
       setHasContent(false);
-      
+
       // Also clear screenshots
       setScreenshots([]);
       screenshotService.clearAll();
@@ -107,7 +107,7 @@ const AppContainer: React.FC = () => {
       const screenshot = screenshotService.addScreenshot(data);
       setScreenshots(screenshotService.getScreenshots());
       toast.success(`Screenshot taken`);
-      
+
       // If in multi-mode, don't auto-process
       if (!isMultiMode) {
         handleProcessScreenshots();
@@ -118,7 +118,7 @@ const AppContainer: React.FC = () => {
       const screenshot = screenshotService.addScreenshot(data);
       setScreenshots(screenshotService.getScreenshots());
       toast.success(`Area screenshot taken`);
-      
+
       // If in multi-mode, don't auto-process
       if (!isMultiMode) {
         handleProcessScreenshots();
@@ -140,13 +140,13 @@ const AppContainer: React.FC = () => {
     const startMultiModeUnsubscribe = ipcRenderer.on("start-multi-mode", () => {
       setIsMultiMode(true);
       screenshotService.setMultiMode(true);
-      
+
       // Clear existing screenshots if any
       if (screenshotService.getCount() > 0) {
         screenshotService.clearAll();
         setScreenshots([]);
       }
-      
+
       toast.info("Multi-screenshot mode activated. Take multiple screenshots and process them together.");
     });
 
@@ -164,57 +164,61 @@ const AppContainer: React.FC = () => {
 
     // Notification events
     const handleNotificationAction = (actionId: string, actionData: any) => {
-      if (actionId === 'open-directory') {
-        sendIpcMessage('open-directory', actionData);
+      if (actionId === "open-directory") {
+        sendIpcMessage("open-directory", actionData);
       }
     };
 
-    const notificationUnsubscribe = ipcRenderer.on("notification", (data: { 
-      body: string; 
-      type: string; 
-      actions?: Array<{ id: string; label: string; data: any }> 
-    }) => {
-      if (data.actions && data.actions.length > 0) {
-        // Create a custom toast with actions
-        const toastMethod = data.type === 'success' ? toast.success :
-                             data.type === 'error' ? toast.error :
-                             data.type === 'warning' ? toast.warning : toast.info;
-        
-        toastMethod(
-          <div className="notification-with-actions">
-            <div className="notification-body">{data.body}</div>
-            <div className="notification-actions">
-              {data.actions.map(action => (
-                <button 
-                  key={action.id} 
-                  className={`action-button ${action.id}`}
-                  onClick={() => handleNotificationAction(action.id, action.data)}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      } else {
-        // Regular toast without actions
-        switch (data.type) {
-          case "success":
-            toast.success(data.body);
-            break;
-          case "error":
-            toast.error(data.body);
-            break;
-          case "warning":
-            toast.warning(data.body);
-            break;
-          case "info":
-          default:
-            toast.info(data.body);
-            break;
+    const notificationUnsubscribe = ipcRenderer.on(
+      "notification",
+      (data: { body: string; type: string; actions?: Array<{ id: string; label: string; data: any }> }) => {
+        if (data.actions && data.actions.length > 0) {
+          // Create a custom toast with actions
+          const toastMethod =
+            data.type === "success"
+              ? toast.success
+              : data.type === "error"
+              ? toast.error
+              : data.type === "warning"
+              ? toast.warning
+              : toast.info;
+
+          toastMethod(
+            <div className="notification-with-actions">
+              <div className="notification-body">{data.body}</div>
+              <div className="notification-actions">
+                {data.actions.map((action) => (
+                  <button
+                    key={action.id}
+                    className={`action-button ${action.id}`}
+                    onClick={() => handleNotificationAction(action.id, action.data)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>,
+          );
+        } else {
+          // Regular toast without actions
+          switch (data.type) {
+            case "success":
+              toast.success(data.body);
+              break;
+            case "error":
+              toast.error(data.body);
+              break;
+            case "warning":
+              toast.warning(data.body);
+              break;
+            case "info":
+            default:
+              toast.info(data.body);
+              break;
+          }
         }
-      }
-    });
+      },
+    );
 
     const warningUnsubscribe = ipcRenderer.on("warning", (message: string) => {
       toast.warning(message);
@@ -248,7 +252,7 @@ const AppContainer: React.FC = () => {
       streamBufferRef.current = "";
       setIsInstructionVisible(false);
       setHasContent(true);
-      
+
       // If we were in multi-mode, exit it after processing
       if (isMultiMode) {
         setIsMultiMode(false);
@@ -308,9 +312,12 @@ const AppContainer: React.FC = () => {
       toast.warning("No screenshots to process. Take a screenshot first.");
       return;
     }
-    
+
     setIsLoading(true);
-    sendIpcMessage("process-screenshots-with-ai", screenshots.map(s => s.data));
+    sendIpcMessage(
+      "process-screenshots-with-ai",
+      screenshots.map((s) => s.data),
+    );
   };
 
   const handleTakeScreenshot = async () => {
@@ -349,13 +356,13 @@ const AppContainer: React.FC = () => {
   const handleStartMultiMode = () => {
     setIsMultiMode(true);
     screenshotService.setMultiMode(true);
-    
+
     // Clear existing screenshots if any
     if (screenshotService.getCount() > 0) {
       screenshotService.clearAll();
       setScreenshots([]);
     }
-    
+
     toast.info("Multi-screenshot mode activated. Take multiple screenshots and process them together.");
     setInstruction("Multi-mode: Take screenshots with Cmd+A, process with Cmd+Enter");
     setIsInstructionVisible(true);
@@ -364,7 +371,7 @@ const AppContainer: React.FC = () => {
   const handleExitMultiMode = () => {
     setIsMultiMode(false);
     screenshotService.setMultiMode(false);
-    
+
     if (screenshots.length > 0) {
       // Ask if user wants to process screenshots before exiting
       if (window.confirm("Do you want to process the screenshots before exiting multi-mode?")) {
@@ -375,7 +382,7 @@ const AppContainer: React.FC = () => {
         setScreenshots([]);
       }
     }
-    
+
     setInstruction("Use Cmd+H to take a screenshot");
     setIsInstructionVisible(true);
   };
@@ -440,28 +447,23 @@ const AppContainer: React.FC = () => {
         {/* Content container */}
         <div className="content-container">
           {/* Instruction banner */}
-          {isInstructionVisible && <InstructionBanner instruction={instruction} />}
+          {/* {isInstructionVisible && <InstructionBanner instruction={instruction} />} */}
 
           {/* Loading content */}
-          {isLoading && (
-            <LoadingContent message="Processing your screenshot..." />
-          )}
+          {isLoading && <LoadingContent message="Processing your screenshot..." />}
 
           {/* Result content */}
           {hasContent && !isLoading && (
             <div className="result-wrapper">
               <ResultContent markdownContent={analysisResult} />
-              <ContextActions 
-                onAddContext={handleAddContextScreenshot} 
-                onReportError={handleReportError} 
-              />
+              <ContextActions onAddContext={handleAddContextScreenshot} onReportError={handleReportError} />
             </div>
           )}
 
           {/* Model badge - always visible */}
           <ModelBadge onOpenSettings={handleOpenSettings} />
         </div>
-        
+
         {/* Toast container for notifications */}
         <ToastContainer
           position="bottom-right"

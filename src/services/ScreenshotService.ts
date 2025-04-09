@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { sendIpcMessage, invokeIpcMethod } from '../hooks/useElectron';
+import { AIService } from './AIService';
 
 export interface Screenshot {
   id: string;
@@ -27,6 +28,13 @@ class ScreenshotService {
     };
     
     this.screenshots.push(newScreenshot);
+    
+    // Send notification about successful screenshot
+    sendIpcMessage('notification', {
+      body: 'Screenshot captured successfully',
+      type: 'success'
+    });
+    
     return newScreenshot;
   }
   
@@ -59,11 +67,15 @@ class ScreenshotService {
   }
   
   // Take a full screenshot
-  takeFullScreenshot(): Promise<Screenshot> {
+  async takeFullScreenshot(): Promise<Screenshot> {
     return new Promise((resolve, reject) => {
-      const listener = (window as any).ipcRenderer.once('screenshot-data', (_: any, data: string) => {
+      const listener = (window as any).ipcRenderer.once('screenshot-data', async (_: any, data: string) => {
         try {
           const screenshot = this.addScreenshot(data);
+          
+          // After adding the screenshot, automatically process it with AI
+          await this.processScreenshots();
+          
           resolve(screenshot);
         } catch (error) {
           reject(error);
@@ -75,11 +87,15 @@ class ScreenshotService {
   }
   
   // Take an area screenshot
-  takeAreaScreenshot(area: { x: number, y: number, width: number, height: number }): Promise<Screenshot> {
+  async takeAreaScreenshot(area: { x: number, y: number, width: number, height: number }): Promise<Screenshot> {
     return new Promise((resolve, reject) => {
-      const listener = (window as any).ipcRenderer.once('area-screenshot-data', (_: any, data: string) => {
+      const listener = (window as any).ipcRenderer.once('area-screenshot-data', async (_: any, data: string) => {
         try {
           const screenshot = this.addScreenshot(data);
+          
+          // After adding the screenshot, automatically process it with AI
+          await this.processScreenshots();
+          
           resolve(screenshot);
         } catch (error) {
           reject(error);
@@ -91,19 +107,25 @@ class ScreenshotService {
   }
   
   // Process screenshots with AI
-  processScreenshots(useStreaming = true): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Convert screenshots to the format expected by the main process
-        const screenshotsData = this.screenshots.map(shot => shot.data);
-        
-        // Send the screenshots to the main process
-        sendIpcMessage('process-screenshots-with-ai', screenshotsData);
-        resolve();
-      } catch (error) {
-        reject(error);
+  async processScreenshots(useStreaming = true): Promise<void> {
+    try {
+      if (this.screenshots.length === 0) {
+        throw new Error('No screenshots to process');
       }
-    });
+
+      // Get the screenshots data
+      const screenshotsData = this.screenshots.map(shot => shot.data);
+      
+      // Use AIService to analyze the screenshots
+      await AIService.analyzeScreenshots(screenshotsData, useStreaming);
+    } catch (error) {
+      console.error('Error processing screenshots:', error);
+      sendIpcMessage('notification', {
+        body: `Failed to process screenshots: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: 'error'
+      });
+      throw error;
+    }
   }
   
   /**
@@ -118,18 +140,16 @@ class ScreenshotService {
         type: 'info'
       });
       
-      // Call the main process to handle the screenshot capture
-      const result = await invokeIpcMethod<boolean>('capture-screenshot-and-process');
-      
-      if (!result) {
-        throw new Error('Failed to capture screenshot');
-      }
+      // Take the screenshot
+      await this.takeFullScreenshot();
+      // Processing is now handled automatically in takeFullScreenshot
     } catch (error) {
       console.error('Error capturing screenshot:', error);
       sendIpcMessage('notification', {
         body: `Failed to capture screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
         type: 'error'
       });
+      throw error;
     }
   }
   
@@ -144,14 +164,15 @@ class ScreenshotService {
         type: 'info'
       });
       
-      // Call the main process to handle adding a context screenshot
-      sendIpcMessage('add-context-screenshot');
+      // Take a new screenshot and process it
+      await this.takeFullScreenshot();
     } catch (error) {
       console.error('Error adding context screenshot:', error);
       sendIpcMessage('notification', {
         body: `Failed to add context: ${error instanceof Error ? error.message : 'Unknown error'}`,
         type: 'error'
       });
+      throw error;
     }
   }
   
@@ -164,7 +185,7 @@ class ScreenshotService {
       return;
     }
     
-    sendIpcMessage('report-solution-error', errorDescription);
+    AIService.reportError(errorDescription);
   }
 }
 
