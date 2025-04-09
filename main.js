@@ -1022,10 +1022,9 @@ async function captureScreenshot() {
     }
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("screenshot-saved", {
-      path: imagePath,
-      isArea: false,
-      dimensions: dimensions,
+    mainWindow.webContents.send("notification", {
+      body: `Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+      type: "success",
     });
 
     console.log(`Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
@@ -1120,10 +1119,9 @@ async function captureWindowScreenshot() {
     }
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("screenshot-saved", {
-      path: imagePath,
-      isArea: false,
-      dimensions: dimensions,
+    mainWindow.webContents.send("notification", {
+      body: `Window screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+      type: "success",
     });
 
     console.log(`Window screenshot saved to ${imagePath}`);
@@ -1216,10 +1214,9 @@ async function captureAreaScreenshot() {
                 const dimensions = { width, height };
 
                 // Notify about saved screenshot
-                mainWindow.webContents.send("screenshot-saved", {
-                  path: imagePath,
-                  isArea: true,
-                  dimensions,
+                mainWindow.webContents.send("notification", {
+                  body: `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+                  type: "success",
                 });
 
                 console.log(`Area screenshot saved to ${imagePath}`);
@@ -1284,10 +1281,9 @@ async function captureAreaScreenshot() {
     mainWindow.show();
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("screenshot-saved", {
-      path: imagePath,
-      isArea: true,
-      dimensions: dimensions,
+    mainWindow.webContents.send("notification", {
+      body: `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+      type: "success",
     });
 
     console.log(`Area screenshot saved to ${imagePath}`);
@@ -1562,7 +1558,7 @@ function createModelSelectionWindow() {
     modelListWindow = null;
     // Notify main window to refresh model badge
     if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('model-changed');
+      mainWindow.webContents.send("model-changed");
     }
   });
 }
@@ -1577,43 +1573,83 @@ function resetProcess() {
 }
 
 // Handler for getting current settings
-ipcMain.handle('get-current-settings', () => {
+ipcMain.handle("get-current-settings", () => {
   return {
     aiProvider,
     currentModel,
-    ollamaUrl: OLLAMA_BASE_URL
+    ollamaUrl: OLLAMA_BASE_URL,
   };
 });
 
 // Handler for updating model settings
-ipcMain.on('update-model-settings', (event, settings) => {
+ipcMain.on("update-model-settings", (event, settings) => {
   console.log("Updating model settings:", settings);
-  
+
   // Update global settings
   aiProvider = settings.aiProvider;
   currentModel = settings.currentModel;
-  
+
   if (settings.ollamaUrl) {
     // Ensure IPv4 compatibility
     OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
   }
-  
+
   // Save to local storage via renderer (more reliable than electron-store for simple settings)
   if (mainWindow) {
-    mainWindow.webContents.send('model-changed');
+    mainWindow.webContents.send("model-changed");
   }
-  
+
   console.log(`Settings updated: Provider=${aiProvider}, Model=${currentModel}, Ollama URL=${OLLAMA_BASE_URL}`);
 });
 
 // Handler for Ollama models
-ipcMain.handle('get-ollama-models', async () => {
+ipcMain.handle("get-ollama-models", async () => {
   try {
     return await getOllamaModels();
   } catch (error) {
     console.error("Error getting Ollama models:", error);
     return [];
   }
+});
+
+// Toggle DevTools when requested
+ipcMain.on("toggle-devtools", () => {
+  if (mainWindow) {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+      mainWindow.webContents.send("devtools-toggled", false);
+    } else {
+      mainWindow.webContents.openDevTools();
+      mainWindow.webContents.send("devtools-toggled", true);
+    }
+  }
+});
+
+// Show context menu for inspection
+ipcMain.on("show-context-menu", () => {
+  if (mainWindow) {
+    const template = [
+      {
+        label: "Inspect Element",
+        click: () => {
+          mainWindow.webContents.openDevTools();
+          mainWindow.webContents.send("devtools-toggled", true);
+        },
+      },
+      { type: "separator" },
+      { label: "Reload", click: () => mainWindow.reload() },
+      { type: "separator" },
+      { label: "Copy", role: "copy" },
+      { label: "Paste", role: "paste" },
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup(BrowserWindow.fromWebContents(mainWindow.webContents));
+  }
+});
+
+ipcMain.on("report-solution-error", async (event, errorDescription) => {
+  // ... existing code ...
 });
 
 function createWindow() {
@@ -1696,10 +1732,9 @@ function createWindow() {
       const dimensions = { width: data.bounds.width, height: data.bounds.height };
 
       // Notify about saved screenshot
-      mainWindow.webContents.send("screenshot-saved", {
-        path: imagePath,
-        isArea: true,
-        dimensions: dimensions,
+      mainWindow.webContents.send("notification", {
+        body: `Window screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+        type: "success",
       });
 
       // Process the screenshot
@@ -1839,11 +1874,9 @@ function createWindow() {
         const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
 
         // Notify user about saved screenshot
-        mainWindow.webContents.send("screenshot-saved", {
-          path: imagePath,
-          fileName: fileName,
-          isArea: true,
-          dimensions: { width: Math.round(rect.width), height: Math.round(rect.height) },
+        mainWindow.webContents.send("notification", {
+          body: `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+          type: "success",
         });
 
         mainWindow.webContents.send("warning", "Using full screenshot instead of area selection");
@@ -1873,7 +1906,7 @@ function getDefaultInstructions() {
     return `Multi-mode: ${screenshots.length} screenshots. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`;
   }
 
-  return `${modifierKey}+B: Toggle visibility | ${modifierKey}+Enter: Process | Press ? for help`;
+  return `${modifierKey}+B: Toggle visibility \n ${modifierKey}+H: Take screenshot \n ${modifierKey}+R: Reset \n`;
 }
 
 // Process screenshots based on current mode
