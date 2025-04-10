@@ -5,49 +5,83 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
+      fail-fast: false
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'npm'
 
+      # Install system dependencies for Linux
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxkbfile-dev libsecret-1-dev libudev-dev libxtst-dev
+        shell: bash
+
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          # Rebuild native modules if needed
+          npm rebuild
+        shell: bash
+
+      # Set up code signing for macOS (if you have certificates)
+      - name: Setup macOS certificates
+        if: matrix.os == 'macos-latest'
+        run: echo "Add your certificate setup steps here if needed"
+        shell: bash
 
       - name: Build application
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed for electron-builder
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
             npm run build:mac
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             npm run build:linux
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+          else
             npm run build:win
           fi
         shell: bash
 
+      - name: List dist directory
+        run: ls -la dist/
+        shell: bash
+
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-build
           path: |
+            dist/*.exe
             dist/*.dmg
             dist/*.AppImage
             dist/*.deb
             dist/*.rpm
-            dist/*.exe
             dist/*.zip
-          if-no-files-found: ignore
+          retention-days: 1
+          if-no-files-found: warn
 
   release:
     needs: build
@@ -56,10 +90,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
           
@@ -69,8 +103,9 @@ jobs:
           echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
           
       - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ steps.package-version.outputs.VERSION }}
           name: Release v${{ steps.package-version.outputs.VERSION }}
@@ -82,6 +117,4 @@ jobs:
             artifacts/**/*.deb
             artifacts/**/*.rpm
             artifacts/**/*.exe
-            artifacts/**/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+            artifacts/**/*.zip 
