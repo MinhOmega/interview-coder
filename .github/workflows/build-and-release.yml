@@ -2,7 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       # Install system dependencies for Linux
       - name: Install Linux dependencies
@@ -46,7 +46,6 @@ jobs:
           npm rebuild
         shell: bash
 
-      # Set up code signing for macOS (if you have certificates)
       - name: Setup macOS certificates
         if: matrix.os == 'macos-latest'
         run: echo "Add your certificate setup steps here if needed"
@@ -54,7 +53,7 @@ jobs:
 
       - name: Build application
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed for electron-builder
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
             npm run build:mac
@@ -87,21 +86,21 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          
+
       - name: Get package version
         id: package-version
         run: |
           echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-          
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         env:
@@ -117,4 +116,4 @@ jobs:
             artifacts/**/*.deb
             artifacts/**/*.rpm
             artifacts/**/*.exe
-            artifacts/**/*.zip 
+            artifacts/**/*.zip
