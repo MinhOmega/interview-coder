@@ -105,7 +105,6 @@ ipcRenderer.on('stream-chunk', async (_, chunk) => {
 ipcRenderer.on('stream-update', async (event, fullText) => {
   // Replace the content with the full updated text (better for Gemini streaming)
   try {
-    console.log("Received stream update, length:", fullText.length);
     // Update the stream buffer
     streamBuffer = fullText;
 
@@ -136,7 +135,6 @@ ipcRenderer.on('stream-update', async (event, fullText) => {
 
 ipcRenderer.on('stream-end', () => {
   // Streaming is complete, reset buffer
-  console.log("Stream ended");
   streamBuffer = '';
 
   // Make sure all code blocks have copy buttons
@@ -187,7 +185,6 @@ async function updateModelBadge() {
         const savedSettings = localStorage.getItem('model-settings');
         if (savedSettings) {
           settings = JSON.parse(savedSettings);
-          console.log('Retrieved settings from localStorage:', settings);
         } else {
           // Fallback to default settings
           settings = {
@@ -328,7 +325,6 @@ function setupCodeCopyButtons() {
       return;
     }
 
-    console.log(`Setting up ${copyButtons.length} code copy buttons`);
 
     copyButtons.forEach(button => {
       // Skip if the button already has a listener (check for data attribute)
@@ -434,7 +430,6 @@ updateModelBadge();
 // Listen for postMessage from model-selector window
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'model-settings-updated') {
-    console.log('Received settings update from model selector:', event.data.settings);
     updateModelBadge();
   }
 });
