@@ -66,19 +66,14 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
    npm install
    ```
 
-3. **Configure Environment**
-   Create a `.env` file in the project root:
-   ```env
-   OPENAI_API_KEY=YOUR_OPENAI_API_KEY
-   OPENAI_MODEL=gpt-4o-mini
-   GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-   GEMINI_MODEL=gemini-2.0-flash
-   AI_PROVIDER=openai
-   OLLAMA_BASE_URL=http://127.0.0.1:11434
-   OLLAMA_MODEL=deepseek-r1:14b
+3. **Launch the Application**
+   ```bash
+   npm run start
    ```
+   
+   You'll be prompted to configure your API keys on first launch. Alternatively, press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open settings and configure your preferred AI provider.
 
-## 🔧 Using with Ollama
+## �� Using with Ollama
 
 1. Install Ollama from [ollama.ai](https://ollama.ai/)
 2. Start the Ollama service

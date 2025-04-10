@@ -1,6 +1,6 @@
 const axios = require("axios");
+const { IPC_CHANNELS } = require("./constants");
 
-// Load models from Ollama
 async function loadOllamaModels() {
   const ollamaStatus = document.getElementById("ollama-status");
   const visionModelsNote = document.getElementById("vision-models-note");
@@ -17,7 +17,7 @@ async function loadOllamaModels() {
   try {
     let models = [];
     try {
-      models = await ipcRenderer.invoke("get-ollama-models");
+      models = await ipcRenderer.invoke(IPC_CHANNELS.GET_OLLAMA_MODELS);
     } catch (invokeError) {
       // Handle missing handler or other errors
       if (invokeError.message.includes("No handler registered for")) {

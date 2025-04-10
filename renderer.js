@@ -412,12 +412,35 @@ function showNotification(message, type = "success") {
   // Position the new notification
   notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
+  // Determine display duration based on notification type and message length
+  let duration = 3500; // Default
+  if (type === "error") {
+    duration = 7000; // Errors show longer
+  } else if (type === "info") {
+    duration = 5000; // Info shows medium length
+  } else if (message.length > 100) {
+    duration = 6000; // Longer messages show longer
+  }
+
   // Trigger reflow to ensure animation works
   void notification.offsetWidth;
   notification.classList.add("visible");
   notification.style.transform = `translateX(0) translateY(-${offset}px)`;
 
-  // Hide after 1 second
+  // Add a subtle indicator for longer notifications
+  if (duration > 3500) {
+    const indicator = document.createElement("div");
+    indicator.className = "notification-timer";
+    notification.appendChild(indicator);
+    
+    // Animate the indicator to show how long the notification will stay
+    indicator.style.animation = `notification-timer ${duration/1000}s linear`;
+  }
+
+  // Log to console for debugging
+  console.log(`Notification (${type}): ${message}`);
+
+  // Hide after duration
   setTimeout(() => {
     notification.classList.remove("visible");
     notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
@@ -427,10 +450,12 @@ function showNotification(message, type = "success") {
       notification.remove();
       // Reposition remaining notifications
       Array.from(notifications).forEach((n, i) => {
-        n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
+        if (n !== notification) { // Skip the one we're removing
+          n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
+        }
       });
     }, 300);
-  }, 3500);
+  }, duration);
 }
 
 // Initialize

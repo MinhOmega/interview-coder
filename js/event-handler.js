@@ -28,7 +28,7 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     }
 
     if (mainWindow) {
-      mainWindow.webContents.send("model-changed");
+      mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);
     }
   });
 

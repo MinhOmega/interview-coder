@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
 const { app, nativeImage } = require("electron");
+const { IPC_CHANNELS } = require("./constants");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -55,7 +56,7 @@ async function captureScreenshot(mainWindow) {
         const screenPermission = systemPreferences.getMediaAccessStatus("screen");
 
         if (screenPermission !== "granted") {
-          mainWindow.webContents.send("notification", {
+          mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
             title: "Permission Required",
             body: "Screen recording permission is required. Please grant it in System Preferences > Security & Privacy > Privacy > Screen Recording.",
             type: "warning",
@@ -107,7 +108,7 @@ async function captureScreenshot(mainWindow) {
     const dimensions = getImageDimensions(imagePath);
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("notification", {
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
       body: `Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
       type: "success",
     });
@@ -131,7 +132,7 @@ async function captureWindowScreenshot(mainWindow) {
     }
 
     // Show instruction in notification
-    mainWindow.webContents.send("notification", {
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
       title: "Screenshot",
       body: "Taking window screenshot...",
     });
@@ -171,7 +172,7 @@ async function captureWindowScreenshot(mainWindow) {
     const dimensions = getImageDimensions(imagePath);
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("notification", {
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
       body: `Window screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
       type: "success",
     });

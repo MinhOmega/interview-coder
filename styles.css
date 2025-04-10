@@ -518,26 +518,53 @@ code {
   opacity: 0;
   transform: translateX(50px);
   transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.notification.success {
-  background-color: var(--bg-notification-success);
-  border: 1px solid rgba(120, 180, 120, 0.3);
-}
-
-.notification.warning {
-  background-color: var(--bg-notification-warning);
-  border: 1px solid rgba(180, 130, 20, 0.3);
-}
-
-.notification.error {
-  background-color: var(--bg-notification-error);
-  border: 1px solid rgba(180, 70, 70, 0.3);
+  border-left: 4px solid rgba(255, 255, 255, 0.5);
 }
 
 .notification.visible {
   opacity: 1;
   transform: translateX(0);
+}
+
+.notification.success {
+  background-color: rgba(25, 135, 84, 0.9);
+  border-left-color: #0f5132;
+}
+
+.notification.error {
+  background-color: rgba(220, 53, 69, 0.9);
+  border-left-color: #842029;
+}
+
+.notification.warning {
+  background-color: rgba(255, 193, 7, 0.9);
+  color: #000;
+  border-left-color: #664d03;
+}
+
+.notification.info {
+  background-color: rgba(13, 110, 253, 0.9);
+  border-left-color: #084298;
+}
+
+/* Add timer animation for notifications */
+.notification-timer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background-color: rgba(255, 255, 255, 0.7);
+  width: 100%;
+  transform-origin: left;
+}
+
+@keyframes notification-timer {
+  0% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
 }
 
 /* For making the window invisible during screen sharing */

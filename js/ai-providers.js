@@ -426,6 +426,10 @@ async function generateWithGemini(messages, model, streaming = false) {
       }
     }
 
+    // Log information about content being sent to Gemini
+    console.log(`Sending to Gemini: ${contentParts.length} content parts`);
+    console.log(`Content parts include ${contentParts.filter(p => p.text).length} text parts and ${contentParts.filter(p => p.inlineData).length} image parts`);
+
     // Create the content message format required by Gemini
     const geminiContent = {
       parts: contentParts,
@@ -440,58 +444,83 @@ async function generateWithGemini(messages, model, streaming = false) {
       maxOutputTokens: 8192,
     };
 
-    // If streaming is requested, use the streaming API
     if (streaming) {
-      const streamingResponse = await geminiModel.generateContentStream({
-        contents: [geminiContent],
-        generationConfig: genConfig,
-      });
-
-      // Set up stream handling
-      let fullResponse = "";
-
-      // Return an object that emits events for streaming
+      console.log("Starting Gemini streaming response");
       const emitter = new EventEmitter();
+      
+      try {
+        const result = await geminiModel.generateContentStream(geminiContent, genConfig);
+        console.log("Gemini stream created successfully");
 
-      // Process the stream
-      (async () => {
-        try {
-          for await (const chunk of streamingResponse.stream) {
-            const chunkText = chunk.text();
-            fullResponse += chunkText;
-
-            // Emit the chunk
-            emitter.emit("chunk", chunkText);
+        (async () => {
+          let fullText = "";
+          try {
+            for await (const chunk of result.stream) {
+              const text = chunk.text();
+              fullText += text;
+              emitter.emit("chunk", text);
+            }
+            console.log("Gemini stream completed successfully");
+            console.log(`Received ${fullText.length} characters from Gemini`);
+            emitter.emit("complete", fullText);
+          } catch (streamError) {
+            console.error("Error in Gemini stream processing:", streamError);
+            console.error("Stream error details:", JSON.stringify(streamError, Object.getOwnPropertyNames(streamError)));
+            emitter.emit("error", streamError);
           }
+        })();
 
-          // Emit completion event
-          emitter.emit("complete", fullResponse);
-        } catch (error) {
-          console.error("Error in Gemini stream processing:", error);
-          console.error("Stack trace:", error.stack);
-          emitter.emit("error", error);
+        return { emitter };
+      } catch (streamCreationError) {
+        console.error("Failed to create Gemini stream:", streamCreationError);
+        console.error("Error details:", JSON.stringify(streamCreationError, Object.getOwnPropertyNames(streamCreationError)));
+        
+        // Create a more detailed error message
+        let errorMessage = "Failed to create Gemini stream";
+        
+        if (streamCreationError.message) {
+          errorMessage += `: ${streamCreationError.message}`;
         }
-      })();
-
-      return {
-        streaming: true,
-        emitter: emitter,
-        text: () => fullResponse,
-      };
+        
+        if (streamCreationError.status) {
+          errorMessage += ` (Status: ${streamCreationError.status})`;
+        }
+        
+        throw new Error(errorMessage);
+      }
     } else {
-      // Standard non-streaming response
-      const response = await geminiModel.generateContent({
-        contents: [geminiContent],
-        generationConfig: genConfig,
-      });
-
-      return response.response.text();
+      console.log("Starting Gemini non-streaming response");
+      try {
+        const result = await geminiModel.generateContent(geminiContent, genConfig);
+        const text = result.response.text();
+        console.log(`Received ${text.length} characters from Gemini`);
+        return text;
+      } catch (error) {
+        console.error("Error in Gemini generateContent:", error);
+        console.error("Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        
+        // Create a more detailed error message
+        let errorMessage = "Failed to generate content with Gemini";
+        
+        if (error.message) {
+          errorMessage += `: ${error.message}`;
+        }
+        
+        if (error.status) {
+          errorMessage += ` (Status: ${error.status})`;
+        }
+        
+        throw new Error(errorMessage);
+      }
     }
   } catch (error) {
-    console.error("Error generating with Gemini:", error.message);
-    if (error.stack) {
-      console.error("Stack trace:", error.stack);
+    console.error("Error in generateWithGemini:", error);
+    
+    // Log additional information for connection errors
+    if (error.message && error.message.includes("network") || error.message.includes("connection")) {
+      console.error("Network error details:", error);
     }
+    
     throw error;
   }
 }

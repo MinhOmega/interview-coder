@@ -74,7 +74,7 @@ function createModelSelectionWindow() {
     modelListWindow = null;
     // Notify main window to refresh model badge
     if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send("model-changed");
+      mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);
     }
   });
 
@@ -103,7 +103,7 @@ function toggleWindowVisibility(forceState) {
     }
 
     // Notify renderer about visibility change
-    mainWindow.webContents.send("update-visibility", isWindowVisible);
+    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
   }
 
   return isWindowVisible;

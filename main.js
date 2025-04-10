@@ -226,15 +226,33 @@ app.whenReady().then(async () => {
       const base64Image = `data:image/png;base64,${data.buffer.toString("base64")}`;
       screenshotManager.addScreenshot(base64Image);
       const dimensions = { width: data.bounds.width, height: data.bounds.height };
+      
+      // Clear notification about screenshot capture
       mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-        body: `Window screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+        body: `Screenshot captured (${dimensions.width}x${dimensions.height})`,
         type: "success",
       });
+      
+      // Show notification that we're preparing to process
+      mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+        body: `Processing screenshot with ${configManager.getAiProvider()}...`,
+        type: "info",
+      });
+      
+      // Add small delay to allow notifications to be seen by user
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       await processScreenshotsWithAI();
     } catch (error) {
       console.error("Error handling screenshot:", error);
       mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Failed to process screenshot: ${error.message}`);
+      
+      // Show detailed error notification
+      mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+        body: `Screenshot capture failed: ${error.message}`,
+        type: "error",
+      });
+      
       mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
     }
   });

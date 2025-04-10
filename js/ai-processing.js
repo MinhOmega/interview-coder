@@ -1,4 +1,5 @@
 const { getScreenshots } = require("./screenshot-manager");
+const { IPC_CHANNELS } = require("./constants");
 
 /**
  * Creates a prompt for the AI based on the number of screenshots
@@ -106,8 +107,14 @@ async function processScreenshots(
   useStreaming = false,
 ) {
   try {
-    mainWindow.webContents.send("loading", true);
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, true);
     const screenshots = getScreenshots();
+
+    // Notify user that screenshots are being processed
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+      body: `Processing ${screenshots.length} screenshot(s) with ${aiProvider} (${currentModel})`,
+      type: "info",
+    });
 
     if (aiProvider === "ollama") {
       const modelVerification = await verifyOllamaModelFn(currentModel);
@@ -130,6 +137,12 @@ async function processScreenshots(
       });
     }
 
+    // Notify user that screenshots are being sent to AI
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+      body: `Sending ${screenshots.length} screenshot(s) to ${aiProvider}...`,
+      type: "info",
+    });
+
     let result;
 
     if (aiProvider === "openai") {
@@ -145,18 +158,31 @@ async function processScreenshots(
           stream: true,
         });
 
-        mainWindow.webContents.send("loading", false);
-        mainWindow.webContents.send("stream-start");
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
+
+        // Notify that streaming has started
+        mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+          body: `Processing started with ${aiProvider}. Streaming response...`,
+          type: "success",
+        });
 
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
-            mainWindow.webContents.send("stream-chunk", content);
+            mainWindow.webContents.send(IPC_CHANNELS.STREAM_CHUNK, content);
           }
         }
 
-        mainWindow.webContents.send("stream-end");
-        mainWindow.webContents.send("hide-instruction");
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+        mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+
+        // Notify when streaming is complete
+        mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+          body: `${aiProvider} processing complete`,
+          type: "success",
+        });
+
         return;
       } else {
         const response = await openai.chat.completions.create({
@@ -171,42 +197,72 @@ async function processScreenshots(
       result = await generateWithOllamaFn(messages, currentModel);
     } else if (aiProvider === "gemini") {
       if (useStreaming) {
+        // Notify that Gemini processing is starting
+        mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+          body: `${aiProvider} is processing screenshots with ${currentModel}...`,
+          type: "info",
+        });
+
         const streamingResult = await generateWithGeminiFn(messages, currentModel, true);
 
-        mainWindow.webContents.send("loading", false);
-        mainWindow.webContents.send("stream-start");
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
 
         let accumulatedText = "";
 
         streamingResult.emitter.on("chunk", (chunk) => {
           accumulatedText += chunk;
-          mainWindow.webContents.send("stream-update", accumulatedText);
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_UPDATE, accumulatedText);
         });
 
         streamingResult.emitter.on("complete", () => {
-          mainWindow.webContents.send("stream-end");
-          mainWindow.webContents.send("hide-instruction");
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+
+          // Notify when Gemini processing is complete
+          mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+            body: `${aiProvider} processing complete`,
+            type: "success",
+          });
         });
 
         streamingResult.emitter.on("error", (error) => {
-          mainWindow.webContents.send("error", error.message);
-          mainWindow.webContents.send("stream-end");
-          mainWindow.webContents.send("hide-instruction");
+          mainWindow.webContents.send(IPC_CHANNELS.ERROR, error.message);
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+
+          // Notify when Gemini processing fails
+          mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+            body: `${aiProvider} processing failed: ${error.message}`,
+            type: "error",
+          });
         });
 
         return;
       } else {
+        // Notify that Gemini processing is starting
+        mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+          body: `${aiProvider} is processing screenshots with ${currentModel}...`,
+          type: "info",
+        });
+
         result = await generateWithGeminiFn(messages, currentModel);
       }
     } else {
       throw new Error(`Unknown AI provider: ${aiProvider}`);
     }
 
-    mainWindow.webContents.send("loading", false);
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
 
-    mainWindow.webContents.send("analysis-result", result);
+    mainWindow.webContents.send(IPC_CHANNELS.ANALYSIS_RESULT, result);
 
-    mainWindow.webContents.send("hide-instruction");
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+
+    // Notify when processing is complete
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+      body: `${aiProvider} processing complete`,
+      type: "success",
+    });
   } catch (err) {
     console.error("Error in processScreenshots:", err);
     console.error("Stack trace:", err.stack);
@@ -216,9 +272,15 @@ async function processScreenshots(
       console.error("Response data:", JSON.stringify(err.response.data));
     }
 
-    mainWindow.webContents.send("loading", false);
-    mainWindow.webContents.send("error", err.message);
-    mainWindow.webContents.send("hide-instruction");
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+    mainWindow.webContents.send(IPC_CHANNELS.ERROR, err.message);
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+
+    // Notify with detailed error message
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+      body: `Error processing screenshots: ${err.message}`,
+      type: "error",
+    });
   }
 }
 
