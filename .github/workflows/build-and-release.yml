@@ -2,90 +2,54 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  packages: write
-  actions: write
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # 1. Checkout the repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
-          cache: 'npm'
+          node-version: '18'
 
+      # 3. Install dependencies
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Build application
-        run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npm run build:mac
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            npm run build:linux
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            npm run build:win
-          fi
-        shell: bash
+      # 4. Build the project (builds for mac, win, and linux)
+      - name: Build project
+        run: npm run build
 
-      - name: List dist directory
-        run: ls -la dist/
-        shell: bash
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.os }}-build
-          path: dist/
-          retention-days: 1
-          if-no-files-found: warn
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: artifacts
-          
-      - name: Get package version
-        id: package-version
-        run: |
-          echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-          
-      - name: Create Release
+      # 5. Create a GitHub Release
+      - name: Create GitHub Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.package-version.outputs.VERSION }}
-          name: Release v${{ steps.package-version.outputs.VERSION }}
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
-          files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
-            artifacts/**/*.exe
-            artifacts/**/*.zip
+
+      # 6. Upload all artifacts from the build folder (assumed "dist")
+      - name: Upload Release Assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in dist/*; do
+            echo "Uploading $file"
+            curl -s -XPOST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"$file" \
+              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
+          done
