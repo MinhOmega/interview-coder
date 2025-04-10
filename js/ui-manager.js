@@ -116,25 +116,6 @@ function initUI() {
     saveButton.appendChild(shortcutHint);
   }
   
-  // Setup the app and window controls
-  setupWindowControls();
-}
-
-// Initialize window control buttons (close, minimize, etc.)
-function setupWindowControls() {
-  const closeButton = document.getElementById('close-button');
-  if (closeButton) {
-    closeButton.addEventListener('click', () => {
-      ipcRenderer.send('close-window');
-    });
-  }
-  
-  const minimizeButton = document.getElementById('minimize-button');
-  if (minimizeButton) {
-    minimizeButton.addEventListener('click', () => {
-      ipcRenderer.send('minimize-window');
-    });
-  }
 }
 
 module.exports = {

@@ -1,7 +1,6 @@
 const { ipcRenderer } = require("electron");
 const axios = require("axios");
-
-// Import modules
+const { IPC_CHANNELS } = require('./js/constants');
 const { API_KEYS, isMac } = require('./js/config');
 const apiKeyManager = require('./js/api-key-manager');
 const geminiProvider = require('./js/gemini-provider');
@@ -9,7 +8,6 @@ const ollamaProvider = require('./js/ollama-provider');
 const utils = require('./js/utils');
 const modalManager = require('./js/modal-manager');
 
-// Elements
 const aiProviderRadios = document.querySelectorAll('input[name="aiProvider"]');
 const radioLabels = document.querySelectorAll(".radio-label");
 const openaiModelSelect = document.getElementById("openai-model");
@@ -22,7 +20,6 @@ const saveBtn = document.getElementById("save-settings");
 const cancelBtn = document.getElementById("cancel");
 const messageDiv = document.getElementById("message");
 
-// Pull model modal elements
 const pullModelModal = document.getElementById("pull-model-modal");
 const closeModalBtn = document.querySelector(".close-modal");
 const modelToPullInput = document.getElementById("model-to-pull");
@@ -30,17 +27,15 @@ const pullStatusDiv = document.getElementById("pull-status");
 const confirmPullBtn = document.getElementById("confirm-pull");
 const cancelPullBtn = document.getElementById("cancel-pull");
 
-// Load current settings
 let currentSettings = {};
 
-// Make utils and configuration available globally for other modules
 window.currentSettings = currentSettings;
 window.selectModelCard = utils.selectModelCard;
 window.ipcRenderer = ipcRenderer;
 
 async function loadCurrentSettings() {
   try {
-    currentSettings = await ipcRenderer.invoke("get-current-settings");
+    currentSettings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
   } catch (error) {
     console.error("Error getting current settings:", error.message);
     // Set default settings if handler is not registered
@@ -237,7 +232,7 @@ saveBtn.addEventListener("click", async () => {
 
   try {
     // Update settings
-    ipcRenderer.send("update-model-settings", settings);
+    ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, settings);
 
     // Show success message
     messageDiv.textContent = "Settings saved!";
@@ -312,7 +307,7 @@ function setupKeyboardShortcuts() {
     if (ctrlOrCmd) {
       switch (e.key) {
         case "b": // Toggle visibility
-          ipcRenderer.send("toggle-visibility");
+          ipcRenderer.send(IPC_CHANNELS.TOGGLE_VISIBILITY);
           e.preventDefault();
           break;
         case "s": // Save settings
@@ -444,7 +439,7 @@ function initialize() {
   setupKeyboardShortcuts();
   
   // Listen for visibility updates from main process
-  ipcRenderer.on("update-visibility", (event, isVisible) => {
+  ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (event, isVisible) => {
     document.body.style.opacity = isVisible ? "1" : "0";
   });
   
