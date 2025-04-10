@@ -2,58 +2,120 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  actions: write
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+      fail-fast: false  # Continue with other OS builds even if one fails
 
     steps:
-      # 1. Checkout the repository
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
 
-      # 2. Setup Node.js (version 20)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: 18
+          cache: 'npm'
 
-      # 3. Install dependencies
+      # Install system dependencies for Linux
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxkbfile-dev libsecret-1-dev libudev-dev libxtst-dev
+        shell: bash
+
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm ci
+          # Rebuild native modules if needed
+          npm rebuild
+        shell: bash
 
-      # 3.5. Install dmg-license to fix build error (only needed for mac builds)
-      - name: Install dmg-license
-        run: npm install dmg-license --no-save
+      # Set up code signing for macOS (if you have certificates)
+      - name: Setup macOS certificates
+        if: matrix.os == 'macos-latest'
+        run: echo "Add your certificate setup steps here if needed"
+        shell: bash
 
-      # 4. Build the project (builds for mac, win, and linux)
-      - name: Build project
-        run: npm run build
+      - name: Build application
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed for electron-builder
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npm run build:mac
+          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            npm run build:linux
+          else
+            npm run build:win
+          fi
+        shell: bash
 
-      # 5. Create a GitHub Release
-      - name: Create GitHub Release
+      - name: List dist directory
+        run: ls -la dist/
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-build
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.zip
+          retention-days: 1
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+          
+      - name: Get package version
+        id: package-version
+        run: |
+          echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          
+      - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release v${{ github.run_number }}
+          tag_name: v${{ steps.package-version.outputs.VERSION }}
+          name: Release v${{ steps.package-version.outputs.VERSION }}
           draft: false
           prerelease: false
-
-      # 6. Upload build artifacts to the GitHub Release
-      - name: Upload Release Assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for file in dist/*; do
-            echo "Uploading $file"
-            curl -s -XPOST \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary @"$file" \
-              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
-          done
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.exe
+            artifacts/**/*.zip 
