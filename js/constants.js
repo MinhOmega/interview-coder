@@ -2,6 +2,7 @@ const AI_PROVIDERS = {
   OPENAI: "openai",
   GEMINI: "gemini",
   OLLAMA: "ollama",
+  DEFAULT: "AI",
 };
 
 const IPC_CHANNELS = {

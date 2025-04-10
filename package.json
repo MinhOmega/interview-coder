@@ -1,6 +1,6 @@
 {
   "name": "interview-coders",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "main": "main.js",
   "description": "Interview Coder is an Electron application that captures and analyzes screenshots using AI (OpenAI, Google Gemini, or Ollama). It features global keyboard shortcuts, multi-page mode for complex questions, real-time streaming responses, and supports both cloud and local AI models. The app provides a customizable UI with transparent, always-on-top windows and markdown-rendered responses, making it ideal for processing coding questions, generating code, or providing detailed answers from screenshots.",
   "author": {
@@ -30,31 +30,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
-        }
-      ]
-    },
-    "dmg": {
-      "icon": "build/logo.icns",
-      "iconSize": 128,
-      "contents": [
-        {
-          "x": 270,
-          "y": 220,
-          "type": "file"
-        },
-        {
-          "x": 270,
-          "y": 400,
-          "type": "link",
-          "path": "/Applications"
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
-      "window": {
-        "width": 540,
-        "height": 400
-      },
-      "title": "Install Interview Coder"
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "This app requires microphone access to record audio for certain features.",
+        "NSCameraUsageDescription": "This app requires camera access to take photos for certain features.",
+        "NSScreenCaptureDescription": "This app requires screen recording permission to capture your screen for analysis."
+      }
     },
     "win": {
       "icon": "build/logo.ico",
@@ -76,9 +62,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "axios": "^1.8.4",
-    "dotenv": "^16.4.7",
     "electron-screenshots": "^0.5.27",
-    "image-size": "^2.0.0",
     "openai": "^4.90.0",
     "rehype-stringify": "^10.0.1",
     "remark-gfm": "^4.0.1",

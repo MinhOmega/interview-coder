@@ -1,4 +1,4 @@
-const { ipcMain, app, desktopCapturer, Menu, BrowserWindow, systemPreferences } = require("electron");
+const { ipcMain, app, Menu, BrowserWindow, systemPreferences } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 
 /**
@@ -17,6 +17,15 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
 
   ipcMain.on(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, (_, settings) => {
     configManager.updateSettings(settings);
+
+    // Initialize or update AI clients based on provider
+    if (settings.aiProvider === 'openai' && settings.openaiApiKey) {
+      aiProviders.updateAIClients('openai', settings.openaiApiKey);
+    } else if (settings.aiProvider === 'gemini' && settings.geminiApiKey) {
+      aiProviders.updateAIClients('gemini', settings.geminiApiKey);
+    } else if (settings.aiProvider === 'ollama' && settings.ollamaUrl) {
+      aiProviders.setOllamaBaseURL(settings.ollamaUrl);
+    }
 
     if (mainWindow) {
       mainWindow.webContents.send("model-changed");
@@ -76,7 +85,28 @@ function setupScreenCaptureDetection(mainWindow, windowManager) {
   if (process.platform === "darwin") {
     try {
       const hasScreenCapturePermission = systemPreferences.getMediaAccessStatus("screen");
+      console.log(`Initial screen capture permission: ${hasScreenCapturePermission}`);
 
+      // Monitor permission changes
+      systemPreferences.subscribeMediaAccessStatus('screen', (status, oldStatus) => {
+        console.log(`Screen permission changed from ${oldStatus} to ${status}`);
+        
+        if (status === 'granted') {
+          mainWindow?.webContents?.send(IPC_CHANNELS.NOTIFICATION, {
+            title: "Permission Granted",
+            body: "Screen recording permission has been granted. You can now take screenshots.",
+            type: "success"
+          });
+        } else if (status === 'denied' || status === 'restricted') {
+          mainWindow?.webContents?.send(IPC_CHANNELS.NOTIFICATION, {
+            title: "Permission Denied",
+            body: "Screen recording permission is denied. Please enable it in System Preferences > Security & Privacy > Privacy > Screen Recording.",
+            type: "error"
+          });
+        }
+      });
+
+      // Use workspace notification to detect screen sharing
       if (hasScreenCapturePermission === "granted") {
         systemPreferences.subscribeWorkspaceNotification("NSWorkspaceScreenIsSharedDidChangeNotification", () => {
           const isBeingCaptured = systemPreferences.getMediaAccessStatus("screen") === "granted";
@@ -88,6 +118,12 @@ function setupScreenCaptureDetection(mainWindow, windowManager) {
             }
           }
         });
+      } else {
+        mainWindow?.webContents?.send(IPC_CHANNELS.NOTIFICATION, {
+          title: "Permission Required",
+          body: "Screen recording permission is required for this app to work correctly. Please enable it in System Preferences > Security & Privacy > Privacy > Screen Recording.",
+          type: "warning"
+        });
       }
     } catch (error) {
       console.error("Error setting up screen capture detection:", error);
@@ -95,31 +131,7 @@ function setupScreenCaptureDetection(mainWindow, windowManager) {
   }
 
   if (process.platform === "win32" || process.platform === "linux") {
-    try {
-      let checkInterval = setInterval(() => {
-        desktopCapturer
-          .getSources({ types: ["screen"] })
-          .then((sources) => {
-            if (sources.length > 1) {
-              windowManager.toggleWindowVisibility(false);
-
-              if (mainWindow?.webContents) {
-                mainWindow.webContents.send(IPC_CHANNELS.SCREEN_SHARING_DETECTED);
-              }
-            }
-          })
-          .catch((error) => {
-            console.error("Error checking screen sources:", error);
-          });
-      }, 5000);
-
-      mainWindow.on("closed", () => {
-        clearInterval(checkInterval);
-        checkInterval = null;
-      });
-    } catch (error) {
-      console.error("Error setting up screen sharing detection:", error);
-    }
+    console.log("Screen capture detection is not implemented for this platform");
   }
 }
 

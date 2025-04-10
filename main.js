@@ -12,7 +12,6 @@ const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS } = require("./js/constants");
-require("dotenv").config();
 
 axios.defaults.family = 4;
 
@@ -20,20 +19,37 @@ let openai = null;
 let geminiAI = null;
 
 try {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
-    openai = new OpenAI({ apiKey });
-  }
-
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
-    geminiAI = new GoogleGenerativeAI(geminiApiKey);
-  }
-
   aiProviders.initializeAIClients();
 } catch (err) {
   console.error("Error setting up AI clients:", err);
+}
+
+// Request screen recording permission on macOS (needed for production builds)
+async function checkScreenCapturePermissions() {
+  if (process.platform === 'darwin') {
+    try {
+      const { systemPreferences } = require('electron');
+      
+      // Check screen capture permission
+      const screenPermission = systemPreferences.getMediaAccessStatus('screen');
+      console.log(`Screen capture permission status: ${screenPermission}`);
+      
+      // Check microphone permission
+      const micPermission = systemPreferences.getMediaAccessStatus('microphone');
+      console.log(`Microphone permission status: ${micPermission}`);
+      
+      // Log permission statuses for debugging
+      if (screenPermission !== 'granted') {
+        console.log('Screen recording permission not granted');
+      }
+      
+      if (micPermission !== 'granted') {
+        console.log('Microphone permission not granted');
+      }
+    } catch (error) {
+      console.error('Error checking media permissions:', error);
+    }
+  }
 }
 
 function resetProcess() {
@@ -87,8 +103,35 @@ async function processScreenshotsWithAI() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  console.log("Application is ready, checking permissions...");
+  
+  // Check screen capture permissions
+  await checkScreenCapturePermissions();
+  
   const mainWindow = windowManager.createMainWindow();
+  
+  // Provide clear permission status to the user
+  if (process.platform === 'darwin') {
+    try {
+      const { systemPreferences } = require('electron');
+      const screenPermission = systemPreferences.getMediaAccessStatus('screen');
+      const micPermission = systemPreferences.getMediaAccessStatus('microphone');
+      
+      if (screenPermission !== 'granted') {
+        setTimeout(() => {
+          mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+            title: "Permission Required",
+            body: "This app requires screen recording permission to work correctly. Please enable it in System Preferences.",
+            type: "warning"
+          });
+        }, 2000);
+      }
+    } catch (err) {
+      console.error("Error checking permissions:", err);
+    }
+  }
+  
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
   const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
 

@@ -1,4 +1,5 @@
 const { BrowserWindow, screen } = require("electron");
+const { IPC_CHANNELS } = require("./constants");
 
 let mainWindow;
 let modelListWindow;
@@ -161,10 +162,10 @@ function updateInstruction(instruction) {
   
   if (!instruction || instruction.trim() === "") {
     // If instruction is empty, hide the instruction banner
-    mainWindow.webContents.send("hide-instruction");
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
   } else {
     // Show the instruction with the provided text
-    mainWindow.webContents.send("update-instruction", instruction);
+    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_INSTRUCTION, instruction);
   }
 }
 

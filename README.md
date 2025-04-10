@@ -30,18 +30,19 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
   - Global keyboard shortcuts for instant captures
   - Support for window and area-specific screenshots
   - Multi-page mode for complex questions
+  - Transparent, always-on-top overlay for easy reference
 
 - 🤖 **Powerful AI Integration**
-  - OpenAI integration (GPT-4 Vision)
-  - Google Gemini support
-  - Local Ollama compatibility
-  - Real-time streaming responses
+  - OpenAI integration (GPT-4o, GPT-4o-mini, GPT-4-vision-preview, GPT-4-turbo)
+  - Google Gemini support (Gemini 2.0 Flash)
+  - Local Ollama compatibility (deepseek-r1:14b and other vision-capable models)
+  - Real-time streaming responses with low latency
 
-- 🎯 **User-Friendly Interface**
-  - Transparent, always-on-top window
-  - Markdown-rendered responses
-  - Customizable positioning
-  - Platform-aware keyboard shortcuts
+- 🎯 **Intelligent User Experience**
+  - Screen sharing detection and automatic hiding
+  - Markdown-rendered responses with syntax highlighting
+  - Code block copy buttons
+  - Customizable positioning and keyboard shortcuts
 
 ## 🛠️ Prerequisites
 
@@ -132,6 +133,27 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
 ### Ollama
 - deepseek-r1:14b (recommended)
 - Any vision-capable Ollama model
+
+## 🔄 Smart Features
+
+- **Screen Sharing Detection**: Automatically hides the application during screen sharing
+- **Real-time Streaming**: See AI responses as they're generated
+- **Multi-page Analysis**: Combine multiple screenshots for context-aware responses
+- **Customizable UI**: Position the window anywhere on your screen with keyboard shortcuts
+
+## 🔧 Building from Source
+
+Build for all platforms:
+```bash
+npm run build
+```
+
+Or build for specific platforms:
+```bash
+npm run build:mac
+npm run build:win
+npm run build:linux
+```
 
 ## ⚠️ Status
 

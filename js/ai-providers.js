@@ -10,20 +10,26 @@ let openai = null;
 let geminiAI = null;
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
-/**
- * Initializes the AI clients
- */
 function initializeAIClients() {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-
-    if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
-      openai = new OpenAI({ apiKey });
-    }
-
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
-      geminiAI = new GoogleGenerativeAI(geminiApiKey);
+    // Only try to load from localStorage if in renderer process
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const storedOpenAIKey = localStorage.getItem('openai_api_key');
+        const storedGeminiKey = localStorage.getItem('gemini_api_key');
+        
+        if (storedOpenAIKey) {
+          console.log("Initializing OpenAI client from stored key");
+          openai = new OpenAI({ apiKey: storedOpenAIKey });
+        }
+        
+        if (storedGeminiKey) {
+          console.log("Initializing Gemini client from stored key");
+          geminiAI = new GoogleGenerativeAI(storedGeminiKey);
+        }
+      } catch (storageErr) {
+        console.error("Error loading keys from localStorage:", storageErr);
+      }
     }
   } catch (err) {
     console.error("Error setting up AI clients:", err);
@@ -39,11 +45,20 @@ function initializeAIClients() {
  */
 function updateAIClients(provider, apiKey) {
   try {
+    console.log(`Updating ${provider} client with new API key...`);
+    
+    if (!apiKey || apiKey.trim() === '') {
+      console.error(`Invalid ${provider} API key: Key is empty or missing`);
+      return false;
+    }
+    
     if (provider === AI_PROVIDERS.OPENAI && apiKey) {
       openai = new OpenAI({ apiKey });
+      console.log("OpenAI client initialized successfully");
       return true;
     } else if (provider === AI_PROVIDERS.GEMINI && apiKey) {
       geminiAI = new GoogleGenerativeAI(apiKey);
+      console.log("Gemini client initialized successfully");
       return true;
     }
     return false;
@@ -385,6 +400,7 @@ async function generateWithGemini(messages, model, streaming = false) {
     }
 
     // Get the Gemini model
+    console.log(`Using Gemini model: ${model}`);
     const geminiModel = geminiAI.getGenerativeModel({ model: model });
 
     // Format as Gemini content parts

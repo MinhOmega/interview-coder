@@ -191,6 +191,19 @@ saveBtn.addEventListener("click", async () => {
     return;
   }
 
+  // For API key validation
+  if (aiProvider === "openai" && (!API_KEYS.openai.key || API_KEYS.openai.key.trim() === '')) {
+    messageDiv.textContent = "Please enter a valid OpenAI API key";
+    messageDiv.className = "status error";
+    return;
+  }
+
+  if (aiProvider === "gemini" && (!API_KEYS.gemini.key || API_KEYS.gemini.key.trim() === '')) {
+    messageDiv.textContent = "Please enter a valid Gemini API key";
+    messageDiv.className = "status error";
+    return;
+  }
+
   // For Ollama, always ensure we're using IPv4
   let ollamaUrl = ollamaUrlInput.value;
   if (aiProvider === "ollama") {
@@ -229,6 +242,13 @@ saveBtn.addEventListener("click", async () => {
     currentModel,
     ollamaUrl,
   };
+
+  // Add API keys to the settings object
+  if (aiProvider === "openai") {
+    settings.openaiApiKey = API_KEYS.openai.key;
+  } else if (aiProvider === "gemini") {
+    settings.geminiApiKey = API_KEYS.gemini.key;
+  }
 
   try {
     // Update settings
@@ -344,6 +364,12 @@ function setupApiKeyInputs() {
           apiKeyManager.validateAndFetchModels('openai', key, () => {
             // Nothing to do for OpenAI model fetching
           });
+          
+          // Update the OpenAI client in real-time
+          ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, {
+            aiProvider: 'openai',
+            openaiApiKey: key
+          });
         }
       } else {
         apiKeyManager.updateApiKeyStatus('openai', 'API key is required', 'error');
@@ -372,6 +398,12 @@ function setupApiKeyInputs() {
         // Auto-fetch models if key is long enough
         if (key.length >= 32) { // Minimum length for API keys
           apiKeyManager.validateAndFetchModels('gemini', key, geminiProvider.loadGeminiModels);
+          
+          // Update the Gemini client in real-time
+          ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, {
+            aiProvider: 'gemini',
+            geminiApiKey: key
+          });
         }
       } else {
         apiKeyManager.updateApiKeyStatus('gemini', 'API key is required', 'error');

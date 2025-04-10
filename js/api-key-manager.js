@@ -42,7 +42,18 @@ function hasValidApiKey(provider) {
 
 async function validateAndFetchModels(provider, key, loadModelsCallback) {
   try {
+    if (!key || key.trim() === '') {
+      updateApiKeyStatus(provider, 'API key is required', 'error');
+      return;
+    }
+    
     if (provider === 'openai') {
+      // Check if OpenAI key has a valid format (starts with sk-)
+      if (!key.startsWith('sk-')) {
+        updateApiKeyStatus(provider, 'Invalid API key format', 'error');
+        return;
+      }
+      
       const response = await fetch('https://api.openai.com/v1/models', {
         headers: {
           'Authorization': `Bearer ${key}`,
@@ -59,9 +70,17 @@ async function validateAndFetchModels(provider, key, loadModelsCallback) {
         updateApiKeyStatus(provider, 'Invalid API key', 'error');
       }
     } else if (provider === 'gemini') {
-      updateApiKeyStatus(provider, 'API key is valid', 'success');
+      // For Gemini, we'll simply mark it as valid initially
+      // The actual validation happens when models are fetched
+      updateApiKeyStatus(provider, 'API key saved', 'success');
+      
+      // Try to fetch models to validate the key
       if (loadModelsCallback) {
-        loadModelsCallback();
+        try {
+          await loadModelsCallback();
+        } catch (error) {
+          updateApiKeyStatus(provider, 'Error validating key: ' + error.message, 'error');
+        }
       }
     }
   } catch (error) {

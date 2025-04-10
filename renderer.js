@@ -430,7 +430,7 @@ function showNotification(message, type = "success") {
         n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
       });
     }, 300);
-  }, 1000);
+  }, 3500);
 }
 
 // Initialize

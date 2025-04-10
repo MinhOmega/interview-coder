@@ -1,22 +1,8 @@
-require("dotenv").config();
-
-// Check if running on macOS
 const isMac = process.platform === "darwin";
 const isWindows = process.platform === "win32";
 const isLinux = process.platform === "linux";
 const modifierKey = isMac ? "⌘" : "Ctrl";
 
-const DEFAULT_CONFIG = {
-  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL
-    ? process.env.OLLAMA_BASE_URL.replace("localhost", "127.0.0.1")
-    : "http://127.0.0.1:11434",
-  DEFAULT_MODEL: process.env.OPENAI_MODEL || "gpt-4o-mini",
-  DEFAULT_GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.0-flash",
-  DEFAULT_OLLAMA_MODEL: process.env.OLLAMA_MODEL || "deepseek-r1:14b",
-  AI_PROVIDER: process.env.AI_PROVIDER || "openai",
-};
-
-// Define shortcuts configuration
 const SHORTCUTS = {
   TOGGLE_VISIBILITY: {
     key: `${modifierKey}+B`,
@@ -113,7 +99,6 @@ const appMetadata = {
 };
 
 module.exports = {
-  DEFAULT_CONFIG,
   SHORTCUTS,
   isMac,
   isWindows,

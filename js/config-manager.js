@@ -1,31 +1,21 @@
-// Configuration manager for the application
-// Handles default values and configuration settings
+const { AI_PROVIDERS } = require("./constants");
 
-require("dotenv").config();
+let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
-// Default values - use IPv4 address explicitly for Ollama
-let OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL
-  ? process.env.OLLAMA_BASE_URL.replace("localhost", "127.0.0.1")
-  : "http://127.0.0.1:11434";
+const DEFAULT_MODEL = AI_PROVIDERS.OLLAMA;
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+const DEFAULT_OLLAMA_MODEL = "deepseek-r1:14b";
 
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || "deepseek-r1:14b";
+let aiProvider = AI_PROVIDERS.DEFAULT;
 
-// Default AI provider
-let aiProvider = process.env.AI_PROVIDER || "openai";
-
-// Current model based on provider
 let currentModel =
-  aiProvider === "openai" ? DEFAULT_MODEL : aiProvider === "gemini" ? DEFAULT_GEMINI_MODEL : DEFAULT_OLLAMA_MODEL;
+  aiProvider === AI_PROVIDERS.OPENAI
+    ? DEFAULT_MODEL
+    : aiProvider === AI_PROVIDERS.GEMINI
+    ? DEFAULT_GEMINI_MODEL
+    : DEFAULT_OLLAMA_MODEL;
 
-// Accessor functions
 function getOllamaBaseUrl() {
-  return OLLAMA_BASE_URL;
-}
-
-function setOllamaBaseUrl(url) {
-  OLLAMA_BASE_URL = url.replace("localhost", "127.0.0.1");
   return OLLAMA_BASE_URL;
 }
 
@@ -73,21 +63,20 @@ function updateSettings(settings) {
   if (settings.aiProvider) {
     aiProvider = settings.aiProvider;
   }
-  
+
   if (settings.currentModel) {
     currentModel = settings.currentModel;
   }
-  
+
   if (settings.ollamaUrl) {
     OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
   }
-  
+
   return getCurrentSettings();
 }
 
 module.exports = {
   getOllamaBaseUrl,
-  setOllamaBaseUrl,
   getDefaultModel,
   getDefaultGeminiModel,
   getDefaultOllamaModel,
@@ -96,5 +85,5 @@ module.exports = {
   getCurrentModel,
   setCurrentModel,
   getCurrentSettings,
-  updateSettings
-}; 
+  updateSettings,
+};
