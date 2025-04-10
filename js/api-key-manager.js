@@ -1,6 +1,5 @@
 const { API_KEYS } = require('./config');
 
-// Function to mask API key
 function maskApiKey(key) {
   if (!key || key.length < 8) return key;
   const firstFour = key.substring(0, 4);
@@ -9,7 +8,6 @@ function maskApiKey(key) {
   return firstFour + '*'.repeat(maskedLength) + lastFour;
 }
 
-// Update API key status message
 function updateApiKeyStatus(provider, message, type = 'info') {
   const statusElement = document.getElementById(API_KEYS[provider].statusId);
   if (statusElement) {
@@ -18,14 +16,12 @@ function updateApiKeyStatus(provider, message, type = 'info') {
   }
 }
 
-// Save API key to localStorage
 function saveApiKey(provider, key) {
   API_KEYS[provider].key = key;
   localStorage.setItem(API_KEYS[provider].storageKey, key);
   updateApiKeyStatus(provider, 'API key saved successfully', 'success');
 }
 
-// Load API keys from localStorage
 function loadApiKeys() {
   Object.keys(API_KEYS).forEach(provider => {
     const savedKey = localStorage.getItem(API_KEYS[provider].storageKey);
@@ -40,12 +36,10 @@ function loadApiKeys() {
   });
 }
 
-// Check if API key is available for provider
 function hasValidApiKey(provider) {
   return API_KEYS[provider] && API_KEYS[provider].key.trim() !== '';
 }
 
-// Function to validate API key and fetch models
 async function validateAndFetchModels(provider, key, loadModelsCallback) {
   try {
     if (provider === 'openai') {

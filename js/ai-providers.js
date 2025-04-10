@@ -2,6 +2,7 @@ const axios = require("axios");
 const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const EventEmitter = require("events");
+const { AI_PROVIDERS } = require("./constants");
 
 axios.defaults.family = 4;
 
@@ -9,6 +10,9 @@ let openai = null;
 let geminiAI = null;
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
+/**
+ * Initializes the AI clients
+ */
 function initializeAIClients() {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -26,13 +30,19 @@ function initializeAIClients() {
   }
 }
 
-// Update AI clients with new API keys
+/**
+ * Updates the AI clients with new API keys
+ *
+ * @param {string} provider - The provider to update
+ * @param {string} apiKey - The new API key
+ * @returns {boolean} True if the client was updated, false otherwise
+ */
 function updateAIClients(provider, apiKey) {
   try {
-    if (provider === "openai" && apiKey) {
+    if (provider === AI_PROVIDERS.OPENAI && apiKey) {
       openai = new OpenAI({ apiKey });
       return true;
-    } else if (provider === "gemini" && apiKey) {
+    } else if (provider === AI_PROVIDERS.GEMINI && apiKey) {
       geminiAI = new GoogleGenerativeAI(apiKey);
       return true;
     }
@@ -43,21 +53,27 @@ function updateAIClients(provider, apiKey) {
   }
 }
 
-// Set the Ollama base URL
+/**
+ * Sets the Ollama base URL
+ *
+ * @param {string} url - The new Ollama base URL
+ */
 function setOllamaBaseURL(url) {
   OLLAMA_BASE_URL = url.replace("localhost", "127.0.0.1");
 }
 
-// Get list of models from Ollama
+/**
+ * Gets the list of models from Ollama
+ *
+ * @returns {Promise<Array>} The list of models
+ */
 async function getOllamaModels() {
   try {
-    // Use IPv4 explicitly by replacing any remaining 'localhost' with '127.0.0.1'
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
 
-    // Add timeout to avoid long waiting times if Ollama is not running
     const response = await axios.get(`${apiUrl}/api/tags`, {
       timeout: 5000,
-      validateStatus: false, // Don't throw on non-2xx status
+      validateStatus: false,
     });
 
     if (response.status !== 200) {
@@ -67,32 +83,21 @@ async function getOllamaModels() {
 
     return response.data.models || [];
   } catch (error) {
-    // More detailed error logging
-    console.error("Error fetching Ollama models:", error.message);
-    if (error.code) {
-      console.error("Error code:", error.code);
-    }
-    if (error.syscall) {
-      console.error("System call:", error.syscall);
-    }
-    if (error.address) {
-      console.error("Address:", error.address);
-    }
-    if (error.port) {
-      console.error("Port:", error.port);
-    }
     return [];
   }
 }
 
-// Verify if an Ollama model exists and has vision capability
+/**
+ * Verifies if an Ollama model exists and has vision capability
+ *
+ * @param {string} modelName - The name of the model to verify
+ * @returns {Promise<Object>} The result of the verification
+ */
 async function verifyOllamaModel(modelName) {
   try {
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
 
-    // First, check if the model is in the list of available models
     try {
-      // Get available models first
       const modelsResponse = await axios.get(`${apiUrl}/api/tags`, {
         timeout: 5000,
         validateStatus: false,
@@ -108,35 +113,20 @@ async function verifyOllamaModel(modelName) {
 
       const modelsList = modelsResponse.data.models || [];
 
-      // Check if our model is in the list
       const modelExists = modelsList.some((m) => m.name === modelName);
 
       if (!modelExists) {
         console.error(`Model ${modelName} does not exist in the list of available models`);
-
-        // For a better user experience, suggest models that do exist
         const availableModels = modelsList.map((m) => m.name);
-        const visionModels = availableModels.filter(
-          (name) =>
-            name.includes("llava") ||
-            name.includes("bakllava") ||
-            name.includes("moondream") ||
-            name.includes("deepseek"),
-        );
-
-        const suggestedModels = visionModels.length > 0 ? visionModels : availableModels;
 
         return {
           exists: false,
           error: `Model "${modelName}" is not available on your Ollama server`,
           availableModels: availableModels,
-          suggestedModels: suggestedModels.slice(0, 5), // Limit to 5 suggestions
         };
       }
 
-      // Model exists in the list, now let's get more details if possible
       try {
-        // The model exists in the list, now we can get more details using show endpoint
         const modelResponse = await axios.get(`${apiUrl}/api/show`, {
           params: { name: modelName },
           timeout: 5000,
@@ -145,72 +135,24 @@ async function verifyOllamaModel(modelName) {
 
         if (modelResponse.status !== 200) {
           console.warn(`Could not get details for model ${modelName}, but it exists in the model list`);
-          // Return exists=true even if details can't be fetched, since we know it exists
           return {
             exists: true,
-            isMultimodal:
-              modelName.includes("llava") ||
-              modelName.includes("bakllava") ||
-              modelName.includes("moondream") ||
-              modelName.includes("deepseek"),
             needsPull: false,
           };
         }
-
-        // Log model details
-        const modelInfo = modelResponse.data;
-
-        // Check if the model is multimodal
-        let isMultimodal = false;
-
-        // Specific model families that are known to be multimodal
-        const multimodalFamilies = ["llava", "bakllava", "moondream", "deepseek-vision", "deepseek-r1"];
-
-        if (modelInfo.details && modelInfo.details.families) {
-          for (const family of modelInfo.details.families) {
-            if (multimodalFamilies.some((f) => family.toLowerCase().includes(f))) {
-              isMultimodal = true;
-              break;
-            }
-          }
-        }
-
-        // Also check the model name itself
-        if (!isMultimodal) {
-          for (const family of multimodalFamilies) {
-            if (modelName.toLowerCase().includes(family)) {
-              isMultimodal = true;
-              break;
-            }
-          }
-        }
-
-        if (!isMultimodal) {
-          console.warn(`Model ${modelName} may not have vision capabilities`);
-        }
-
         return {
           exists: true,
-          isMultimodal,
           needsPull: false,
         };
       } catch (modelDetailsError) {
         console.error(`Error getting model details: ${modelDetailsError.message}`);
-        // Return exists=true even if details can't be fetched, since we know it exists in the list
         return {
           exists: true,
-          isMultimodal:
-            modelName.includes("llava") ||
-            modelName.includes("bakllava") ||
-            modelName.includes("moondream") ||
-            modelName.includes("deepseek"),
           needsPull: false,
         };
       }
     } catch (error) {
       console.error(`Error checking model existence: ${error.message}`);
-
-      // Check if the error is because Ollama is not running
       if (error.code === "ECONNREFUSED" || error.code === "ECONNRESET") {
         return {
           exists: false,
@@ -232,18 +174,19 @@ async function verifyOllamaModel(modelName) {
   }
 }
 
-// Generate chat completion with Ollama
+/**
+ * Generates a chat completion with Ollama
+ *
+ * @param {Array} messages - The messages to generate a chat completion with
+ * @param {string} model - The model to use for the chat completion
+ * @returns {Promise<string>} The generated chat completion
+ */
 async function generateWithOllama(messages, model) {
   try {
-    // Check if we're using deepseek-r1 model
     const isDeepseek = model.toLowerCase().includes("deepseek-r1");
-
-    // Format messages for Ollama
     const ollamaMessages = [];
 
-    // Special handling for deepseek models which might need a different approach
     if (isDeepseek) {
-      // Extract all images
       const imageList = [];
       let textPrompt = "";
 
@@ -260,14 +203,10 @@ async function generateWithOllama(messages, model) {
         }
       }
 
-      // Try different approaches for deepseek model
       try {
         const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
-
-        // Create a combined prompt with images and text
         let prompt = textPrompt;
 
-        // Add images to the prompt
         const response = await axios.post(
           `${apiUrl}/api/generate`,
           {
@@ -277,7 +216,7 @@ async function generateWithOllama(messages, model) {
             stream: false,
           },
           {
-            timeout: 180000, // 3 minutes
+            timeout: 180000,
           },
         );
 
@@ -290,13 +229,10 @@ async function generateWithOllama(messages, model) {
           console.error("Response data:", JSON.stringify(deepseekError.response.data));
         }
 
-        // Try alternative approach
         try {
-          // Create a message with the text first, then all images
           const firstMsg = { role: "user", content: textPrompt };
           ollamaMessages.push(firstMsg);
 
-          // Create a message object for chat endpoint
           const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
           const chatResponse = await axios.post(
             `${apiUrl}/api/chat`,
@@ -320,42 +256,33 @@ async function generateWithOllama(messages, model) {
             console.error("Response data:", JSON.stringify(alternativeError.response.data));
           }
 
-          // Rethrow the original error
           throw deepseekError;
         }
       }
     }
 
-    // Standard format for non-deepseek models
     for (const msg of messages) {
       if (msg.role) {
         ollamaMessages.push(msg);
-        continue; // Already in the right format
+        continue;
       }
 
-      // Text format conversion
       if (msg.type === "text") {
         ollamaMessages.push({ role: "user", content: msg.text });
-      }
-      // Image format conversion
-      else if (msg.type === "image_url") {
+      } else if (msg.type === "image_url") {
         try {
           const base64Image = msg.image_url.url.split(",")[1];
 
-          // Check if we already have a user message to add image to
           if (ollamaMessages.length > 0 && ollamaMessages[ollamaMessages.length - 1].role === "user") {
-            // If the content is a string, convert it to an array
             const lastMessage = ollamaMessages[ollamaMessages.length - 1];
             if (typeof lastMessage.content === "string") {
               lastMessage.content = [{ type: "text", text: lastMessage.content }];
             }
 
-            // Add the image to the content array
             if (Array.isArray(lastMessage.content)) {
               lastMessage.content.push({ type: "image", data: base64Image });
             }
           } else {
-            // Create a new message with just the image
             ollamaMessages.push({
               role: "user",
               content: [{ type: "image", data: base64Image }],
@@ -368,15 +295,12 @@ async function generateWithOllama(messages, model) {
       }
     }
 
-    // Use IPv4 explicitly
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
 
-    // Try generating with the chat API endpoint
     let response;
     let result;
 
     try {
-      // First try with the chat endpoint
       response = await axios.post(
         `${apiUrl}/api/chat`,
         {
@@ -385,7 +309,7 @@ async function generateWithOllama(messages, model) {
           stream: false,
         },
         {
-          timeout: 120000, // Increased timeout to 2 minutes
+          timeout: 120000,
         },
       );
 
@@ -398,15 +322,11 @@ async function generateWithOllama(messages, model) {
         console.error("Response data:", JSON.stringify(chatError.response.data));
       }
 
-      // Fallback to generate API if chat fails
-
-      // Construct a prompt from the messages
       let prompt = "";
       for (const msg of ollamaMessages) {
         if (typeof msg.content === "string") {
           prompt += `${msg.role === "assistant" ? "Assistant: " : "User: "}${msg.content}\n\n`;
         } else if (Array.isArray(msg.content)) {
-          // For messages with images, we still need to include any text
           const textParts = msg.content.filter((c) => c.type === "text").map((c) => c.text);
           if (textParts.length > 0) {
             prompt += `${msg.role === "assistant" ? "Assistant: " : "User: "}${textParts.join(" ")}\n\n`;
@@ -418,7 +338,6 @@ async function generateWithOllama(messages, model) {
 
       prompt += "Assistant: ";
 
-      // Try the generate endpoint
       try {
         response = await axios.post(
           `${apiUrl}/api/generate`,
@@ -441,7 +360,6 @@ async function generateWithOllama(messages, model) {
           console.error("Response data:", JSON.stringify(generateError.response.data));
         }
 
-        // If both methods fail, rethrow the original error
         throw chatError;
       }
     }
@@ -450,7 +368,6 @@ async function generateWithOllama(messages, model) {
   } catch (error) {
     console.error("Error generating with Ollama:", error.message);
 
-    // Add additional error information
     if (error.response) {
       console.error("Response status:", error.response.status);
       console.error("Response data:", JSON.stringify(error.response.data));
