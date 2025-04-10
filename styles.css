@@ -1,0 +1,684 @@
+:root {
+  /* Background colors */
+  --bg-transparent: transparent;
+  --bg-main: rgba(128, 128, 128, 0.15);
+  --bg-content: rgba(128, 128, 128, 0.15);
+  --bg-dark: rgba(25, 25, 25, 0.97);
+  --bg-darker: rgba(20, 20, 20, 0.98);
+  --bg-code: rgba(25, 25, 25, 0.97);
+  --bg-toolbar: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
+  --bg-button: rgba(60, 60, 60, 0.7);
+  --bg-button-hover: rgba(80, 80, 80, 0.9);
+  --bg-button-shortcut: rgba(40, 40, 40, 0.7);
+  --bg-inline-code: rgba(40, 40, 40, 0.7);
+  --bg-table-header: rgba(40, 40, 40, 0.8);
+  --bg-table-even: rgba(40, 40, 40, 0.4);
+  --bg-language-tag: rgba(50, 50, 50, 0.95);
+  --bg-notification-success: rgba(76, 175, 80, 0.95);
+  --bg-notification-warning: rgba(255, 152, 0, 0.95);
+  --bg-notification-error: rgba(244, 67, 54, 0.95);
+  --bg-error: rgba(255, 77, 77, 0.08);
+  --bg-warning: rgba(255, 204, 51, 0.08);
+  --bg-scrollbar: rgba(30, 30, 30, 0.95);
+  --bg-scrollbar-thumb: rgba(120, 120, 120, 0.7);
+  --bg-scrollbar-thumb-hover: rgba(120, 120, 120, 0.9);
+  --bg-code-scrollbar-thumb: rgba(140, 140, 140, 0.7);
+  --bg-code-scrollbar-thumb-hover: rgba(160, 160, 160, 0.95);
+  --bg-context-actions: rgba(30, 30, 30, 0.9);
+  --bg-context-button: rgba(50, 50, 50, 0.8);
+  --bg-context-button-hover: rgba(70, 70, 70, 0.9);
+  --bg-add-context: rgba(40, 90, 40, 0.6);
+  --bg-add-context-hover: rgba(50, 120, 50, 0.8);
+  --bg-report-error: rgba(90, 40, 40, 0.6);
+  --bg-report-error-hover: rgba(120, 50, 50, 0.8);
+  --bg-model-badge: rgba(30, 30, 30, 0.8);
+  --bg-code-block: rgba(40, 40, 40, 0.9);
+  --bg-body: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f4f8;
+  --bg-selected: #e6f7ff;
+  --bg-button-primary: #4361ee;
+  --bg-button-primary-hover: #3a56d4;
+  --bg-button-success: #2ecc71;
+  --bg-button-success-hover: #27ae60;
+  --bg-button-warning: #f39c12;
+  --bg-button-warning-hover: #e67e22;
+  --bg-button-danger: #e74c3c;
+  --bg-button-danger-hover: #c0392b;
+  --bg-loading: rgba(0, 0, 0, 0.05);
+  --bg-modal-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Text colors */
+  --text-main: rgba(255, 255, 255, 0.9);
+  --text-code: rgba(255, 255, 255, 0.95);
+  --text-blockquote: rgba(255, 255, 255, 0.8);
+  --text-link: #5e9eff;
+  --text-error: #ff4d4d;
+  --text-warning: #ffcc33;
+  --text-primary: #1a1a2e;
+  --text-secondary: #505f79;
+  --text-muted: #8892a0;
+  --text-light: #ffffff;
+  --text-success: #00875a;
+  --text-error: #de350b;
+  --text-warning: #ff8800;
+
+  /* Border colors */
+  --border-light: rgba(120, 120, 120, 0.2);
+  --border-medium: rgba(120, 120, 120, 0.3);
+  --border-dark: rgba(100, 100, 100, 0.3);
+  --border-code: rgba(120, 120, 120, 0.3);
+  --border-language-tag: rgba(120, 120, 120, 0.4);
+  --border-error: #ff4d4d;
+  --border-warning: #ffcc33;
+  --border-success: #2E7D32;
+  --border-focused: #4361ee;
+  --border-warning-notification: #E65100;
+  --border-error-notification: #C62828;
+  --border-button: rgba(80, 80, 80, 0.3);
+  --border-context-button: rgba(100, 100, 100, 0.4);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Animation */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+html {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-transparent);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-transparent);
+  font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
+  overflow: hidden;
+  position: relative;
+  border-radius: 12px;
+}
+
+#instruction-banner {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 20, 0.9);
+  color: #fff;
+  padding: 10px 18px;
+  font-size: 14px;
+  border-radius: 8px;
+  z-index: 9999;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  user-select: none;
+}
+
+#result-content {
+  width: 100%;
+  margin: 0 auto;
+  padding: 30px 20px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  overflow-x: hidden;
+  background-color: var(--bg-transparent);
+  height: 100vh;
+}
+
+#result-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.code-block-container pre code {
+  background: transparent !important;
+  border-radius: 6px !important;
+  position: relative;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace !important;
+  overflow-x: auto !important;
+  white-space: pre !important;
+}
+
+.code-block-container {
+  position: relative;
+  margin: 1.5em 0;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.code-block-container pre {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 30px;
+}
+
+pre:before {
+  display: none !important;
+}
+
+.code-language-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--bg-code-block);
+  color: white;
+  padding: 3px 10px;
+  border-radius: 6px 0 6px 0;
+  font-size: 12px;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  z-index: 5;
+  border-right: 1px solid var(--border-dark);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+#result-content pre::-webkit-scrollbar {
+  height: 10px;
+  background: var(--bg-scrollbar);
+  border-radius: 5px;
+}
+
+#result-content pre::-webkit-scrollbar-thumb {
+  background: var(--bg-code-scrollbar-thumb);
+  border-radius: 5px;
+}
+
+#result-content pre::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-code-scrollbar-thumb-hover);
+}
+
+/* Make long code lines wrap to be helpful on mobile */
+@media (max-width: 768px) {
+
+  #result-content pre,
+  code {
+    white-space: pre-wrap !important;
+  }
+}
+
+#result-content::-webkit-scrollbar {
+  width: 5px;
+  background: var(--bg-scrollbar);
+  border-radius: 5px;
+}
+
+#result-content::-webkit-scrollbar-thumb {
+  background: var(--bg-scrollbar-thumb);
+  border-radius: 5px;
+}
+
+#result-content::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-scrollbar-thumb-hover);
+}
+
+/* Code block copy button */
+.copy-code-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background-color: var(--bg-button);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+  z-index: 10;
+}
+
+pre:hover .copy-code-button {
+  opacity: 1;
+}
+
+.copy-code-button:hover {
+  background-color: var(--bg-button-hover);
+}
+
+.copy-code-button.copied {
+  background-color: #4CAF50;
+}
+
+/* Markdown content table styling */
+#result-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 15px 0;
+  font-size: 0.9em;
+}
+
+#result-content th,
+#result-content td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-dark);
+}
+
+#result-content th {
+  background-color: var(--bg-table-header);
+  text-align: left;
+}
+
+#result-content tr:nth-child(even) {
+  background-color: var(--bg-table-even);
+}
+
+/* Make content have more breathing room */
+#result-content h1,
+#result-content h2,
+#result-content h3 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+#result-content h1 {
+  font-size: 1.8em;
+  border-bottom: 1px solid var(--border-dark);
+  padding-bottom: 8px;
+}
+
+#result-content h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--border-dark);
+  padding-bottom: 6px;
+}
+
+#result-content h3 {
+  font-size: 1.2em;
+}
+
+/* Improved list styling */
+#result-content ul,
+#result-content ol {
+  padding-left: 2em;
+  margin: 1em 0;
+}
+
+#result-content li {
+  margin-bottom: 0.5em;
+}
+
+#result-content ol li {
+  padding-left: 0.5em;
+}
+
+/* Blockquote styling */
+#result-content blockquote {
+  border-left: 4px solid rgba(120, 120, 120, 0.5);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-style: italic;
+}
+
+/* Link styling */
+#result-content a {
+  color: var(--text-link);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-link);
+}
+
+#result-content a:hover {
+  text-decoration: none;
+  border-bottom: 1px solid var(--text-link);
+}
+
+pre {
+  background: transparent;
+  color: white;
+  padding: 16px;
+  border-radius: 8px;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 1.2em 0;
+  border: 1px solid var(--border-dark);
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.9em;
+}
+
+code {
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  background: var(--bg-code-block);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.error-message {
+  color: var(--text-error);
+  background: var(--bg-error);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--border-error);
+  margin: 15px 0;
+}
+
+.warning-message {
+  color: var(--text-warning);
+  background: var(--bg-warning);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--border-warning);
+  margin: 15px 0;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.skeleton-section {
+  width: 100%;
+  margin-bottom: 30px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeleton-header {
+  height: 28px;
+  width: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.skeleton-text {
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.skeleton-text.line-90 {
+  width: 90%;
+}
+
+.skeleton-text.line-80 {
+  width: 80%;
+}
+
+.skeleton-text.line-70 {
+  width: 70%;
+}
+
+.skeleton-code {
+  height: 120px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.model-badge {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(30, 30, 30, 0.8);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  user-select: none;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 8000;
+  border: 1px solid var(--border-dark);
+}
+
+.screenshot-notification {
+  position: fixed;
+  bottom: 50px;
+  right: 12px;
+  background: rgba(20, 130, 20, 0.9);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 9000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  max-width: 400px;
+  border: 1px solid rgba(120, 180, 120, 0.3);
+}
+
+.screenshot-notification.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.screenshot-notification .file-path {
+  font-size: 11px;
+  opacity: 0.8;
+  word-break: break-all;
+  margin-top: 5px;
+}
+
+/* Updated Notification styles */
+#notification-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100000;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.notification {
+  padding: 14px 20px;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  word-break: break-word;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(50px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.notification.success {
+  background-color: var(--bg-notification-success);
+  border: 1px solid rgba(120, 180, 120, 0.3);
+}
+
+.notification.warning {
+  background-color: var(--bg-notification-warning);
+  border: 1px solid rgba(180, 130, 20, 0.3);
+}
+
+.notification.error {
+  background-color: var(--bg-notification-error);
+  border: 1px solid rgba(180, 70, 70, 0.3);
+}
+
+.notification.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* For making the window invisible during screen sharing */
+body.invisible-mode {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+body.invisible-mode:hover {
+  opacity: 1;
+}
+
+/* Updated top toolbar styles */
+#top-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
+  border-bottom: 1px solid var(--border-dark);
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9500;
+  -webkit-app-region: drag;
+  box-sizing: border-box;
+  height: 50px;
+  cursor: move;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+#top-toolbar::-webkit-scrollbar {
+  height: 6px;
+}
+
+#top-toolbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+#top-toolbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+/* Toolbar buttons */
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-button);
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 13px;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  /* Make buttons clickable */
+  border: 1px solid rgba(80, 80, 80, 0.3);
+}
+
+.toolbar-button:hover {
+  background-color: var(--bg-button-hover);
+}
+
+.toolbar-button .icon {
+  font-size: 14px;
+  margin-right: 8px;
+  min-width: 14px;
+  text-align: center;
+}
+
+.toolbar-button .shortcut {
+  font-size: 10px;
+  margin-left: 6px;
+  background: rgba(40, 40, 40, 0.7);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* Window control buttons */
+.window-controls {
+  display: none;
+  /* Hide window controls - removing completely */
+}
+
+.window-control {
+  display: none;
+  /* Hide window controls - removing completely */
+}
+
+.close-btn,
+.minimize-btn,
+.maximize-btn {
+  display: none;
+  /* Hide window controls - removing completely */
+}
+
+/* Additional styles to completely hide any macOS window controls */
+:root {
+  --electron-titlebar-height: 0;
+}
+
+.window-controls,
+.window-control,
+.close-btn,
+.minimize-btn,
+.maximize-btn,
+:host(.platform-darwin) .titlebar-button,
+:host(.platform-darwin) .titlebar-close,
+:host(.platform-darwin) .titlebar-minimize,
+:host(.platform-darwin) .titlebar-maximize,
+:host(.platform-darwin) .titlebar-fullscreen {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  pointer-events: none !important;
+}
+
+/* Content container */
+#content-container {
+  margin-top: 60px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  position: relative;
+  background: var(--bg-main);
+}
+
+/* Response overlay */
+#main-content {
+  margin: 60px auto 20px auto;
+  max-width: 900px;
+  color: white;
+  position: relative;
+}
