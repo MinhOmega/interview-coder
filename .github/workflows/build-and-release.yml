@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -36,18 +41,17 @@ jobs:
           fi
         shell: bash
 
+      - name: List dist directory
+        run: ls -la dist/
+        shell: bash
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-build
-          path: |
-            dist/*.dmg
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
-            dist/*.exe
-            dist/*.zip
-          if-no-files-found: ignore
+          path: dist/
+          retention-days: 1
+          if-no-files-found: warn
 
   release:
     needs: build
