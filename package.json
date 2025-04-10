@@ -2,14 +2,46 @@
   "name": "interview-coders",
   "version": "1.0.0",
   "main": "main.js",
+  "description": "Interview Coder is an Electron application that captures and analyzes screenshots using AI (OpenAI, Google Gemini, or Ollama). It features global keyboard shortcuts, multi-page mode for complex questions, real-time streaming responses, and supports both cloud and local AI models. The app provides a customizable UI with transparent, always-on-top windows and markdown-rendered responses, making it ideal for processing coding questions, generating code, or providing detailed answers from screenshots.",
+  "author": {
+    "name": "Minh Vo",
+    "email": "vnqminh0502@gmail.com"
+  },
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder build --mac --win --linux",
+    "build:mac": "electron-builder build --mac",
+    "build:win": "electron-builder build --win",
+    "build:linux": "electron-builder build --linux"
+  },
+  "build": {
+    "appId": "com.interviewcoders.app",
+    "productName": "Interview Coder",
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Development"
+    }
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
-    "electron": "^35.1.2",
     "electron-screenshots": "^0.5.27",
     "image-size": "^2.0.0",
     "openai": "^4.90.0",
@@ -19,5 +51,9 @@
     "remark-rehype": "^11.1.2",
     "screenshot-desktop": "^1.15.0",
     "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12"
   }
 }
