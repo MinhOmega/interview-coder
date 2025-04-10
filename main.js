@@ -1648,10 +1648,6 @@ ipcMain.on("show-context-menu", () => {
   }
 });
 
-ipcMain.on("report-solution-error", async (event, errorDescription) => {
-  // ... existing code ...
-});
-
 function createWindow() {
   // Get primary display dimensions for centering
   const { screen } = require("electron");
