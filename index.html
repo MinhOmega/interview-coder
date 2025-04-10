@@ -114,7 +114,7 @@
     ipcRenderer.on('update-instruction', (event, instruction) => {
       const banner = document.getElementById('instruction-banner');
       banner.innerHTML = instruction.replace(/\n/g, '<br>');
-      banner.style.opacity = '1';
+      banner.style.display = 'block';
     });
 
     // Initialize context menu for element inspection
@@ -132,7 +132,7 @@
 
     ipcRenderer.on('hide-instruction', () => {
       const banner = document.getElementById('instruction-banner');
-      banner.style.opacity = '0';
+      banner.style.display = 'none';
     });
 
     ipcRenderer.on('update-visibility', (event, isVisible) => {
@@ -155,8 +155,6 @@
     ipcRenderer.on('loading', (event, isLoading) => {
       document.getElementById('loading-content').style.display = isLoading ? 'flex' : 'none';
       document.getElementById('result-content').style.display = isLoading ? 'none' : 'block';
-
-      // Show/hide context actions when not loading
     });
 
     ipcRenderer.on('analysis-result', async (event, markdown) => {
@@ -245,7 +243,7 @@
 
       // Hide instruction banner when streaming is complete
       const banner = document.getElementById('instruction-banner');
-      banner.style.opacity = '0';
+      banner.style.display = 'none';
 
       // Add a small scroll to ensure visible buttons if needed
       const resultContent = document.getElementById('result-content');
@@ -533,64 +531,15 @@
         }, 300);
       }, 1000);
     }
-
-    // Register for keyboard events to handle shortcuts
-    document.addEventListener('keydown', (e) => {
-      // Allow event to propagate to text fields
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      // Don't process if some modifier keys are pressed (to avoid conflicts)
-      if (e.altKey) return;
-
-      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
-
-      // If Ctrl/Cmd key is pressed
-      if (ctrlOrCmd) {
-        // When window is invisible, only handle Command/Ctrl + B
-        if (!isWindowVisible) {
-          if (e.key === 'b') {
-            toggleWindowVisibility();
-            e.preventDefault();
-          }
-          return;
-        }
-
-        // Handle all shortcuts when window is visible
-        switch (e.key) {
-          case 'b': // Toggle visibility
-            toggleWindowVisibility();
-            e.preventDefault();
-            break;
-
-          case 'Enter': // Process screenshots
-            ipcRenderer.send('process-screenshots');
-            e.preventDefault();
-            break;
-
-          case 'r': // Reset
-            ipcRenderer.send('reset-process');
-            e.preventDefault();
-            break;
-
-          case 'q': // Quit
-            ipcRenderer.send('quit-app');
-            e.preventDefault();
-            break;
-        }
-      }
-    });
-
     // Initialize
     updateModelBadge();
 
-    // Refresh model badge whenever focus returns to window
-    // (e.g., after closing model-selector)
-    window.addEventListener('focus', () => {
-      console.log('Window focused, refreshing model badge');
-      updateModelBadge();
-    });
+    // // Refresh model badge whenever focus returns to window
+    // // (e.g., after closing model-selector)
+    // window.addEventListener('focus', () => {
+    //   console.log('Window focused, refreshing model badge');
+    //   updateModelBadge();
+    // });
 
     // Listen for postMessage from model-selector window
     window.addEventListener('message', (event) => {
@@ -604,12 +553,6 @@
     document.querySelectorAll('.shortcut').forEach(el => {
       const text = el.textContent;
       el.textContent = text.replace('⌘', isMac ? '⌘' : 'Ctrl');
-    });
-
-    // Handle content container visibility
-    ipcRenderer.on('hide-content', () => {
-      const contentContainer = document.getElementById('content-container');
-      contentContainer.style.display = 'none';
     });
   </script>
 </body>
