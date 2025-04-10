@@ -10,25 +10,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repository using the latest version of actions/checkout.
+      # 1. Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Set up Node.js using the latest setup-node action with Node 20.
+      # 2. Setup Node.js (version 20)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3. Install dependencies.
+      # 3. Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4. Build the project (building for macOS, Windows, and Linux).
+      # 3.5. Install dmg-license to fix build error (only needed for mac builds)
+      - name: Install dmg-license
+        run: npm install dmg-license --no-save
+
+      # 4. Build the project (builds for mac, win, and linux)
       - name: Build project
         run: npm run build
 
-      # 5. Create a GitHub Release.
+      # 5. Create a GitHub Release
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
@@ -40,7 +44,7 @@ jobs:
           draft: false
           prerelease: false
 
-      # 6. Upload build artifacts to the Release.
+      # 6. Upload build artifacts to the GitHub Release
       - name: Upload Release Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
