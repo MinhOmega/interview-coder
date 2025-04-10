@@ -34,6 +34,16 @@
 
   <div class="section" id="openai-section">
     <h2>OpenAI Models</h2>
+    
+    <div class="api-key-section">
+      <h3>OpenAI API Key</h3>
+      <div class="api-key-input-container">
+        <input type="password" id="openai-api-key" placeholder="Enter your OpenAI API key" class="api-key-input">
+      </div>
+      <div class="api-key-status" id="openai-key-status"></div>
+      <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
+    </div>
+    
     <div class="model-cards" id="openai-model-cards">
       <div class="model-card" data-model="gpt-4o-mini">
         <div class="model-card-title">GPT-4o Mini</div>
@@ -64,6 +74,16 @@
 
   <div class="section" id="gemini-section" style="display: none;">
     <h2>Gemini Models</h2>
+    
+    <div class="api-key-section">
+      <h3>Gemini API Key</h3>
+      <div class="api-key-input-container">
+        <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key" class="api-key-input">
+      </div>
+      <div class="api-key-status" id="gemini-key-status"></div>
+      <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
+    </div>
+    
     <div id="gemini-loading" class="flex justify-between items-center">
       <span>Loading Gemini models... <span class="loading"></span></span>
     </div>
@@ -123,19 +143,22 @@
     </div>
   </div>
 
-  <div class="flex justify-between mt-6">
-    <button id="save-settings" class="btn-success">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-        style="margin-right: 6px;">
-        <path d="M5 12L10 17L19 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round" />
+  <div id="message" class="status"></div>
+
+  <div class="sticky-footer">
+    <button id="save-settings" class="btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 12L10 17L19 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
       Save Settings
     </button>
-    <button id="cancel" class="btn">Cancel</button>
+    <button id="cancel" class="btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      Cancel
+    </button>
   </div>
-
-  <div id="message" class="status mt-4"></div>
 
   <!-- Pull model modal dialog -->
   <div id="pull-model-modal" class="modal">
@@ -157,6 +180,35 @@
           Pull Model
         </button>
         <button id="cancel-pull" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Key Required Modal -->
+  <div id="api-key-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h3 id="api-key-modal-title">API Key Required</h3>
+      <p id="api-key-modal-message" class="mb-4">Please enter your API key to use this model.</p>
+      
+      <div class="api-key-input-container">
+        <input type="password" id="modal-api-key" placeholder="Enter your API key" class="api-key-input">
+      </div>
+      
+      <div id="modal-api-key-status" class="api-key-status mt-2"></div>
+      
+      <div class="helper-text mt-2 mb-4">Your API key is stored locally and never sent to our servers</div>
+      
+      <div class="flex justify-between mt-4">
+        <button id="save-api-key" class="btn-success">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+            style="margin-right: 6px;">
+            <path d="M5 12L10 17L19 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+          Save API Key
+        </button>
+        <button id="cancel-api-key" class="btn">Cancel</button>
       </div>
     </div>
   </div>
