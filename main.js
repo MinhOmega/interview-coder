@@ -1,9 +1,4 @@
-const {
-  app,
-  BrowserWindow,
-  globalShortcut,
-  ipcMain
-} = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { OpenAI } = require("openai");
@@ -11,25 +6,20 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 require("dotenv").config();
 
-// Import our modules
-const configManager = require('./js/config-manager');
-const windowManager = require('./js/window-manager');
-const screenshotManager = require('./js/screenshot-manager');
-const hotkeyManager = require('./js/hotkey-manager');
-const aiProviders = require('./js/ai-providers');
-const aiProcessing = require('./js/ai-processing');
-const eventHandler = require('./js/event-handler');
+const configManager = require("./js/config-manager");
+const windowManager = require("./js/window-manager");
+const screenshotManager = require("./js/screenshot-manager");
+const hotkeyManager = require("./js/hotkey-manager");
+const aiProviders = require("./js/ai-providers");
+const aiProcessing = require("./js/ai-processing");
+const eventHandler = require("./js/event-handler");
 
-// Configure axios to use IPv4
 axios.defaults.family = 4;
 
-// Initialize OpenAI client
 let openai = null;
 let geminiAI = null;
 
-// Initialize modules
 try {
-  // Get API key from .env file
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
@@ -41,7 +31,7 @@ try {
   if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
     geminiAI = new GoogleGenerativeAI(geminiApiKey);
   }
-  
+
   // Initialize AI providers
   aiProviders.initializeAIClients();
 } catch (err) {
@@ -51,12 +41,14 @@ try {
 // Function to reset the process
 function resetProcess() {
   screenshotManager.resetScreenshots();
-  windowManager.updateInstruction(windowManager.getDefaultInstructions(
-    screenshotManager.getMultiPageMode(),
-    screenshotManager.getScreenshots().length,
-    hotkeyManager.getModifierKey()
-  ));
-  
+  windowManager.updateInstruction(
+    windowManager.getDefaultInstructions(
+      screenshotManager.getMultiPageMode(),
+      screenshotManager.getScreenshots().length,
+      hotkeyManager.getModifierKey(),
+    ),
+  );
+
   const mainWindow = windowManager.getMainWindow();
   if (mainWindow) {
     mainWindow.webContents.send("clear-result");
@@ -67,7 +59,7 @@ function resetProcess() {
 async function processScreenshotsWithAI() {
   const mainWindow = windowManager.getMainWindow();
   const screenshots = screenshotManager.getScreenshots();
-  
+
   if (screenshots.length === 0) {
     mainWindow.webContents.send("warning", "No screenshots to process. Take a screenshot first.");
     return;
@@ -75,26 +67,28 @@ async function processScreenshotsWithAI() {
 
   try {
     windowManager.updateInstruction("Processing screenshots with AI...");
-    
+
     // Process screenshots with AI
     await aiProcessing.processScreenshots(
-      mainWindow, 
-      configManager.getAiProvider(), 
+      mainWindow,
+      configManager.getAiProvider(),
       configManager.getCurrentModel(),
       aiProviders.verifyOllamaModel,
       aiProviders.generateWithOllama,
       aiProviders.generateWithGemini,
       openai,
-      true // Use streaming
+      true, // Use streaming
     );
   } catch (error) {
     console.error("Error processing screenshots:", error);
     mainWindow.webContents.send("error", "Failed to process screenshots: " + error.message);
-    windowManager.updateInstruction(windowManager.getDefaultInstructions(
-      screenshotManager.getMultiPageMode(),
-      screenshotManager.getScreenshots().length,
-      hotkeyManager.getModifierKey()
-    ));
+    windowManager.updateInstruction(
+      windowManager.getDefaultInstructions(
+        screenshotManager.getMultiPageMode(),
+        screenshotManager.getScreenshots().length,
+        hotkeyManager.getModifierKey(),
+      ),
+    );
   }
 }
 
@@ -102,13 +96,13 @@ async function processScreenshotsWithAI() {
 app.whenReady().then(() => {
   // Create the main window
   const mainWindow = windowManager.createMainWindow();
-  
+
   // Setup event handlers
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
-  
+
   // Initialize screenshot capture
   const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
-  
+
   // Setup shortcut handlers
   hotkeyManager.registerHandlers({
     TOGGLE_VISIBILITY: () => {
@@ -137,11 +131,13 @@ app.whenReady().then(() => {
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+H error:`, error);
         mainWindow.webContents.send("error", `Error processing command: ${error.message}`);
-        windowManager.updateInstruction(windowManager.getDefaultInstructions(
-          screenshotManager.getMultiPageMode(),
-          screenshotManager.getScreenshots().length,
-          hotkeyManager.getModifierKey()
-        ));
+        windowManager.updateInstruction(
+          windowManager.getDefaultInstructions(
+            screenshotManager.getMultiPageMode(),
+            screenshotManager.getScreenshots().length,
+            hotkeyManager.getModifierKey(),
+          ),
+        );
       }
     },
     AREA_SCREENSHOT: () => {
@@ -151,11 +147,13 @@ app.whenReady().then(() => {
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
         mainWindow.webContents.send("error", `Error starting area capture: ${error.message}`);
-        windowManager.updateInstruction(windowManager.getDefaultInstructions(
-          screenshotManager.getMultiPageMode(),
-          screenshotManager.getScreenshots().length,
-          hotkeyManager.getModifierKey()
-        ));
+        windowManager.updateInstruction(
+          windowManager.getDefaultInstructions(
+            screenshotManager.getMultiPageMode(),
+            screenshotManager.getScreenshots().length,
+            hotkeyManager.getModifierKey(),
+          ),
+        );
       }
     },
     MULTI_PAGE: async () => {
@@ -163,14 +161,18 @@ app.whenReady().then(() => {
         if (!screenshotManager.getMultiPageMode()) {
           screenshotManager.setMultiPageMode(true);
           windowManager.updateInstruction(
-            `Multi-mode: ${screenshotManager.getScreenshots().length} screenshots. ${hotkeyManager.getModifierKey()}+A to add more, ${hotkeyManager.getModifierKey()}+Enter to analyze`,
+            `Multi-mode: ${
+              screenshotManager.getScreenshots().length
+            } screenshots. ${hotkeyManager.getModifierKey()}+A to add more, ${hotkeyManager.getModifierKey()}+Enter to analyze`,
           );
         }
         windowManager.updateInstruction("Taking screenshot for multi-mode...");
         const img = await screenshotManager.captureScreenshot(mainWindow);
         screenshotManager.addScreenshot(img);
         windowManager.updateInstruction(
-          `Multi-mode: ${screenshotManager.getScreenshots().length} screenshots captured. ${hotkeyManager.getModifierKey()}+A to add more, ${hotkeyManager.getModifierKey()}+Enter to analyze`,
+          `Multi-mode: ${
+            screenshotManager.getScreenshots().length
+          } screenshots captured. ${hotkeyManager.getModifierKey()}+A to add more, ${hotkeyManager.getModifierKey()}+Enter to analyze`,
         );
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+A error:`, error);
@@ -183,8 +185,8 @@ app.whenReady().then(() => {
     },
     MODEL_SELECTION: () => windowManager.createModelSelectionWindow(),
   });
-  
-  // Listen for screenshot events  
+
+  // Listen for screenshot events
   screenshotInstance.on("ok", async (data) => {
     try {
       const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
@@ -223,19 +225,21 @@ app.whenReady().then(() => {
 
   // Setup screen capture detection
   eventHandler.setupScreenCaptureDetection(mainWindow, windowManager);
-  
+
   // Register hotkeys
   hotkeyManager.updateHotkeys(true);
 
   // Send initial status to renderer
   setTimeout(() => {
-    windowManager.updateInstruction(windowManager.getDefaultInstructions(
-      screenshotManager.getMultiPageMode(),
-      screenshotManager.getScreenshots().length,
-      hotkeyManager.getModifierKey()
-    ));
+    windowManager.updateInstruction(
+      windowManager.getDefaultInstructions(
+        screenshotManager.getMultiPageMode(),
+        screenshotManager.getScreenshots().length,
+        hotkeyManager.getModifierKey(),
+      ),
+    );
   }, 1000);
-  
+
   // Handle screenshot-ready-for-processing event
   ipcMain.on("screenshot-ready-for-processing", async () => {
     await processScreenshotsWithAI();
@@ -255,4 +259,4 @@ app.on("activate", () => {
     // Register hotkeys again
     hotkeyManager.updateHotkeys(true);
   }
-}); 
+});

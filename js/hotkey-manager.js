@@ -1,14 +1,12 @@
 const { globalShortcut } = require("electron");
 
-// Check if running on macOS
 const isMac = process.platform === "darwin";
 const modifierKey = isMac ? "Command" : "Ctrl";
 
-// Define shortcuts configuration
 const SHORTCUTS = {
   TOGGLE_VISIBILITY: {
     key: `${modifierKey}+B`,
-    handler: null, // Will be set in registerHandlers
+    handler: null,
     alwaysActive: true,
   },
   PROCESS_SCREENSHOTS: {
