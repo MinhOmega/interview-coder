@@ -52,18 +52,14 @@ try {
 
   if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
     openai = new OpenAI({ apiKey });
-    console.log("OpenAI client initialized");
   } else {
-    console.log("No valid OpenAI API key found, will try to use Ollama if selected");
   }
 
   // Initialize Gemini client
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
     geminiAI = new GoogleGenerativeAI(geminiApiKey);
-    console.log("Gemini AI client initialized");
   } else {
-    console.log("No valid Gemini API key found");
   }
 } catch (err) {
   console.error("Error setting up AI clients:", err);
@@ -169,7 +165,6 @@ const SHORTCUTS = {
   QUIT: {
     key: `${modifierKey}+Q`,
     handler: () => {
-      console.log("Quitting application...");
       app.quit();
     },
   },
@@ -256,7 +251,6 @@ function toggleWindowVisibility(forceState) {
 // Get list of models from Ollama
 async function getOllamaModels() {
   try {
-    console.log("🚀 ~ getOllamaModels ~ OLLAMA_BASE_URL:", OLLAMA_BASE_URL);
     // Use IPv4 explicitly by replacing any remaining 'localhost' with '127.0.0.1'
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
 
@@ -265,8 +259,6 @@ async function getOllamaModels() {
       timeout: 5000,
       validateStatus: false, // Don't throw on non-2xx status
     });
-
-    console.log("🚀 ~ getOllamaModels ~ response status:", response.status);
 
     if (response.status !== 200) {
       console.error(`Error: Ollama API returned status ${response.status}`);
@@ -296,7 +288,6 @@ async function getOllamaModels() {
 // Verify if an Ollama model exists and has vision capability
 async function verifyOllamaModel(modelName) {
   try {
-    console.log(`Verifying Ollama model: ${modelName}`);
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
 
     // First, check if the model is in the list of available models
@@ -307,8 +298,6 @@ async function verifyOllamaModel(modelName) {
         validateStatus: false,
       });
 
-      console.log(`Models list response status: ${modelsResponse.status}`);
-
       if (modelsResponse.status !== 200) {
         console.error(`Failed to get list of models (status ${modelsResponse.status})`);
         return {
@@ -318,7 +307,6 @@ async function verifyOllamaModel(modelName) {
       }
 
       const modelsList = modelsResponse.data.models || [];
-      console.log(`Available models: ${modelsList.map((m) => m.name).join(", ")}`);
 
       // Check if our model is in the list
       const modelExists = modelsList.some((m) => m.name === modelName);
@@ -355,8 +343,6 @@ async function verifyOllamaModel(modelName) {
           validateStatus: false,
         });
 
-        console.log(`Model info response status: ${modelResponse.status}`);
-
         if (modelResponse.status !== 200) {
           console.warn(`Could not get details for model ${modelName}, but it exists in the model list`);
           // Return exists=true even if details can't be fetched, since we know it exists
@@ -373,7 +359,6 @@ async function verifyOllamaModel(modelName) {
 
         // Log model details
         const modelInfo = modelResponse.data;
-        console.log(`Model details for ${modelName}:`, JSON.stringify(modelInfo, null, 2));
 
         // Check if the model is multimodal
         let isMultimodal = false;
@@ -403,7 +388,6 @@ async function verifyOllamaModel(modelName) {
         if (!isMultimodal) {
           console.warn(`Model ${modelName} may not have vision capabilities`);
         } else {
-          console.log(`Model ${modelName} appears to have vision capabilities`);
         }
 
         return {
@@ -453,33 +437,15 @@ async function verifyOllamaModel(modelName) {
 async function generateWithOllama(messages, model) {
   try {
     // Format messages for Ollama
-    console.log(`Preparing to generate with Ollama using model: ${model}`);
 
     // Check if we're using deepseek-r1 model
     const isDeepseek = model.toLowerCase().includes("deepseek-r1");
-    console.log(`Using model ${model}, isDeepseek: ${isDeepseek}`);
 
     // Format messages for Ollama
     const ollamaMessages = [];
 
-    // Log the original messages for debugging
-    console.log(
-      "Original messages structure:",
-      JSON.stringify(
-        messages.map((m) => {
-          // Don't log actual image data as it's too large
-          if (m.type === "image_url") {
-            return { type: "image_url", image_url: { url: "[base64 image data]" } };
-          }
-          return m;
-        }),
-      ),
-    );
-
     // Special handling for deepseek models which might need a different approach
     if (isDeepseek) {
-      console.log("Using special format for deepseek-r1 model");
-
       // Extract all images
       const imageList = [];
       let textPrompt = "";
@@ -499,10 +465,7 @@ async function generateWithOllama(messages, model) {
 
       // Try different approaches for deepseek model
       try {
-        console.log("Attempting deepseek format 1 (using /api/generate endpoint)");
-
         const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
-        console.log(`Sending request to Ollama API at: ${apiUrl}/api/generate`);
 
         // Create a combined prompt with images and text
         let prompt = textPrompt;
@@ -521,7 +484,6 @@ async function generateWithOllama(messages, model) {
           },
         );
 
-        console.log("Generate API response status:", response.status);
         return response.data.response;
       } catch (deepseekError) {
         console.error("Error with deepseek format 1:", deepseekError.message);
@@ -533,8 +495,6 @@ async function generateWithOllama(messages, model) {
 
         // Try alternative approach
         try {
-          console.log("Attempting deepseek format 2 (using multipart message)");
-
           // Create a message with the text first, then all images
           const firstMsg = { role: "user", content: textPrompt };
           ollamaMessages.push(firstMsg);
@@ -554,7 +514,6 @@ async function generateWithOllama(messages, model) {
             },
           );
 
-          console.log("Chat API response status:", chatResponse.status);
           return chatResponse.data.message.content;
         } catch (alternativeError) {
           console.error("Error with deepseek format 2:", alternativeError.message);
@@ -614,32 +573,8 @@ async function generateWithOllama(messages, model) {
       }
     }
 
-    // Log the transformed messages (without actual image data for clarity)
-    console.log(
-      "Formatted messages for Ollama:",
-      JSON.stringify(
-        ollamaMessages.map((m) => {
-          if (typeof m.content === "string") {
-            return { role: m.role, content: m.content };
-          } else if (Array.isArray(m.content)) {
-            return {
-              role: m.role,
-              content: m.content.map((c) => {
-                if (c.type === "image") {
-                  return { type: "image", data: "[base64 image data]" };
-                }
-                return c;
-              }),
-            };
-          }
-          return m;
-        }),
-      ),
-    );
-
     // Use IPv4 explicitly
     const apiUrl = OLLAMA_BASE_URL.replace("localhost", "127.0.0.1");
-    console.log(`Sending request to Ollama API at: ${apiUrl}/api/chat`);
 
     // Try generating with the chat API endpoint
     let response;
@@ -647,7 +582,6 @@ async function generateWithOllama(messages, model) {
 
     try {
       // First try with the chat endpoint
-      console.log("Attempting to use /api/chat endpoint...");
       response = await axios.post(
         `${apiUrl}/api/chat`,
         {
@@ -660,7 +594,6 @@ async function generateWithOllama(messages, model) {
         },
       );
 
-      console.log("Chat API response status:", response.status);
       result = response.data.message.content;
     } catch (chatError) {
       console.error("Error with /api/chat endpoint:", chatError.message);
@@ -671,7 +604,6 @@ async function generateWithOllama(messages, model) {
       }
 
       // Fallback to generate API if chat fails
-      console.log("Falling back to /api/generate endpoint...");
 
       // Construct a prompt from the messages
       let prompt = "";
@@ -690,7 +622,6 @@ async function generateWithOllama(messages, model) {
       }
 
       prompt += "Assistant: ";
-      console.log("Constructed prompt:", prompt);
 
       // Try the generate endpoint
       try {
@@ -706,7 +637,6 @@ async function generateWithOllama(messages, model) {
           },
         );
 
-        console.log("Generate API response status:", response.status);
         result = response.data.response;
       } catch (generateError) {
         console.error("Error with /api/generate endpoint:", generateError.message);
@@ -721,7 +651,6 @@ async function generateWithOllama(messages, model) {
       }
     }
 
-    console.log("Successfully generated response from Ollama");
     return result;
   } catch (error) {
     console.error("Error generating with Ollama:", error.message);
@@ -741,8 +670,6 @@ async function generateWithGemini(messages, model, streaming = false) {
     if (!geminiAI) {
       throw new Error("Gemini AI client is not initialized. Please check your API key.");
     }
-
-    console.log(`Generating with Gemini using model: ${model}`);
 
     // Get the Gemini model
     const geminiModel = geminiAI.getGenerativeModel({ model: model });
@@ -786,8 +713,6 @@ async function generateWithGemini(messages, model, streaming = false) {
 
     // If streaming is requested, use the streaming API
     if (streaming) {
-      console.log("Using streaming API with Gemini");
-
       const streamingResponse = await geminiModel.generateContentStream({
         contents: [geminiContent],
         generationConfig: genConfig,
@@ -804,7 +729,6 @@ async function generateWithGemini(messages, model, streaming = false) {
         try {
           for await (const chunk of streamingResponse.stream) {
             const chunkText = chunk.text();
-            console.log("Gemini stream chunk received:", chunkText.substring(0, 50) + "...");
             fullResponse += chunkText;
 
             // Emit the chunk
@@ -812,7 +736,6 @@ async function generateWithGemini(messages, model, streaming = false) {
           }
 
           // Emit completion event
-          console.log("Gemini stream complete, total length:", fullResponse.length);
           emitter.emit("complete", fullResponse);
         } catch (error) {
           console.error("Error in Gemini stream processing:", error);
@@ -859,8 +782,6 @@ function updateInstruction(instruction) {
  */
 async function captureScreenshot() {
   try {
-    console.log("Capturing screen content...");
-
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
     const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
 
@@ -1027,7 +948,6 @@ async function captureScreenshot() {
       type: "success",
     });
 
-    console.log(`Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
     return base64Image;
   } catch (error) {
     console.error("Screenshot capture failed:", error);
@@ -1040,8 +960,6 @@ async function captureScreenshot() {
  */
 async function captureWindowScreenshot() {
   try {
-    console.log("Preparing to capture specific window...");
-
     // Hide our app window first
     const wasVisible = mainWindow.isVisible();
     if (wasVisible) {
@@ -1062,7 +980,6 @@ async function captureWindowScreenshot() {
     // Use platform-specific approach for window capture
     if (process.platform === "darwin") {
       try {
-        console.log("Using native macOS window capture");
         // -w flag captures the window the user clicks on
         await new Promise((resolve, reject) => {
           const { exec } = require("child_process");
@@ -1094,7 +1011,6 @@ async function captureWindowScreenshot() {
 
     // Verify the screenshot was taken (user might have canceled)
     if (!fs.existsSync(imagePath)) {
-      console.log("Window capture was canceled or failed");
       throw new Error("Window capture was canceled");
     }
 
@@ -1124,7 +1040,6 @@ async function captureWindowScreenshot() {
       type: "success",
     });
 
-    console.log(`Window screenshot saved to ${imagePath}`);
     return base64Image;
   } catch (error) {
     console.error("Window screenshot capture failed:", error);
@@ -1138,20 +1053,16 @@ async function captureWindowScreenshot() {
 async function captureAreaScreenshot() {
   // Hide the main window
   mainWindow.hide();
-  console.log("Waiting for window to hide...");
 
   await new Promise((resolve) => setTimeout(resolve, 300)); // Wait for window to hide
 
   try {
-    console.log("Preparing to capture area...");
-
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
     const imagePath = path.join(app.getPath("pictures"), `area-screenshot-${timestamp}.png`);
 
     // Use platform-specific approach for area capture
     if (process.platform === "darwin") {
       try {
-        console.log("Using native macOS area selection");
         // -s flag allows user to select an area
         await new Promise((resolve, reject) => {
           const { exec } = require("child_process");
@@ -1190,8 +1101,6 @@ async function captureAreaScreenshot() {
 
       return new Promise((resolve, reject) => {
         ipcMain.once("area-selected", async (event, { x, y, width, height, imageData }) => {
-          console.log("Area selected:", x, y, width, height);
-
           try {
             if (width < 10 || height < 10) {
               captureWindow.close();
@@ -1202,7 +1111,6 @@ async function captureAreaScreenshot() {
 
             // If we received image data directly from the renderer
             if (imageData) {
-              console.log("Using image data from renderer");
               captureWindow.close();
               mainWindow.show();
 
@@ -1219,7 +1127,6 @@ async function captureAreaScreenshot() {
                   type: "success",
                 });
 
-                console.log(`Area screenshot saved to ${imagePath}`);
                 resolve(imageData);
               } catch (error) {
                 console.error("Error saving area screenshot:", error);
@@ -1241,7 +1148,6 @@ async function captureAreaScreenshot() {
         });
 
         ipcMain.once("area-selection-cancelled", () => {
-          console.log("Area selection cancelled by user");
           captureWindow.close();
           mainWindow.show();
           reject(new Error("Area selection cancelled"));
@@ -1251,7 +1157,6 @@ async function captureAreaScreenshot() {
 
     // Check if the file exists (user might have canceled)
     if (!fs.existsSync(imagePath)) {
-      console.log("Area capture was canceled");
       mainWindow.show();
       throw new Error("Area capture was canceled");
     }
@@ -1286,7 +1191,6 @@ async function captureAreaScreenshot() {
       type: "success",
     });
 
-    console.log(`Area screenshot saved to ${imagePath}`);
     return base64Image;
   } catch (error) {
     console.error("Area screenshot failed:", error);
@@ -1297,8 +1201,6 @@ async function captureAreaScreenshot() {
 
 async function processScreenshots(useStreaming = false) {
   try {
-    console.log(`Starting processScreenshots with provider: ${aiProvider}, model: ${currentModel}`);
-
     // Show loading state
     mainWindow.webContents.send("loading", true);
 
@@ -1408,7 +1310,6 @@ Format your response in clear, well-structured Markdown with proper code blocks 
 
     // Build message with text + each screenshot
     const messages = [{ type: "text", text: promptText }];
-    console.log(`Processing ${screenshots.length} screenshots`);
 
     for (const img of screenshots) {
       // Check if the image already has the data URL prefix or not
@@ -1425,8 +1326,6 @@ Format your response in clear, well-structured Markdown with proper code blocks 
       if (!openai) {
         throw new Error("OpenAI client is not initialized. Please check your API key.");
       }
-
-      console.log("Using OpenAI for processing with model:", currentModel);
 
       if (useStreaming) {
         // Make the streaming request using OpenAI
@@ -1461,16 +1360,12 @@ Format your response in clear, well-structured Markdown with proper code blocks 
         });
 
         result = response.choices[0].message.content;
-        console.log("Successfully received response from OpenAI");
       }
     } else if (aiProvider === "ollama") {
       // Use Ollama for generation
-      console.log("Using Ollama for processing with model:", currentModel);
       result = await generateWithOllama(messages, currentModel);
-      console.log("Successfully received response from Ollama");
     } else if (aiProvider === "gemini") {
       // Use Gemini for generation
-      console.log("Using Gemini for processing with model:", currentModel);
 
       if (useStreaming) {
         const streamingResult = await generateWithGemini(messages, currentModel, true);
@@ -1503,7 +1398,6 @@ Format your response in clear, well-structured Markdown with proper code blocks 
         return;
       } else {
         result = await generateWithGemini(messages, currentModel);
-        console.log("Successfully received response from Gemini");
       }
     } else {
       throw new Error(`Unknown AI provider: ${aiProvider}`);
@@ -1514,7 +1408,6 @@ Format your response in clear, well-structured Markdown with proper code blocks 
 
     // Send the text to the renderer
     mainWindow.webContents.send("analysis-result", result);
-    console.log("Analysis complete and sent to renderer");
 
     // Hide instruction banner when done
     mainWindow.webContents.send("hide-instruction");
@@ -1582,8 +1475,6 @@ ipcMain.handle("get-current-settings", () => {
 
 // Handler for updating model settings
 ipcMain.on("update-model-settings", (event, settings) => {
-  console.log("Updating model settings:", settings);
-
   // Update global settings
   aiProvider = settings.aiProvider;
   currentModel = settings.currentModel;
@@ -1597,8 +1488,6 @@ ipcMain.on("update-model-settings", (event, settings) => {
   if (mainWindow) {
     mainWindow.webContents.send("model-changed");
   }
-
-  console.log(`Settings updated: Provider=${aiProvider}, Model=${currentModel}, Ollama URL=${OLLAMA_BASE_URL}`);
 });
 
 // Handler for Ollama models
@@ -1743,9 +1632,7 @@ function createWindow() {
   });
 
   // Listen for cancel event
-  screenshotInstance.on("cancel", () => {
-    console.log("Screenshot cancelled");
-  });
+  screenshotInstance.on("cancel", () => {});
 
   // Detect screen capture/sharing
   if (process.platform === "darwin") {
@@ -1757,12 +1644,9 @@ function createWindow() {
       const hasScreenCapturePermission = systemPreferences.getMediaAccessStatus("screen");
 
       if (hasScreenCapturePermission === "granted") {
-        console.log("Screen capture permission is granted");
-
         // Check if screen is being captured/shared
         systemPreferences.subscribeWorkspaceNotification("NSWorkspaceScreenIsSharedDidChangeNotification", () => {
           const isBeingCaptured = systemPreferences.getMediaAccessStatus("screen") === "granted";
-          console.log("Screen sharing status changed:", isBeingCaptured ? "sharing active" : "sharing inactive");
 
           if (isBeingCaptured) {
             // Screen is being shared, make window nearly invisible
@@ -1790,7 +1674,6 @@ function createWindow() {
           .then((sources) => {
             // If more than one screen source is found, it might indicate screen sharing
             if (sources.length > 1) {
-              console.log("Multiple screen sources detected, possible screen sharing");
               toggleWindowVisibility(false);
 
               // Notify the renderer
@@ -1847,12 +1730,10 @@ function createWindow() {
 
   // Add compatibility handling for both area-selector.html and capture-helper.html
   ipcMain.on("area-cancelled", () => {
-    console.log("Received deprecated area-cancelled event - for backward compatibility");
     mainWindow.show();
   });
 
   ipcMain.on("area-selected", async (event, rect) => {
-    console.log("Received deprecated area-selected event - for backward compatibility");
     try {
       // Handle the old format from area-selector.html
       const timestamp = Date.now();
@@ -1875,8 +1756,6 @@ function createWindow() {
         });
 
         mainWindow.webContents.send("warning", "Using full screenshot instead of area selection");
-
-        console.log(`Fallback screenshot saved to: ${imagePath}`);
 
         // Process with AI
         updateInstruction("Processing area screenshot with AI...");
