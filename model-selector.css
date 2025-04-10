@@ -70,6 +70,7 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  padding-bottom: calc(var(--space-xl) * 2);
 }
 
 h1 {
@@ -106,6 +107,75 @@ h3 {
 
 .section:hover {
   box-shadow: var(--shadow-md);
+}
+
+/* API Key Section */
+.api-key-section {
+  background-color: var(--bg-hover);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--border-light);
+}
+
+.api-key-input-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.api-key-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  padding-right: 40px; /* Make room for the toggle button */
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-card);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: var(--border-focused);
+  box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+}
+
+.api-key-status {
+  margin-top: var(--space-sm);
+  font-size: 13px;
+}
+
+.api-key-status.success {
+  color: var(--text-success);
+}
+
+.api-key-status.error {
+  color: var(--text-error);
+}
+
+.api-key-status.warning {
+  color: var(--text-warning);
+}
+
+.btn-icon {
+  position: absolute;
+  right: var(--space-sm);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-icon:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
 }
 
 /* Flex utilities */
@@ -610,4 +680,93 @@ button:disabled {
   background-color: #f1f3f5;
   color: var(--text-secondary);
   border: 1px solid var(--border-light);
+}
+
+/* API Key Toggle Button Styles */
+.api-key-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.api-key-toggle:hover {
+  color: #333;
+}
+
+.api-key-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.api-key-toggle .eye-off-icon {
+  display: none;
+}
+
+.api-key-toggle[title*="Hide"] .eye-icon {
+  display: none;
+}
+
+.api-key-toggle[title*="Hide"] .eye-off-icon {
+  display: block;
+}
+
+/* API Key Input Container */
+.api-key-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.api-key-input {
+  padding-right: 40px; /* Make room for the toggle button */
+}
+
+/* Sticky footer for buttons */
+.sticky-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: var(--bg-card);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  padding: var(--space-md);
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  z-index: 100;
+}
+
+.sticky-footer button {
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.sticky-footer button svg {
+  flex-shrink: 0;
+}
+
+/* Fix for small screens - ensure buttons stay in a row */
+@media (max-width: 768px) {
+  .sticky-footer {
+    padding: var(--space-md);
+    gap: var(--space-md);
+    flex-direction: row;
+  }
+  
+  .sticky-footer button {
+    flex: 1;
+  }
 } 
