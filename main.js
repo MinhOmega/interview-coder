@@ -16,40 +16,11 @@ const { IPC_CHANNELS } = require("./js/constants");
 axios.defaults.family = 4;
 
 let openai = null;
-let geminiAI = null;
 
 try {
   aiProviders.initializeAIClients();
 } catch (err) {
   console.error("Error setting up AI clients:", err);
-}
-
-// Request screen recording permission on macOS (needed for production builds)
-async function checkScreenCapturePermissions() {
-  if (process.platform === 'darwin') {
-    try {
-      const { systemPreferences } = require('electron');
-      
-      // Check screen capture permission
-      const screenPermission = systemPreferences.getMediaAccessStatus('screen');
-      console.log(`Screen capture permission status: ${screenPermission}`);
-      
-      // Check microphone permission
-      const micPermission = systemPreferences.getMediaAccessStatus('microphone');
-      console.log(`Microphone permission status: ${micPermission}`);
-      
-      // Log permission statuses for debugging
-      if (screenPermission !== 'granted') {
-        console.log('Screen recording permission not granted');
-      }
-      
-      if (micPermission !== 'granted') {
-        console.log('Microphone permission not granted');
-      }
-    } catch (error) {
-      console.error('Error checking media permissions:', error);
-    }
-  }
 }
 
 function resetProcess() {
@@ -104,26 +75,21 @@ async function processScreenshotsWithAI() {
 }
 
 app.whenReady().then(async () => {
-  console.log("Application is ready, checking permissions...");
-  
-  // Check screen capture permissions
-  await checkScreenCapturePermissions();
-  
   const mainWindow = windowManager.createMainWindow();
-  
+
   // Provide clear permission status to the user
-  if (process.platform === 'darwin') {
+  if (process.platform === "darwin") {
     try {
-      const { systemPreferences } = require('electron');
-      const screenPermission = systemPreferences.getMediaAccessStatus('screen');
-      const micPermission = systemPreferences.getMediaAccessStatus('microphone');
-      
-      if (screenPermission !== 'granted') {
+      const { systemPreferences } = require("electron");
+      const screenPermission = systemPreferences.getMediaAccessStatus("screen");
+      const micPermission = systemPreferences.getMediaAccessStatus("microphone");
+
+      if (screenPermission !== "granted") {
         setTimeout(() => {
           mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
             title: "Permission Required",
             body: "This app requires screen recording permission to work correctly. Please enable it in System Preferences.",
-            type: "warning"
+            type: "warning",
           });
         }, 2000);
       }
@@ -131,7 +97,7 @@ app.whenReady().then(async () => {
       console.error("Error checking permissions:", err);
     }
   }
-  
+
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
   const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
 
@@ -226,39 +192,38 @@ app.whenReady().then(async () => {
       const base64Image = `data:image/png;base64,${data.buffer.toString("base64")}`;
       screenshotManager.addScreenshot(base64Image);
       const dimensions = { width: data.bounds.width, height: data.bounds.height };
-      
+
       // Clear notification about screenshot capture
       mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
         body: `Screenshot captured (${dimensions.width}x${dimensions.height})`,
         type: "success",
       });
-      
+
       // Show notification that we're preparing to process
       mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
         body: `Processing screenshot with ${configManager.getAiProvider()}...`,
         type: "info",
       });
-      
+
       // Add small delay to allow notifications to be seen by user
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       await processScreenshotsWithAI();
     } catch (error) {
       console.error("Error handling screenshot:", error);
       mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Failed to process screenshot: ${error.message}`);
-      
+
       // Show detailed error notification
       mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
         body: `Screenshot capture failed: ${error.message}`,
         type: "error",
       });
-      
+
       mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
     }
   });
 
   screenshotInstance.on("cancel", () => {});
-  eventHandler.setupScreenCaptureDetection(mainWindow, windowManager);
   hotkeyManager.updateHotkeys(true);
 
   setTimeout(() => {

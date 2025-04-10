@@ -3,7 +3,7 @@ const { IPC_CHANNELS } = require("./constants");
 
 /**
  * Sets up event handlers for the application's IPC communication
- * 
+ *
  * @param {BrowserWindow} mainWindow - The main application window
  * @param {Object} configManager - Manager for application configuration
  * @param {Object} windowManager - Manager for window visibility and state
@@ -19,11 +19,11 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     configManager.updateSettings(settings);
 
     // Initialize or update AI clients based on provider
-    if (settings.aiProvider === 'openai' && settings.openaiApiKey) {
-      aiProviders.updateAIClients('openai', settings.openaiApiKey);
-    } else if (settings.aiProvider === 'gemini' && settings.geminiApiKey) {
-      aiProviders.updateAIClients('gemini', settings.geminiApiKey);
-    } else if (settings.aiProvider === 'ollama' && settings.ollamaUrl) {
+    if (settings.aiProvider === "openai" && settings.openaiApiKey) {
+      aiProviders.updateAIClients("openai", settings.openaiApiKey);
+    } else if (settings.aiProvider === "gemini" && settings.geminiApiKey) {
+      aiProviders.updateAIClients("gemini", settings.geminiApiKey);
+    } else if (settings.aiProvider === "ollama" && settings.ollamaUrl) {
       aiProviders.setOllamaBaseURL(settings.ollamaUrl);
     }
 
@@ -75,67 +75,6 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
   return ipcMain;
 }
 
-/**
- * Sets up screen capture detection to hide the application when screen sharing is detected
- * 
- * @param {BrowserWindow} mainWindow - The main application window
- * @param {Object} windowManager - Manager for window visibility and state
- */
-function setupScreenCaptureDetection(mainWindow, windowManager) {
-  if (process.platform === "darwin") {
-    try {
-      const hasScreenCapturePermission = systemPreferences.getMediaAccessStatus("screen");
-      console.log(`Initial screen capture permission: ${hasScreenCapturePermission}`);
-
-      // Monitor permission changes
-      systemPreferences.subscribeMediaAccessStatus('screen', (status, oldStatus) => {
-        console.log(`Screen permission changed from ${oldStatus} to ${status}`);
-        
-        if (status === 'granted') {
-          mainWindow?.webContents?.send(IPC_CHANNELS.NOTIFICATION, {
-            title: "Permission Granted",
-            body: "Screen recording permission has been granted. You can now take screenshots.",
-            type: "success"
-          });
-        } else if (status === 'denied' || status === 'restricted') {
-          mainWindow?.webContents?.send(IPC_CHANNELS.NOTIFICATION, {
-            title: "Permission Denied",
-            body: "Screen recording permission is denied. Please enable it in System Preferences > Security & Privacy > Privacy > Screen Recording.",
-            type: "error"
-          });
-        }
-      });
-
-      // Use workspace notification to detect screen sharing
-      if (hasScreenCapturePermission === "granted") {
-        systemPreferences.subscribeWorkspaceNotification("NSWorkspaceScreenIsSharedDidChangeNotification", () => {
-          const isBeingCaptured = systemPreferences.getMediaAccessStatus("screen") === "granted";
-
-          if (isBeingCaptured) {
-            windowManager.toggleWindowVisibility(false);
-            if (mainWindow?.webContents) {
-              mainWindow.webContents.send(IPC_CHANNELS.SCREEN_SHARING_DETECTED);
-            }
-          }
-        });
-      } else {
-        mainWindow?.webContents?.send(IPC_CHANNELS.NOTIFICATION, {
-          title: "Permission Required",
-          body: "Screen recording permission is required for this app to work correctly. Please enable it in System Preferences > Security & Privacy > Privacy > Screen Recording.",
-          type: "warning"
-        });
-      }
-    } catch (error) {
-      console.error("Error setting up screen capture detection:", error);
-    }
-  }
-
-  if (process.platform === "win32" || process.platform === "linux") {
-    console.log("Screen capture detection is not implemented for this platform");
-  }
-}
-
 module.exports = {
   setupEventHandlers,
-  setupScreenCaptureDetection,
 };

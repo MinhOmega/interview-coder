@@ -13,16 +13,16 @@ let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 function initializeAIClients() {
   try {
     // Only try to load from localStorage if in renderer process
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== "undefined") {
       try {
-        const storedOpenAIKey = localStorage.getItem('openai_api_key');
-        const storedGeminiKey = localStorage.getItem('gemini_api_key');
-        
+        const storedOpenAIKey = localStorage.getItem("openai_api_key");
+        const storedGeminiKey = localStorage.getItem("gemini_api_key");
+
         if (storedOpenAIKey) {
           console.log("Initializing OpenAI client from stored key");
           openai = new OpenAI({ apiKey: storedOpenAIKey });
         }
-        
+
         if (storedGeminiKey) {
           console.log("Initializing Gemini client from stored key");
           geminiAI = new GoogleGenerativeAI(storedGeminiKey);
@@ -46,12 +46,12 @@ function initializeAIClients() {
 function updateAIClients(provider, apiKey) {
   try {
     console.log(`Updating ${provider} client with new API key...`);
-    
-    if (!apiKey || apiKey.trim() === '') {
+
+    if (!apiKey || apiKey.trim() === "") {
       console.error(`Invalid ${provider} API key: Key is empty or missing`);
       return false;
     }
-    
+
     if (provider === AI_PROVIDERS.OPENAI && apiKey) {
       openai = new OpenAI({ apiKey });
       console.log("OpenAI client initialized successfully");
@@ -428,13 +428,11 @@ async function generateWithGemini(messages, model, streaming = false) {
 
     // Log information about content being sent to Gemini
     console.log(`Sending to Gemini: ${contentParts.length} content parts`);
-    console.log(`Content parts include ${contentParts.filter(p => p.text).length} text parts and ${contentParts.filter(p => p.inlineData).length} image parts`);
-
-    // Create the content message format required by Gemini
-    const geminiContent = {
-      parts: contentParts,
-      role: "user",
-    };
+    console.log(
+      `Content parts include ${contentParts.filter((p) => p.text).length} text parts and ${
+        contentParts.filter((p) => p.inlineData).length
+      } image parts`,
+    );
 
     // Generate configuration including safety settings
     const genConfig = {
@@ -444,12 +442,22 @@ async function generateWithGemini(messages, model, streaming = false) {
       maxOutputTokens: 8192,
     };
 
+    // Create the content object required by Gemini
+    const geminiContent = {
+      parts: contentParts,
+      role: "user",
+    };
+
     if (streaming) {
       console.log("Starting Gemini streaming response");
       const emitter = new EventEmitter();
-      
+
       try {
-        const result = await geminiModel.generateContentStream(geminiContent, genConfig);
+        // For streaming, we need to use the proper request format
+        const result = await geminiModel.generateContentStream({
+          contents: [geminiContent],
+          generationConfig: genConfig,
+        });
         console.log("Gemini stream created successfully");
 
         (async () => {
@@ -465,7 +473,10 @@ async function generateWithGemini(messages, model, streaming = false) {
             emitter.emit("complete", fullText);
           } catch (streamError) {
             console.error("Error in Gemini stream processing:", streamError);
-            console.error("Stream error details:", JSON.stringify(streamError, Object.getOwnPropertyNames(streamError)));
+            console.error(
+              "Stream error details:",
+              JSON.stringify(streamError, Object.getOwnPropertyNames(streamError)),
+            );
             emitter.emit("error", streamError);
           }
         })();
@@ -473,54 +484,58 @@ async function generateWithGemini(messages, model, streaming = false) {
         return { emitter };
       } catch (streamCreationError) {
         console.error("Failed to create Gemini stream:", streamCreationError);
-        console.error("Error details:", JSON.stringify(streamCreationError, Object.getOwnPropertyNames(streamCreationError)));
-        
+        console.error(
+          "Error details:",
+          JSON.stringify(streamCreationError, Object.getOwnPropertyNames(streamCreationError)),
+        );
+
         // Create a more detailed error message
         let errorMessage = "Failed to create Gemini stream";
-        
+
         if (streamCreationError.message) {
           errorMessage += `: ${streamCreationError.message}`;
         }
-        
+
         if (streamCreationError.status) {
           errorMessage += ` (Status: ${streamCreationError.status})`;
         }
-        
+
         throw new Error(errorMessage);
       }
     } else {
       console.log("Starting Gemini non-streaming response");
       try {
-        const result = await geminiModel.generateContent(geminiContent, genConfig);
+        // For non-streaming, use the same format as streaming for consistency
+        const result = await geminiModel.generateContent(geminiContent);
         const text = result.response.text();
         console.log(`Received ${text.length} characters from Gemini`);
         return text;
       } catch (error) {
         console.error("Error in Gemini generateContent:", error);
         console.error("Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        
+
         // Create a more detailed error message
         let errorMessage = "Failed to generate content with Gemini";
-        
+
         if (error.message) {
           errorMessage += `: ${error.message}`;
         }
-        
+
         if (error.status) {
           errorMessage += ` (Status: ${error.status})`;
         }
-        
+
         throw new Error(errorMessage);
       }
     }
   } catch (error) {
     console.error("Error in generateWithGemini:", error);
-    
+
     // Log additional information for connection errors
-    if (error.message && error.message.includes("network") || error.message.includes("connection")) {
+    if ((error.message && error.message.includes("network")) || error.message.includes("connection")) {
       console.error("Network error details:", error);
     }
-    
+
     throw error;
   }
 }
