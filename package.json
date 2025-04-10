@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "cross-env NODE_ENV=development electron ."
+    "start": "electron ."
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
@@ -15,16 +14,10 @@
     "image-size": "^2.0.0",
     "openai": "^4.90.0",
     "rehype-stringify": "^10.0.1",
-    "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
-    "remark-html": "^16.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "screenshot-desktop": "^1.15.0",
     "unified": "^11.0.5"
-  },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "electron-reloader": "^1.2.3"
   }
 }
