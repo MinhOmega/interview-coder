@@ -1,7 +1,7 @@
 const axios = require("axios");
 const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { Events } = require("events");
+const EventEmitter = require("events");
 
 // Configure axios to use IPv4
 axios.defaults.family = 4;
@@ -523,7 +523,7 @@ async function generateWithGemini(messages, model, streaming = false) {
       let fullResponse = "";
 
       // Return an object that emits events for streaming
-      const emitter = new Events.EventEmitter();
+      const emitter = new EventEmitter();
 
       // Process the stream
       (async () => {
