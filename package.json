@@ -35,17 +35,17 @@
       ]
     },
     "dmg": {
-      "background": "build/mac_bg.PNG",
       "icon": "build/logo.icns",
       "iconSize": 128,
       "contents": [
         {
-          "x": 130,
-          "y": 220
+          "x": 270,
+          "y": 220,
+          "type": "file"
         },
         {
-          "x": 410,
-          "y": 220,
+          "x": 270,
+          "y": 400,
           "type": "link",
           "path": "/Applications"
         }

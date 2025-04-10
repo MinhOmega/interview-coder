@@ -3,25 +3,20 @@ const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const EventEmitter = require("events");
 
-// Configure axios to use IPv4
 axios.defaults.family = 4;
 
-// Initialize clients
 let openai = null;
 let geminiAI = null;
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
-// Initialize the AI clients
 function initializeAIClients() {
   try {
-    // Get API key from .env file
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
       openai = new OpenAI({ apiKey });
     }
 
-    // Initialize Gemini client
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
       geminiAI = new GoogleGenerativeAI(geminiApiKey);
@@ -34,10 +29,10 @@ function initializeAIClients() {
 // Update AI clients with new API keys
 function updateAIClients(provider, apiKey) {
   try {
-    if (provider === 'openai' && apiKey) {
+    if (provider === "openai" && apiKey) {
       openai = new OpenAI({ apiKey });
       return true;
-    } else if (provider === 'gemini' && apiKey) {
+    } else if (provider === "gemini" && apiKey) {
       geminiAI = new GoogleGenerativeAI(apiKey);
       return true;
     }
@@ -578,5 +573,5 @@ module.exports = {
   generateWithOllama,
   generateWithGemini,
   getOpenAI: () => openai,
-  getGeminiAI: () => geminiAI
-}; 
+  getGeminiAI: () => geminiAI,
+};

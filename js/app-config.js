@@ -1,14 +1,11 @@
-const path = require("path");
 require("dotenv").config();
-const os = require('os');
 
 // Check if running on macOS
 const isMac = process.platform === "darwin";
-const isWindows = process.platform === 'win32';
-const isLinux = process.platform === 'linux';
+const isWindows = process.platform === "win32";
+const isLinux = process.platform === "linux";
 const modifierKey = isMac ? "⌘" : "Ctrl";
 
-// Default values - use IPv4 address explicitly for Ollama
 const DEFAULT_CONFIG = {
   OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL
     ? process.env.OLLAMA_BASE_URL.replace("localhost", "127.0.0.1")
@@ -16,63 +13,63 @@ const DEFAULT_CONFIG = {
   DEFAULT_MODEL: process.env.OPENAI_MODEL || "gpt-4o-mini",
   DEFAULT_GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.0-flash",
   DEFAULT_OLLAMA_MODEL: process.env.OLLAMA_MODEL || "deepseek-r1:14b",
-  AI_PROVIDER: process.env.AI_PROVIDER || "openai"
+  AI_PROVIDER: process.env.AI_PROVIDER || "openai",
 };
 
 // Define shortcuts configuration
 const SHORTCUTS = {
   TOGGLE_VISIBILITY: {
     key: `${modifierKey}+B`,
-    handler: null, // Will be set in main.js
+    handler: null,
     alwaysActive: true,
   },
   PROCESS_SCREENSHOTS: {
     key: `${modifierKey}+Enter`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   OPEN_SETTINGS: {
     key: `${modifierKey}+,`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   MOVE_LEFT: {
     key: `${modifierKey}+Left`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   MOVE_RIGHT: {
     key: `${modifierKey}+Right`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   MOVE_UP: {
     key: `${modifierKey}+Up`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   MOVE_DOWN: {
     key: `${modifierKey}+Down`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   TAKE_SCREENSHOT: {
     key: `${modifierKey}+H`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   AREA_SCREENSHOT: {
     key: `${modifierKey}+D`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   MULTI_PAGE: {
     key: `${modifierKey}+A`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   RESET: {
     key: `${modifierKey}+R`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   QUIT: {
     key: `${modifierKey}+Q`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
   MODEL_SELECTION: {
     key: `${modifierKey}+M`,
-    handler: null, // Will be set in main.js
+    handler: null,
   },
 };
 
@@ -83,39 +80,36 @@ const platformSpecificShortcuts = {
 
 // Default application settings
 const defaultSettings = {
-  aiProvider: 'openai',
-  openaiApiKey: '',
-  geminiApiKey: '',
-  ollamaBaseUrl: 'http://localhost:11434',
-  preferredModel: 'gpt-3.5-turbo',
-  theme: 'system',
+  aiProvider: "openai",
+  openaiApiKey: "",
+  geminiApiKey: "",
+  ollamaBaseUrl: "http://localhost:11434",
+  preferredModel: "gpt-3.5-turbo",
+  theme: "system",
   fontSize: 14,
   showLineNumbers: true,
   wordWrap: true,
   enableNotifications: true,
   autoUpdate: true,
-  saveHistory: true
+  saveHistory: true,
 };
 
-// API timeout settings in milliseconds
 const timeouts = {
-  modelList: 5000,     // Timeout for fetching model list
-  completion: 60000,   // Timeout for completion requests
-  longOperation: 30000 // Timeout for other long operations
+  modelList: 5000,
+  completion: 60000,
+  longOperation: 30000,
 };
 
-// File paths (relative to user data folder)
 const paths = {
-  settings: 'settings.json',
-  history: 'history.json'
+  settings: "settings.json",
+  history: "history.json",
 };
 
-// Application metadata
 const appMetadata = {
-  name: 'OA Coder',
-  version: '1.0.0',
-  releaseDate: '2023-06-01',
-  repository: 'https://github.com/yourname/oa-coder'
+  name: "OA Coder",
+  version: "1.0.0",
+  releaseDate: "2023-06-01",
+  repository: "https://github.com/yourname/oa-coder",
 };
 
 module.exports = {
@@ -129,5 +123,5 @@ module.exports = {
   defaultSettings,
   timeouts,
   paths,
-  appMetadata
-}; 
+  appMetadata,
+};
