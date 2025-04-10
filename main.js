@@ -19,20 +19,6 @@ const axios = require("axios");
 const Screenshots = require("electron-screenshots");
 require("dotenv").config();
 
-// Enable hot reload for development
-try {
-  // Only enable in development and not in production
-  if (process.env.NODE_ENV !== "production") {
-    require("electron-reloader")(module, {
-      debug: true,
-      watchRenderer: true,
-    });
-    console.log("Hot reload enabled");
-  }
-} catch (err) {
-  console.error("Error setting up hot reload:", err);
-}
-
 // Check if running on macOS
 const isMac = process.platform === "darwin";
 const modifierKey = isMac ? "Command" : "Crtl";
