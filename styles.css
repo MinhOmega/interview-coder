@@ -1,7 +1,66 @@
+:root {
+  /* Background colors */
+  --bg-transparent: transparent;
+  --bg-main: rgba(128, 128, 128, 0.15);
+  --bg-content: rgba(128, 128, 128, 0.15);
+  --bg-dark: rgba(25, 25, 25, 0.97);
+  --bg-darker: rgba(20, 20, 20, 0.98);
+  --bg-code: rgba(25, 25, 25, 0.97);
+  --bg-toolbar: linear-gradient(to bottom, rgba(35, 35, 35, 0.98), rgba(30, 30, 30, 0.95));
+  --bg-button: rgba(60, 60, 60, 0.7);
+  --bg-button-hover: rgba(80, 80, 80, 0.9);
+  --bg-button-shortcut: rgba(40, 40, 40, 0.7);
+  --bg-inline-code: rgba(40, 40, 40, 0.7);
+  --bg-table-header: rgba(40, 40, 40, 0.8);
+  --bg-table-even: rgba(40, 40, 40, 0.4);
+  --bg-language-tag: rgba(50, 50, 50, 0.95);
+  --bg-notification-success: rgba(76, 175, 80, 0.95);
+  --bg-notification-warning: rgba(255, 152, 0, 0.95);
+  --bg-notification-error: rgba(244, 67, 54, 0.95);
+  --bg-error: rgba(255, 77, 77, 0.08);
+  --bg-warning: rgba(255, 204, 51, 0.08);
+  --bg-scrollbar: rgba(30, 30, 30, 0.95);
+  --bg-scrollbar-thumb: rgba(120, 120, 120, 0.7);
+  --bg-scrollbar-thumb-hover: rgba(120, 120, 120, 0.9);
+  --bg-code-scrollbar-thumb: rgba(140, 140, 140, 0.7);
+  --bg-code-scrollbar-thumb-hover: rgba(160, 160, 160, 0.95);
+  --bg-context-actions: rgba(30, 30, 30, 0.9);
+  --bg-context-button: rgba(50, 50, 50, 0.8);
+  --bg-context-button-hover: rgba(70, 70, 70, 0.9);
+  --bg-add-context: rgba(40, 90, 40, 0.6);
+  --bg-add-context-hover: rgba(50, 120, 50, 0.8);
+  --bg-report-error: rgba(90, 40, 40, 0.6);
+  --bg-report-error-hover: rgba(120, 50, 50, 0.8);
+  --bg-model-badge: rgba(30, 30, 30, 0.8);
+
+  /* Text colors */
+  --text-main: rgba(255, 255, 255, 0.9);
+  --text-code: rgba(255, 255, 255, 0.95);
+  --text-blockquote: rgba(255, 255, 255, 0.8);
+  --text-link: #5e9eff;
+  --text-error: #ff4d4d;
+  --text-warning: #ffcc33;
+
+  /* Border colors */
+  --border-light: rgba(120, 120, 120, 0.2);
+  --border-medium: rgba(120, 120, 120, 0.3);
+  --border-dark: rgba(100, 100, 100, 0.3);
+  --border-code: rgba(120, 120, 120, 0.3);
+  --border-table: rgba(100, 100, 100, 0.3);
+  --border-language-tag: rgba(120, 120, 120, 0.4);
+  --border-error: #ff4d4d;
+  --border-warning: #ffcc33;
+  --border-success: #2E7D32;
+  --border-warning-notification: #E65100;
+  --border-error-notification: #C62828;
+  --border-button: rgba(80, 80, 80, 0.3);
+  --border-context-button: rgba(100, 100, 100, 0.4);
+}
+
 html {
   width: 100%;
   height: 100%;
-  background: none;
+  background: var(--bg-transparent);
 }
 
 body {
@@ -9,17 +68,12 @@ body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background: rgba(25, 25, 25, 0.85);
-  /* Darker, more modern semi-transparent background */
+  background: var(--bg-transparent);
   font-family: 'Inter', 'SF Pro Display', Arial, sans-serif;
   overflow: hidden;
   position: relative;
   border-radius: 12px;
-  /* More rounded corners */
-  border: 1px solid rgba(100, 100, 100, 0.3);
-  /* Subtle border */
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  /* Stronger shadow for depth */
 }
 
 /* Improved instruction banner */
@@ -42,19 +96,13 @@ body {
 
 #result-content {
   width: 100%;
-  max-width: 900px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 30px 20px;
   box-sizing: border-box;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
-  background-color: transparent;
-}
-
-#result-content:empty {
-  display: none;
+  overflow-x: hidden;
+  background-color: var(--bg-transparent);
+  height: 100vh;
 }
 
 /* Ensure code blocks are scrollable */
@@ -66,7 +114,6 @@ body {
 /* Code block improvements */
 .code-block-container pre code {
   background: transparent !important;
-  padding: 15px !important;
   border-radius: 6px !important;
   position: relative;
   font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace !important;
@@ -115,17 +162,18 @@ pre:before {
 /* Enhanced scrollbar styles for code blocks */
 #result-content pre::-webkit-scrollbar {
   height: 10px;
-  background: transparent;
+  background: var(--bg-scrollbar);
   border-radius: 5px;
 }
 
 #result-content pre::-webkit-scrollbar-thumb {
-  background: rgba(100, 100, 100, 0.7);
+  background: var(--bg-code-scrollbar-thumb);
+  /* Brighter scrollbar for better visibility */
   border-radius: 5px;
 }
 
 #result-content pre::-webkit-scrollbar-thumb:hover {
-  background: rgba(120, 120, 120, 0.9);
+  background: var(--bg-code-scrollbar-thumb-hover);
 }
 
 /* Make long code lines wrap to be helpful on mobile */
@@ -137,20 +185,19 @@ pre:before {
   }
 }
 
-/* Scrollbar for result content */
 #result-content::-webkit-scrollbar {
-  width: 10px;
-  background: rgba(30, 30, 30, 0.5);
+  width: 5px;
+  background: var(--bg-scrollbar);
   border-radius: 5px;
 }
 
 #result-content::-webkit-scrollbar-thumb {
-  background: rgba(100, 100, 100, 0.7);
+  background: var(--bg-scrollbar-thumb);
   border-radius: 5px;
 }
 
 #result-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(120, 120, 120, 0.9);
+  background: var(--bg-scrollbar-thumb-hover);
 }
 
 /* Code block copy button */
@@ -268,7 +315,7 @@ pre:hover .copy-code-button {
 
 pre {
   background: transparent;
-  color: #f0f0f0;
+  color: white;
   padding: 16px;
   border-radius: 8px;
   white-space: pre;
@@ -283,7 +330,6 @@ code {
   font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
   background: rgba(60, 60, 60, 0.95);
   color: #fff;
-  padding: 3px 6px;
   border-radius: 4px;
   font-size: 0.9em;
 }
@@ -474,7 +520,7 @@ body.invisible-mode {
 }
 
 body.invisible-mode:hover {
-  opacity: 0.8;
+  opacity: 1;
 }
 
 /* Updated top toolbar styles */
@@ -490,9 +536,7 @@ body.invisible-mode:hover {
   align-items: center;
   gap: 12px;
   z-index: 9500;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   -webkit-app-region: drag;
-  border-radius: 12px 12px 0 0;
   box-sizing: border-box;
   height: 50px;
   cursor: move;
@@ -595,20 +639,18 @@ body.invisible-mode:hover {
 
 /* Content container */
 #content-container {
-  padding-top: 60px;
+  margin-top: 60px;
   width: 100%;
-  height: calc(100% - 50px);
+  height: 100%;
   box-sizing: border-box;
   position: relative;
+  background: var(--bg-main);
 }
 
 /* Response overlay */
 #main-content {
-  padding: 20px;
   margin: 60px auto 20px auto;
   max-width: 900px;
-  color: #f0f0f0;
+  color: white;
   position: relative;
-  padding-bottom: 80px;
-  /* Add extra padding at the bottom for the sticky buttons */
 }
