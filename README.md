@@ -1,7 +1,7 @@
 # <div align="center">Interview Coder</div>
 
 <div align="center">
-  <img src="build/icon.png" alt="Interview Coder Logo" width="150" height="150"/>
+  <img src="build/logo.png" alt="Interview Coder Logo" width="150" height="150"/>
   <br/>
   <br/>
   <strong>Your AI-Powered Coding Interview Assistant</strong>
