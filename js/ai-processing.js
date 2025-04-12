@@ -147,7 +147,7 @@ async function processScreenshots(
 
     if (aiProvider === AI_PROVIDERS.OPENAI) {
       if (!openai) {
-        throw new Error("OpenAI client is not initialized. Please check your API key.");
+        throw new Error("OpenAI client is not initialized. Please go to Settings and enter your API key.");
       }
 
       if (useStreaming) {

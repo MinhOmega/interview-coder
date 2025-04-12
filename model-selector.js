@@ -184,10 +184,47 @@ saveBtn.addEventListener("click", async () => {
   const aiProvider = selectedRadio.value;
   let currentModel;
 
+  // Check if we need to initialize API clients based on the selected provider
   if (aiProvider === AI_PROVIDERS.OPENAI) {
+    // Ensure we have an API key for OpenAI
+    const openaiKey = API_KEYS.openai.key;
+    if (!openaiKey) {
+      messageDiv.textContent = "Please enter your OpenAI API key first";
+      messageDiv.className = "status error";
+      return;
+    }
+    
+    // Initialize OpenAI client with the current key
+    try {
+      await ipcRenderer.invoke("initialize-ai-client", "openai", openaiKey);
+    } catch (err) {
+      console.error("Failed to initialize OpenAI client:", err);
+      messageDiv.textContent = "Failed to initialize OpenAI client";
+      messageDiv.className = "status error";
+      return;
+    }
+    
     const selectedCard = openaiModelCards.querySelector(".model-card.selected");
     currentModel = selectedCard ? selectedCard.getAttribute("data-model") : openaiModelSelect.value;
   } else if (aiProvider === AI_PROVIDERS.GEMINI) {
+    // Ensure we have an API key for Gemini
+    const geminiKey = API_KEYS.gemini.key;
+    if (!geminiKey) {
+      messageDiv.textContent = "Please enter your Gemini API key first";
+      messageDiv.className = "status error";
+      return;
+    }
+    
+    // Initialize Gemini client with the current key
+    try {
+      await ipcRenderer.invoke("initialize-ai-client", "gemini", geminiKey);
+    } catch (err) {
+      console.error("Failed to initialize Gemini client:", err);
+      messageDiv.textContent = "Failed to initialize Gemini client";
+      messageDiv.className = "status error";
+      return;
+    }
+    
     const selectedCard = document.getElementById("gemini-model-cards").querySelector(".model-card.selected");
     currentModel = selectedCard
       ? selectedCard.getAttribute("data-model")
@@ -370,6 +407,9 @@ function setupApiKeyInputs() {
         // Save the key
         apiKeyManager.saveApiKey("openai", key);
 
+        // Initialize OpenAI client with the new key
+        ipcRenderer.invoke("initialize-ai-client", "openai", key);
+
         // Auto-fetch models if key is long enough
         if (key.length >= 32) {
           // Minimum length for API keys
@@ -400,6 +440,9 @@ function setupApiKeyInputs() {
 
         // Save the key
         apiKeyManager.saveApiKey("gemini", key);
+
+        // Initialize Gemini client with the new key
+        ipcRenderer.invoke("initialize-ai-client", "gemini", key);
 
         // Auto-fetch models if key is long enough
         if (key.length >= 32) {
