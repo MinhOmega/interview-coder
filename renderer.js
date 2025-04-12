@@ -183,6 +183,17 @@ ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, () => {
   showNotification("Screen sharing detected - window hidden. Press " + modifierKey + "+B to show.", "warning");
 });
 
+// Handle content scrolling from keyboard shortcuts
+ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, (_, scrollAmount) => {
+  const resultContent = document.getElementById("result-content");
+  if (resultContent) {
+    resultContent.scrollBy({
+      top: scrollAmount,
+      behavior: "smooth"
+    });
+  }
+});
+
 // Update the model badge with current settings
 async function updateModelBadge() {
   try {
