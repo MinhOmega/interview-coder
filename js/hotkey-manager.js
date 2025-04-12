@@ -18,19 +18,35 @@ const SHORTCUTS = {
     handler: null,
   },
   MOVE_LEFT: {
-    key: `${modifierKey}+Left`,
+    key: `${modifierKey}+Shift+Left`,
     handler: null,
   },
   MOVE_RIGHT: {
-    key: `${modifierKey}+Right`,
+    key: `${modifierKey}+Shift+Right`,
     handler: null,
   },
   MOVE_UP: {
-    key: `${modifierKey}+Up`,
+    key: `${modifierKey}+Shift+Up`,
     handler: null,
   },
   MOVE_DOWN: {
-    key: `${modifierKey}+Down`,
+    key: `${modifierKey}+Shift+Down`,
+    handler: null,
+  },
+  SCROLL_UP: {
+    key: `Shift+Up`,
+    handler: null,
+  },
+  SCROLL_DOWN: {
+    key: `Shift+Down`,
+    handler: null,
+  },
+  INCREASE_WINDOW_SIZE: {
+    key: `${modifierKey}+Shift+=`,
+    handler: null,
+  },
+  DECREASE_WINDOW_SIZE: {
+    key: `${modifierKey}+Shift+-`,
     handler: null,
   },
   TAKE_SCREENSHOT: {

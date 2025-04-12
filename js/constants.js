@@ -29,6 +29,7 @@ const IPC_CHANNELS = {
   SCREENSHOT_READY_FOR_PROCESSING: "screenshot-ready-for-processing",
   GET_OLLAMA_MODELS: "get-ollama-models",
   DEV_RELOAD: "dev-reload",
+  SCROLL_CONTENT: "scroll-content",
 };
 
 module.exports = {
