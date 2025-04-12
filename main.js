@@ -14,10 +14,35 @@ const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS } = require("./js/constants");
 require("dotenv").config();
 
+// Set up hot reload for development
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+if (isDev) {
+  try {
+    require('electron-reload')(__dirname, {
+      electron: path.join(__dirname, 'node_modules', '.bin', 'electron'),
+      hardResetMethod: 'exit',
+      ignored: [
+        /node_modules/,
+        /[\/\\]\./,
+        /\.git/,
+        /\.map$/,
+        /package-lock\.json$/
+      ]
+    });
+    console.log('Hot reload enabled for development');
+  } catch (err) {
+    console.error('Failed to initialize hot reload:', err);
+  }
+}
+
+// Development mode notification
+if (isDev) {
+  console.log('Running in development mode with hot reload');
+}
+
 axios.defaults.family = 4;
 
 let openai = null;
-let geminiAI = null;
 
 try {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -91,6 +116,17 @@ app.whenReady().then(() => {
   const mainWindow = windowManager.createMainWindow();
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
   const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
+
+  // Set up hot reload for development mode with more granular control
+  if (isDev) {
+    try {
+      const devConfig = require('./js/dev-config');
+      // Pass windows to the hot reload module for targeted reloading
+      devConfig.setupHotReload(mainWindow, windowManager.getModelListWindow());
+    } catch (err) {
+      console.error('Error setting up dev hot reload:', err);
+    }
+  }
 
   hotkeyManager.registerHandlers({
     TOGGLE_VISIBILITY: () => {
