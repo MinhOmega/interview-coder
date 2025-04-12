@@ -1,5 +1,4 @@
 :root {
-  /* Color scheme */
   --bg-body: #f8f9fa;
   --bg-card: #ffffff;
   --bg-hover: #f0f4f8;
@@ -14,8 +13,7 @@
   --bg-button-danger-hover: #c0392b;
   --bg-loading: rgba(0, 0, 0, 0.05);
   --bg-modal-overlay: rgba(0, 0, 0, 0.4);
-  
-  /* Text colors */
+
   --text-primary: #1a1a2e;
   --text-secondary: #505f79;
   --text-muted: #8892a0;
@@ -23,33 +21,28 @@
   --text-success: #00875a;
   --text-error: #de350b;
   --text-warning: #ff8800;
-  
-  /* Border colors */
+
   --border-light: #dfe1e6;
   --border-medium: #c1c7d0;
   --border-focused: #4361ee;
   --border-success: #2ecc71;
   --border-warning: #f39c12;
   --border-error: #e74c3c;
-  
-  /* Shadows */
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  
-  /* Spacing */
+
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
-  
-  /* Border radius */
+
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  
-  /* Animation */
+
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 }
@@ -109,7 +102,6 @@ h3 {
   box-shadow: var(--shadow-md);
 }
 
-/* API Key Section */
 .api-key-section {
   background-color: var(--bg-hover);
   padding: var(--space-md);
@@ -127,7 +119,7 @@ h3 {
 .api-key-input {
   width: 100%;
   padding: var(--space-sm) var(--space-md);
-  padding-right: 40px; /* Make room for the toggle button */
+  padding-right: 40px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-medium);
   background-color: var(--bg-card);
@@ -178,7 +170,6 @@ h3 {
   color: var(--text-primary);
 }
 
-/* Flex utilities */
 .flex {
   display: flex;
 }
@@ -207,24 +198,54 @@ h3 {
   gap: var(--space-md);
 }
 
-/* Margin utilities */
-.mt-0 { margin-top: 0; }
-.mt-1 { margin-top: var(--space-xs); }
-.mt-2 { margin-top: var(--space-sm); }
-.mt-4 { margin-top: var(--space-md); }
-.mt-6 { margin-top: var(--space-lg); }
+.mt-0 {
+  margin-top: 0;
+}
 
-.mb-0 { margin-bottom: 0; }
-.mb-1 { margin-bottom: var(--space-xs); }
-.mb-2 { margin-bottom: var(--space-sm); }
-.mb-4 { margin-bottom: var(--space-md); }
-.mb-6 { margin-bottom: var(--space-lg); }
+.mt-1 {
+  margin-top: var(--space-xs);
+}
 
-/* Width utilities */
-.w-full { width: 100%; }
-.w-auto { width: auto; }
+.mt-2 {
+  margin-top: var(--space-sm);
+}
 
-/* Forms */
+.mt-4 {
+  margin-top: var(--space-md);
+}
+
+.mt-6 {
+  margin-top: var(--space-lg);
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.mb-1 {
+  margin-bottom: var(--space-xs);
+}
+
+.mb-2 {
+  margin-bottom: var(--space-sm);
+}
+
+.mb-4 {
+  margin-bottom: var(--space-md);
+}
+
+.mb-6 {
+  margin-bottom: var(--space-lg);
+}
+
+.w-full {
+  width: 100%;
+}
+
+.w-auto {
+  width: auto;
+}
+
 .radio-group {
   margin-bottom: var(--space-md);
 }
@@ -255,7 +276,8 @@ h3 {
   margin-right: var(--space-sm);
 }
 
-select, input[type="text"] {
+select,
+input[type="text"] {
   width: 100%;
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
@@ -266,13 +288,13 @@ select, input[type="text"] {
   transition: all var(--transition-fast);
 }
 
-select:focus, input[type="text"]:focus {
+select:focus,
+input[type="text"]:focus {
   outline: none;
   border-color: var(--border-focused);
   box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
 }
 
-/* Helper text */
 .text-xs {
   font-size: 12px;
 }
@@ -288,7 +310,6 @@ select:focus, input[type="text"]:focus {
   margin-bottom: var(--space-sm);
 }
 
-/* Status indicators */
 .status {
   padding: var(--space-sm);
   margin-top: var(--space-sm);
@@ -314,7 +335,6 @@ select:focus, input[type="text"]:focus {
   border-left: 3px solid var(--border-warning);
 }
 
-/* Buttons */
 button {
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
@@ -378,7 +398,6 @@ button:disabled {
   background-color: var(--bg-button-danger-hover);
 }
 
-/* Loading spinner */
 .loading {
   display: inline-block;
   width: 16px;
@@ -397,7 +416,6 @@ button:disabled {
   }
 }
 
-/* Model cards */
 .model-cards {
   display: grid;
   gap: var(--space-sm);
@@ -442,7 +460,7 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: calc(100% - 60px); /* Make room for badges */
+  max-width: calc(100% - 60px);
 }
 
 .model-card-badge {
@@ -461,126 +479,119 @@ button:disabled {
   color: var(--bg-button-primary);
 }
 
-/* Add a second badge positioning class for multiple badges */
 .model-card-badge.second {
   top: 32px;
 }
 
-/* Compact mode for model cards on small widths */
 @media (max-width: 500px) {
   .model-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .model-card {
     padding: var(--space-sm);
     margin-bottom: var(--space-xs);
   }
-  
+
   .model-card-title {
     font-size: 14px;
   }
-  
+
   .model-card-description {
     font-size: 11px;
   }
-  
+
   .model-card-badge {
     font-size: 9px;
     padding: 1px 4px;
   }
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   body {
     padding: var(--space-sm);
   }
-  
+
   .section {
     padding: var(--space-md);
   }
-  
+
   .model-cards {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
-  
+
   .modal-content {
     width: 95%;
     margin: 5% auto;
     padding: var(--space-md);
   }
-  
+
   h1 {
     font-size: 20px;
     margin-bottom: var(--space-md);
   }
-  
+
   h2 {
     font-size: 16px;
   }
-  
-  /* Make provider selection more touch-friendly */
+
   .radio-label {
     padding: var(--space-md);
     margin-bottom: var(--space-md);
   }
-  
-  /* Improve button spacing on mobile */
+
   .flex.justify-between {
     gap: var(--space-sm);
   }
-  
+
   button {
     padding: var(--space-sm) var(--space-md);
     font-size: 13px;
   }
 }
 
-/* Small mobile screens */
 @media (max-width: 480px) {
   body {
     padding: var(--space-xs);
   }
-  
+
   .section {
     padding: var(--space-sm);
     margin-bottom: var(--space-md);
   }
-  
+
   .model-cards {
     grid-template-columns: 1fr;
   }
-  
-  /* Stack buttons on very small screens */
+
   .flex.justify-between {
     flex-direction: column;
     gap: var(--space-sm);
   }
-  
+
   button {
     width: 100%;
   }
-  
+
   .radio-label {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-xs);
   }
-  
+
   .radio-label input[type="radio"] {
     margin-right: 0;
     margin-bottom: var(--space-xs);
   }
-  
+
   .provider-badge {
     margin-left: 0;
     margin-top: var(--space-xs);
   }
 }
 
-/* Loading status styling improvements */
-#gemini-loading, #ollama-status {
+#gemini-loading,
+#ollama-status {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -590,13 +601,11 @@ button:disabled {
   margin-bottom: var(--space-md);
 }
 
-/* Ensure better keyboard navigation */
 .model-card:focus {
   outline: 2px solid var(--border-focused);
   outline-offset: 2px;
 }
 
-/* Modal dialog */
 .modal {
   display: none;
   position: fixed;
@@ -610,8 +619,13 @@ button:disabled {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
@@ -626,8 +640,15 @@ button:disabled {
 }
 
 @keyframes slideDown {
-  from { transform: translateY(-30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .close-modal {
@@ -643,7 +664,6 @@ button:disabled {
   color: var(--text-error);
 }
 
-/* Provider badge */
 .provider-badge {
   display: inline-flex;
   align-items: center;
@@ -669,7 +689,6 @@ button:disabled {
   color: #4361ee;
 }
 
-/* Keyboard shortcut badge */
 .shortcut-badge {
   display: inline-flex;
   align-items: center;
@@ -682,7 +701,6 @@ button:disabled {
   border: 1px solid var(--border-light);
 }
 
-/* API Key Toggle Button Styles */
 .api-key-toggle {
   position: absolute;
   right: 10px;
@@ -721,17 +739,15 @@ button:disabled {
   display: block;
 }
 
-/* API Key Input Container */
 .api-key-input-container {
   position: relative;
   width: 100%;
 }
 
 .api-key-input {
-  padding-right: 40px; /* Make room for the toggle button */
+  padding-right: 40px;
 }
 
-/* Sticky footer for buttons */
 .sticky-footer {
   position: fixed;
   bottom: 0;
@@ -758,15 +774,14 @@ button:disabled {
   flex-shrink: 0;
 }
 
-/* Fix for small screens - ensure buttons stay in a row */
 @media (max-width: 768px) {
   .sticky-footer {
     padding: var(--space-md);
     gap: var(--space-md);
     flex-direction: row;
   }
-  
+
   .sticky-footer button {
     flex: 1;
   }
-} 
+}
