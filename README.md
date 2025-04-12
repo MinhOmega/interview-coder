@@ -141,6 +141,44 @@ This project is under active development. While core features are functional, yo
 
 Inspired by interviewcoder.co but with a twist - making the tool openly available rather than behind paywalls. This project aims to challenge the status quo of technical interviews and encourage companies to explore more comprehensive ways of assessing candidates beyond traditional coding challenges.
 
+## Development Mode with Hot Reload
+
+This application supports a development mode with hot reloading for a more efficient development experience.
+
+### Running in Development Mode
+
+Use these npm scripts to run the application with hot reload enabled:
+
+```bash
+# For macOS/Linux
+npm run dev
+
+# For Windows
+npm run dev:windows
+```
+
+### Hot Reload Features
+
+When running in development mode, the application provides the following features:
+
+- **Automatic reloading** when files are changed
+- **Manual reload** with keyboard shortcut `Ctrl+Shift+R` (or `Cmd+Shift+R` on macOS)
+- **Force reload option** in the right-click context menu
+- **Independent window reload** - only reloads the window (main or settings) that's affected by the file changes
+
+### Monitored Files
+
+The following files are monitored for changes:
+
+- **Renderer Files**: HTML, CSS, and renderer JavaScript files
+- **Main Process Files**: main.js and all files in the js/ directory
+
+### Debugging
+
+To open the DevTools for debugging:
+- Use keyboard shortcut `Ctrl+Shift+I` (or `Cmd+Shift+I` on macOS)
+- Or right-click and select "Inspect Element" from the context menu
+
 <div align="center">
 <br/>
 Made with ❤️ by <a href="mailto:vnqminh0502@gmail.com">Minh Vo</a>

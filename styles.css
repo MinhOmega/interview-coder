@@ -1,7 +1,6 @@
 :root {
-  /* Background colors */
   --bg-transparent: transparent;
-  --bg-main: rgba(128, 128, 128, 0.15);
+  --bg-main: rgba(30, 30, 30, 0.3);
   --bg-content: rgba(128, 128, 128, 0.15);
   --bg-dark: rgba(25, 25, 25, 0.97);
   --bg-darker: rgba(20, 20, 20, 0.98);
@@ -48,7 +47,6 @@
   --bg-loading: rgba(0, 0, 0, 0.05);
   --bg-modal-overlay: rgba(0, 0, 0, 0.4);
 
-  /* Text colors */
   --text-main: rgba(255, 255, 255, 0.9);
   --text-code: rgba(255, 255, 255, 0.95);
   --text-blockquote: rgba(255, 255, 255, 0.8);
@@ -63,7 +61,6 @@
   --text-error: #de350b;
   --text-warning: #ff8800;
 
-  /* Border colors */
   --border-light: rgba(120, 120, 120, 0.2);
   --border-medium: rgba(120, 120, 120, 0.3);
   --border-dark: rgba(100, 100, 100, 0.3);
@@ -78,24 +75,20 @@
   --border-button: rgba(80, 80, 80, 0.3);
   --border-context-button: rgba(100, 100, 100, 0.4);
 
-  /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
-  /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
 
-  /* Border radius */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  /* Animation */
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 }
@@ -180,7 +173,7 @@ pre:before {
   position: absolute;
   top: 0;
   left: 0;
-  background-color: var(--bg-code-block);
+  background-color: var(--bg-language-tag);
   color: white;
   padding: 3px 10px;
   border-radius: 6px 0 6px 0;
@@ -230,7 +223,10 @@ pre:before {
   background: var(--bg-scrollbar-thumb-hover);
 }
 
-/* Code block copy button */
+.code-block-container .copy-code-button {
+  right: 5px;
+}
+
 .copy-code-button {
   position: absolute;
   top: 5px;
@@ -258,7 +254,6 @@ pre:hover .copy-code-button {
   background-color: #4CAF50;
 }
 
-/* Markdown content table styling */
 #result-content table {
   border-collapse: collapse;
   width: 100%;
@@ -281,7 +276,6 @@ pre:hover .copy-code-button {
   background-color: var(--bg-table-even);
 }
 
-/* Make content have more breathing room */
 #result-content h1,
 #result-content h2,
 #result-content h3 {
@@ -322,7 +316,6 @@ pre:hover .copy-code-button {
   padding-left: 0.5em;
 }
 
-/* Blockquote styling */
 #result-content blockquote {
   border-left: 4px solid rgba(120, 120, 120, 0.5);
   padding-left: 1em;
@@ -331,7 +324,6 @@ pre:hover .copy-code-button {
   font-style: italic;
 }
 
-/* Link styling */
 #result-content a {
   color: var(--text-link);
   text-decoration: none;
@@ -344,6 +336,11 @@ pre:hover .copy-code-button {
 }
 
 pre {
+  background-color: rgba(175, 184, 193, 0.2);
+  border-radius: 6px;
+  padding: 16px;
+  margin: 0;
+  overflow-x: auto;
   background: transparent;
   color: white;
   padding: 16px;
@@ -551,7 +548,6 @@ body.invisible-mode:hover {
   opacity: 1;
 }
 
-/* Updated top toolbar styles */
 #top-toolbar {
   position: fixed;
   top: 0;
@@ -586,7 +582,6 @@ body.invisible-mode:hover {
   border-radius: 3px;
 }
 
-/* Toolbar buttons */
 .toolbar-button {
   display: flex;
   align-items: center;
@@ -599,7 +594,6 @@ body.invisible-mode:hover {
   font-size: 13px;
   white-space: nowrap;
   -webkit-app-region: no-drag;
-  /* Make buttons clickable */
   border: 1px solid rgba(80, 80, 80, 0.3);
 }
 
@@ -622,50 +616,12 @@ body.invisible-mode:hover {
   border-radius: 4px;
 }
 
-/* Window control buttons */
-.window-controls {
-  display: none;
-  /* Hide window controls - removing completely */
-}
-
-.window-control {
-  display: none;
-  /* Hide window controls - removing completely */
-}
-
 .close-btn,
 .minimize-btn,
 .maximize-btn {
   display: none;
-  /* Hide window controls - removing completely */
 }
 
-/* Additional styles to completely hide any macOS window controls */
-:root {
-  --electron-titlebar-height: 0;
-}
-
-.window-controls,
-.window-control,
-.close-btn,
-.minimize-btn,
-.maximize-btn,
-:host(.platform-darwin) .titlebar-button,
-:host(.platform-darwin) .titlebar-close,
-:host(.platform-darwin) .titlebar-minimize,
-:host(.platform-darwin) .titlebar-maximize,
-:host(.platform-darwin) .titlebar-fullscreen {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  position: absolute !important;
-  left: -9999px !important;
-  pointer-events: none !important;
-}
-
-/* Content container */
 #content-container {
   margin-top: 60px;
   width: 100%;
@@ -675,10 +631,20 @@ body.invisible-mode:hover {
   background: var(--bg-main);
 }
 
-/* Response overlay */
 #main-content {
   margin: 60px auto 20px auto;
   max-width: 900px;
   color: white;
   position: relative;
+}
+
+code.inline-code {
+  background-color: var(--bg-inline-code);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  font-size: 85%;
+  white-space: break-spaces;
+  color: #fff;
+  display: inline;
 }

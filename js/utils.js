@@ -54,16 +54,26 @@ function updateSectionVisibility(provider) {
   ollamaSection.style.display = "none";
   geminiSection.style.display = "none";
 
+  // If provider is not defined or is a default value, keep all sections hidden
+  if (!provider || provider === "AI") {
+    // Remove selected class from all radio labels
+    radioLabels.forEach((label) => label.classList.remove("selected"));
+    return;
+  }
+
   // Update selected radio label styling
   radioLabels.forEach((label) => label.classList.remove("selected"));
-  document.getElementById(`${provider}-radio-label`).classList.add("selected");
+  const selectedLabel = document.getElementById(`${provider}-radio-label`);
+  if (selectedLabel) {
+    selectedLabel.classList.add("selected");
+  }
 
   // Show the selected provider's section
   if (provider === "openai") {
     openaiSection.style.display = "block";
   } else if (provider === "gemini") {
     geminiSection.style.display = "block";
-  } else {
+  } else if (provider === "ollama") {
     ollamaSection.style.display = "block";
   }
 }

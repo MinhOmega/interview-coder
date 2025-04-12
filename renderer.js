@@ -4,8 +4,15 @@ const remarkGfm = require("remark-gfm").default;
 const remarkParse = require("remark-parse").default;
 const remarkStringify = require("remark-stringify").default;
 const remarkRehype = require("remark-rehype").default;
-const processor = unified().use(remarkParse).use(remarkRehype).use(remarkStringify).use(remarkGfm);
-const { IPC_CHANNELS } = require("./js/constants");
+const rehypeRaw = require("rehype-raw").default;
+const rehypeStringify = require("rehype-stringify").default;
+const processor = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkRehype, { allowDangerousHtml: true })
+  .use(rehypeRaw)
+  .use(remarkStringify);
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 
 const isMac = navigator.platform.includes("Mac");
 const modifierKey = isMac ? "Command" : "Ctrl";
@@ -27,6 +34,12 @@ document.addEventListener("contextmenu", (e) => {
 document.addEventListener("keydown", (e) => {
   if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
     ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
+    e.preventDefault();
+  }
+
+  // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
+    ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
     e.preventDefault();
   }
 });
@@ -185,20 +198,9 @@ async function updateModelBadge() {
         const savedSettings = localStorage.getItem("model-settings");
         if (savedSettings) {
           settings = JSON.parse(savedSettings);
-        } else {
-          // Fallback to default settings
-          settings = {
-            aiProvider: "openai",
-            currentModel: "gpt-4o-mini",
-          };
         }
       } catch (localStorageErr) {
         console.error("Error retrieving from localStorage:", localStorageErr);
-        // Fallback to default settings
-        settings = {
-          aiProvider: "openai",
-          currentModel: "gpt-4o-mini",
-        };
       }
     }
 
@@ -206,21 +208,20 @@ async function updateModelBadge() {
 
     let providerName = "";
     switch (settings.aiProvider) {
-      case "openai":
+      case AI_PROVIDERS.OPENAI:
         providerName = "OpenAI";
         break;
-      case "ollama":
+      case AI_PROVIDERS.OLLAMA:
         providerName = "Ollama";
         break;
-      case "gemini":
+      case AI_PROVIDERS.GEMINI:
         providerName = "Gemini";
         break;
-      default:
-        providerName = settings.aiProvider || "AI";
     }
 
-    const modelName = settings.currentModel || "Default Model";
-    badge.textContent = `${providerName}: ${modelName}`;
+    const modelName = settings.currentModel;
+    badge.textContent =
+      providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
 
     // Save current settings to localStorage for persistence
     try {
@@ -237,30 +238,62 @@ async function updateModelBadge() {
 }
 
 function markdownProcess(markdown) {
-  return (
-    markdown
-      // Escape HTML
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      // Code blocks
-      .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-        return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
-      })
-      // Headers
-      .replace(/^### (.*$)/gm, "<h3>$1</h3>")
-      .replace(/^## (.*$)/gm, "<h2>$1</h2>")
-      .replace(/^# (.*$)/gm, "<h1>$1</h1>")
-      // Bold and italic
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      // Lists
-      .replace(/^\* (.+)/gm, "<li>$1</li>")
-      .replace(/(<li>.*<\/li>)\n/g, "<ul>$1</ul>")
-      // Links
-      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
-      // Paragraphs
-      .replace(/\n\n/g, "</p><p>")
-  );
+  // First safely handle HTML elements while preserving HTML tags like <sup>
+  const safeMarkdown = markdown
+    // Code blocks with language - escape HTML inside code blocks
+    .replace(/```(\w+)\n([\s\S]*?)```/g, (_, lang, code) => {
+      return "```" + lang + "\n" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "\n```";
+    })
+    // Code blocks without language - escape HTML inside code blocks
+    .replace(/```\n([\s\S]*?)```/g, (_, code) => {
+      return "```\n" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "\n```";
+    })
+    // Inline code blocks - escape HTML within them
+    .replace(/`([^`]+)`/g, (_, code) => {
+      return "`" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "`";
+    });
+  
+  // Create a temp div to handle HTML strings safely
+  const tempDiv = document.createElement("div");
+  
+  // Process the markdown with HTML preserved
+  let processedContent = safeMarkdown
+    // Code blocks with language
+    .replace(/```(\w+)\n([\s\S]*?)```/g, (_, lang, code) => {
+      return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
+    })
+    // Code blocks without language
+    .replace(/```\n([\s\S]*?)```/g, (_, code) => {
+      return `<pre><code>${code.trim()}</code></pre>`;
+    })
+    // Inline code blocks
+    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+    // Headers
+    .replace(/^### (.*$)/gm, "<h3>$1</h3>")
+    .replace(/^## (.*$)/gm, "<h2>$1</h2>")
+    .replace(/^# (.*$)/gm, "<h1>$1</h1>")
+    // Bold and italic
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    // Lists
+    .replace(/^\* (.+)/gm, "<li>$1</li>")
+    .replace(/(<li>.*<\/li>)\n/g, "<ul>$1</ul>")
+    // Links
+    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
+    // Paragraphs
+    .replace(/\n\n/g, "</p><p>");
+    
+  tempDiv.innerHTML = processedContent;
+  
+  // Fix any broken HTML structure
+  if (!processedContent.startsWith("<p>")) {
+    processedContent = "<p>" + processedContent;
+  }
+  if (!processedContent.endsWith("</p>")) {
+    processedContent = processedContent + "</p>";
+  }
+  
+  return processedContent;
 }
 
 async function processMarkdown(markdown) {
@@ -273,14 +306,41 @@ async function processMarkdown(markdown) {
     let html = "";
     if (processor) {
       try {
-        const file = await processor.process(markdown);
+        // Try using the unified processor first
+        // Create a custom processor for each run to avoid state issues
+        const customProcessor = unified()
+          .use(remarkParse)
+          .use(remarkGfm)
+          .use(remarkRehype, { allowDangerousHtml: true })
+          .use(rehypeRaw)
+          .use(rehypeStringify);
+        
+        const file = await customProcessor.process(markdown);
         html = String(file);
+        
+        // Ensure inline code blocks are properly styled
+        const tempWrapper = document.createElement("div");
+        tempWrapper.innerHTML = html;
+        
+        // Add class to inline code elements if not already present
+        tempWrapper.querySelectorAll("code:not([class])").forEach((codeEl) => {
+          // Skip if inside a pre element (block code)
+          if (codeEl.parentElement.tagName !== "PRE") {
+            codeEl.classList.add("inline-code");
+          }
+        });
+        
+        html = tempWrapper.innerHTML;
       } catch (err) {
+        console.error("Error using unified processor:", err);
+        // Fall back to our custom markdown processor
         html = markdownProcess(markdown);
       }
     } else {
+      // Use our custom markdown processor if unified isn't available
       html = markdownProcess(markdown);
     }
+    
     // Add copy buttons to code blocks and language tags
     const wrapper = document.createElement("div");
     wrapper.innerHTML = html;
@@ -288,6 +348,12 @@ async function processMarkdown(markdown) {
     // Find all pre > code elements and wrap them with copy button and language tag
     wrapper.querySelectorAll("pre > code").forEach((codeBlock) => {
       const pre = codeBlock.parentNode;
+      
+      // Skip if already processed
+      if (pre.parentNode && pre.parentNode.classList.contains("code-block-container")) {
+        return;
+      }
+      
       const container = document.createElement("div");
       container.className = "code-block-container";
 
@@ -318,7 +384,10 @@ async function processMarkdown(markdown) {
     });
 
     return wrapper.innerHTML;
-  } catch (err) {}
+  } catch (err) {
+    console.error("Error in markdown processing:", err);
+    return `<p class="error-message">Error processing markdown: ${err.message}</p>`;
+  }
 }
 
 // Add copy code functionality
@@ -405,32 +474,26 @@ function showNotification(message, type = "success") {
 
   container.appendChild(notification);
 
-  // Get all existing notifications
   const notifications = container.getElementsByClassName("notification");
   const offset = (notifications.length - 1) * 10; // Stack effect
 
-  // Position the new notification
   notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
-  // Trigger reflow to ensure animation works
   void notification.offsetWidth;
   notification.classList.add("visible");
   notification.style.transform = `translateX(0) translateY(-${offset}px)`;
 
-  // Hide after 1 second
   setTimeout(() => {
     notification.classList.remove("visible");
     notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
-    // Remove from DOM after animation completes
     setTimeout(() => {
       notification.remove();
-      // Reposition remaining notifications
       Array.from(notifications).forEach((n, i) => {
         n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
       });
     }, 300);
-  }, 1000);
+  }, 3500);
 }
 
 // Initialize

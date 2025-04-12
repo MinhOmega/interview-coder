@@ -2,6 +2,7 @@ const AI_PROVIDERS = {
   OPENAI: "openai",
   GEMINI: "gemini",
   OLLAMA: "ollama",
+  DEFAULT: "AI",
 };
 
 const IPC_CHANNELS = {
@@ -27,6 +28,7 @@ const IPC_CHANNELS = {
   UPDATE_MODEL_SETTINGS: "update-model-settings",
   SCREENSHOT_READY_FOR_PROCESSING: "screenshot-ready-for-processing",
   GET_OLLAMA_MODELS: "get-ollama-models",
+  DEV_RELOAD: "dev-reload",
 };
 
 module.exports = {
