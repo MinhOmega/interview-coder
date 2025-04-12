@@ -135,6 +135,7 @@ body {
   overflow-x: hidden;
   background-color: var(--bg-transparent);
   height: 100vh;
+  padding-top: 70px;
 }
 
 #result-content pre {
@@ -633,7 +634,6 @@ body.invisible-mode:hover {
 
 #main-content {
   margin: 60px auto 20px auto;
-  max-width: 900px;
   color: white;
   position: relative;
 }
