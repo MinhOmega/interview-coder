@@ -183,9 +183,9 @@ async function fetchGeminiModels() {
       if (window.currentSettings && window.currentSettings.aiProvider === "gemini" && window.currentSettings.currentModel) {
         window.selectModelCard("gemini", window.currentSettings.currentModel);
       } else {
-        // Select a default model - prefer gemini-1.5-flash if available
+        // Select a default model - prefer gemini-2.0-flash if available
         const defaultModel = geminiModels.find(
-          (model) => model.name.includes("gemini-1.5-flash") || model.name.includes("gemini-pro"),
+          (model) => model.name.includes("gemini-2.0-flash") || model.name.includes("gemini-pro"),
         );
 
         if (defaultModel) {
