@@ -11,7 +11,7 @@ const hotkeyManager = require("./js/hotkey-manager");
 const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
-const { IPC_CHANNELS } = require("./js/constants");
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 require("dotenv").config();
 
 // Set up hot reload for development
@@ -45,17 +45,10 @@ axios.defaults.family = 4;
 let openai = null;
 
 try {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
-    openai = new OpenAI({ apiKey });
-  }
-
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
-    geminiAI = new GoogleGenerativeAI(geminiApiKey);
-  }
-
+  // No longer initializing from environment variables
+  // Clients will be initialized through API key inputs in the UI
+  
+  // Still calling initializeAIClients for backward compatibility
   aiProviders.initializeAIClients();
 } catch (err) {
   console.error("Error setting up AI clients:", err);
@@ -114,6 +107,25 @@ async function processScreenshotsWithAI() {
 
 app.whenReady().then(() => {
   const mainWindow = windowManager.createMainWindow();
+  
+  // Handle API key initialization from UI
+  ipcMain.handle("initialize-ai-client", async (event, provider, apiKey) => {
+    try {
+      console.log(`Initializing ${provider} client with provided API key`);
+      const result = aiProviders.updateAIClients(provider, apiKey);
+      
+      if (provider === AI_PROVIDERS.OPENAI && result) {
+        // Update the openai reference for use in processScreenshots
+        openai = aiProviders.getOpenAI();
+      }
+      
+      return { success: result };
+    } catch (error) {
+      console.error(`Error initializing ${provider} client:`, error);
+      return { success: false, error: error.message };
+    }
+  });
+  
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
   const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
 

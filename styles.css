@@ -1,7 +1,7 @@
 :root {
   /* Background colors */
   --bg-transparent: transparent;
-  --bg-main: rgba(128, 128, 128, 0.15);
+  --bg-main: rgba(30, 30, 30, 0.3);
   --bg-content: rgba(128, 128, 128, 0.15);
   --bg-dark: rgba(25, 25, 25, 0.97);
   --bg-darker: rgba(20, 20, 20, 0.98);

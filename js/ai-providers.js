@@ -12,22 +12,12 @@ let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
 /**
  * Initializes the AI clients
+ * This function is kept for backward compatibility but doesn't initialize from env vars anymore
  */
 function initializeAIClients() {
-  try {
-    const apiKey = process.env.OPENAI_API_KEY;
-
-    if (apiKey && apiKey !== "YOUR_OPENAI_API_KEY") {
-      openai = new OpenAI({ apiKey });
-    }
-
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (geminiApiKey && geminiApiKey !== "YOUR_GEMINI_API_KEY") {
-      geminiAI = new GoogleGenerativeAI(geminiApiKey);
-    }
-  } catch (err) {
-    console.error("Error setting up AI clients:", err);
-  }
+  // No longer initializing from environment variables
+  // Clients will be initialized through updateAIClients when API keys are provided
+  console.log("AI clients will be initialized when API keys are provided");
 }
 
 /**
@@ -41,9 +31,11 @@ function updateAIClients(provider, apiKey) {
   try {
     if (provider === AI_PROVIDERS.OPENAI && apiKey) {
       openai = new OpenAI({ apiKey });
+      console.log("OpenAI client initialized successfully");
       return true;
     } else if (provider === AI_PROVIDERS.GEMINI && apiKey) {
       geminiAI = new GoogleGenerativeAI(apiKey);
+      console.log("Gemini AI client initialized successfully");
       return true;
     }
     return false;
@@ -381,7 +373,7 @@ async function generateWithOllama(messages, model) {
 async function generateWithGemini(messages, model, streaming = false) {
   try {
     if (!geminiAI) {
-      throw new Error("Gemini AI client is not initialized. Please check your API key.");
+      throw new Error("Gemini AI client is not initialized. Please go to Settings and enter your API key.");
     }
 
     // Get the Gemini model
