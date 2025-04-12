@@ -1,12 +1,13 @@
 const { ipcRenderer } = require("electron");
 const axios = require("axios");
-const { IPC_CHANNELS } = require('./js/constants');
-const { API_KEYS, isMac } = require('./js/config');
-const apiKeyManager = require('./js/api-key-manager');
-const geminiProvider = require('./js/gemini-provider');
-const ollamaProvider = require('./js/ollama-provider');
-const utils = require('./js/utils');
-const modalManager = require('./js/modal-manager');
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
+const { API_KEYS, isMac } = require("./js/config");
+const apiKeyManager = require("./js/api-key-manager");
+const geminiProvider = require("./js/gemini-provider");
+const ollamaProvider = require("./js/ollama-provider");
+const utils = require("./js/utils");
+const modalManager = require("./js/modal-manager");
+const configManager = require("./js/config-manager");
 
 const aiProviderRadios = document.querySelectorAll('input[name="aiProvider"]');
 const radioLabels = document.querySelectorAll(".radio-label");
@@ -39,11 +40,7 @@ async function loadCurrentSettings() {
   } catch (error) {
     console.error("Error getting current settings:", error.message);
     // Set default settings if handler is not registered
-    currentSettings = {
-      aiProvider: "openai",
-      currentModel: "gpt-4o-mini",
-      ollamaUrl: "http://127.0.0.1:11434",
-    };
+    currentSettings = configManager.getCurrentSettings();
 
     // Show notification about missing handler
     messageDiv.textContent = "Settings system not fully initialized. Using default configuration.";
@@ -53,12 +50,20 @@ async function loadCurrentSettings() {
   // Set UI based on current settings
   // Update radio buttons and label styling
   radioLabels.forEach((label) => label.classList.remove("selected"));
-  const selectedRadioLabel = document.getElementById(`${currentSettings.aiProvider}-radio-label`);
-  if (selectedRadioLabel) {
-    selectedRadioLabel.classList.add("selected");
+  
+  // Only select a radio button if a provider is specified
+  if (currentSettings.aiProvider && currentSettings.aiProvider !== "AI") {
+    const selectedRadioLabel = document.getElementById(`${currentSettings.aiProvider}-radio-label`);
+    if (selectedRadioLabel) {
+      selectedRadioLabel.classList.add("selected");
+      
+      // Check the radio button
+      const radioInput = document.querySelector(`input[name="aiProvider"][value="${currentSettings.aiProvider}"]`);
+      if (radioInput) {
+        radioInput.checked = true;
+      }
+    }
   }
-
-  document.querySelector(`input[name="aiProvider"][value="${currentSettings.aiProvider}"]`).checked = true;
 
   // Replace localhost with 127.0.0.1 for better compatibility
   const baseUrl = currentSettings.ollamaUrl || "http://127.0.0.1:11434";
@@ -75,7 +80,7 @@ async function loadCurrentSettings() {
   utils.updateSectionVisibility(currentSettings.aiProvider);
 
   // Load Ollama models
-  if (currentSettings.aiProvider === "ollama") {
+  if (currentSettings.aiProvider === AI_PROVIDERS.OLLAMA) {
     ollamaProvider.loadOllamaModels();
   }
 
@@ -99,10 +104,10 @@ for (const radio of aiProviderRadios) {
   radio.addEventListener("change", () => {
     const provider = radio.value;
     utils.updateSectionVisibility(provider);
-    
-    if (provider === "ollama") {
+
+    if (provider === AI_PROVIDERS.OLLAMA) {
       ollamaProvider.loadOllamaModels();
-    } else if (provider === "gemini") {
+    } else if (provider === AI_PROVIDERS.GEMINI) {
       geminiProvider.loadGeminiModels();
     }
   });
@@ -167,33 +172,90 @@ window.addEventListener("click", (event) => {
 
 // Save button handler
 saveBtn.addEventListener("click", async () => {
-  const aiProvider = document.querySelector('input[name="aiProvider"]:checked').value;
+  const selectedRadio = document.querySelector('input[name="aiProvider"]:checked');
+  
+  // Check if a provider has been selected
+  if (!selectedRadio) {
+    messageDiv.textContent = "Please select an AI provider first";
+    messageDiv.className = "status error";
+    return;
+  }
+  
+  const aiProvider = selectedRadio.value;
   let currentModel;
 
-  if (aiProvider === "openai") {
+  // Check if we need to initialize API clients based on the selected provider
+  if (aiProvider === AI_PROVIDERS.OPENAI) {
+    // Ensure we have an API key for OpenAI
+    const openaiKey = API_KEYS.openai.key;
+    if (!openaiKey) {
+      messageDiv.textContent = "Please enter your OpenAI API key first";
+      messageDiv.className = "status error";
+      return;
+    }
+    
+    // Initialize OpenAI client with the current key
+    try {
+      await ipcRenderer.invoke("initialize-ai-client", "openai", openaiKey);
+    } catch (err) {
+      console.error("Failed to initialize OpenAI client:", err);
+      messageDiv.textContent = "Failed to initialize OpenAI client";
+      messageDiv.className = "status error";
+      return;
+    }
+    
     const selectedCard = openaiModelCards.querySelector(".model-card.selected");
     currentModel = selectedCard ? selectedCard.getAttribute("data-model") : openaiModelSelect.value;
-  } else if (aiProvider === "gemini") {
+  } else if (aiProvider === AI_PROVIDERS.GEMINI) {
+    // Ensure we have an API key for Gemini
+    const geminiKey = API_KEYS.gemini.key;
+    if (!geminiKey) {
+      messageDiv.textContent = "Please enter your Gemini API key first";
+      messageDiv.className = "status error";
+      return;
+    }
+    
+    // Initialize Gemini client with the current key
+    try {
+      await ipcRenderer.invoke("initialize-ai-client", "gemini", geminiKey);
+    } catch (err) {
+      console.error("Failed to initialize Gemini client:", err);
+      messageDiv.textContent = "Failed to initialize Gemini client";
+      messageDiv.className = "status error";
+      return;
+    }
+    
     const selectedCard = document.getElementById("gemini-model-cards").querySelector(".model-card.selected");
-    currentModel = selectedCard ? selectedCard.getAttribute("data-model") : document.getElementById("gemini-model").value;
+    currentModel = selectedCard
+      ? selectedCard.getAttribute("data-model")
+      : document.getElementById("gemini-model").value;
   } else {
     const selectedCard = document.getElementById("ollama-model-cards").querySelector(".model-card.selected");
-    currentModel = selectedCard ? selectedCard.getAttribute("data-model") : document.getElementById("ollama-model").value;
+    currentModel = selectedCard
+      ? selectedCard.getAttribute("data-model")
+      : document.getElementById("ollama-model").value;
   }
 
   // Validate selection
   if (
-    aiProvider === "ollama" &&
+    aiProvider === AI_PROVIDERS.OLLAMA &&
     (!currentModel || currentModel === "loading" || currentModel === "Ollama not configured")
   ) {
     messageDiv.textContent = "Please select a valid Ollama model";
     messageDiv.className = "status error";
     return;
   }
+  
+  // Validate that a model is selected
+  if (!currentModel) {
+    messageDiv.textContent = "Please select a model";
+    messageDiv.className = "status error";
+    return;
+  }
 
   // For Ollama, always ensure we're using IPv4
   let ollamaUrl = ollamaUrlInput.value;
-  if (aiProvider === "ollama") {
+  if (aiProvider === AI_PROVIDERS.OLLAMA) {
     ollamaUrl = ollamaUrl.replace("localhost", "127.0.0.1");
 
     // If using Ollama, test the connection first
@@ -316,6 +378,12 @@ function setupKeyboardShortcuts() {
           break;
       }
     }
+
+    // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
+    if (ctrlOrCmd && e.shiftKey && e.key === "R") {
+      ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
+      e.preventDefault();
+    }
   });
 }
 
@@ -324,29 +392,33 @@ function setupApiKeyInputs() {
   // Setup API key input for OpenAI
   const openaiApiKeyInput = document.getElementById(API_KEYS.openai.inputId);
   if (openaiApiKeyInput) {
-    openaiApiKeyInput.addEventListener('input', (e) => {
+    openaiApiKeyInput.addEventListener("input", (e) => {
       const key = e.target.value.trim();
       if (key) {
         // Store the full key
         API_KEYS.openai.key = key;
-        
+
         // Mask the key in the input
         const maskedKey = apiKeyManager.maskApiKey(key);
         if (openaiApiKeyInput.value !== maskedKey) {
           openaiApiKeyInput.value = maskedKey;
         }
-        
+
         // Save the key
-        apiKeyManager.saveApiKey('openai', key);
-        
+        apiKeyManager.saveApiKey("openai", key);
+
+        // Initialize OpenAI client with the new key
+        ipcRenderer.invoke("initialize-ai-client", "openai", key);
+
         // Auto-fetch models if key is long enough
-        if (key.length >= 32) { // Minimum length for API keys
-          apiKeyManager.validateAndFetchModels('openai', key, () => {
+        if (key.length >= 32) {
+          // Minimum length for API keys
+          apiKeyManager.validateAndFetchModels("openai", key, () => {
             // Nothing to do for OpenAI model fetching
           });
         }
       } else {
-        apiKeyManager.updateApiKeyStatus('openai', 'API key is required', 'error');
+        apiKeyManager.updateApiKeyStatus("openai", "API key is required", "error");
       }
     });
   }
@@ -354,101 +426,105 @@ function setupApiKeyInputs() {
   // Setup API key input for Gemini
   const geminiApiKeyInput = document.getElementById(API_KEYS.gemini.inputId);
   if (geminiApiKeyInput) {
-    geminiApiKeyInput.addEventListener('input', (e) => {
+    geminiApiKeyInput.addEventListener("input", (e) => {
       const key = e.target.value.trim();
       if (key) {
         // Store the full key
         API_KEYS.gemini.key = key;
-        
+
         // Mask the key in the input
         const maskedKey = apiKeyManager.maskApiKey(key);
         if (geminiApiKeyInput.value !== maskedKey) {
           geminiApiKeyInput.value = maskedKey;
         }
-        
+
         // Save the key
-        apiKeyManager.saveApiKey('gemini', key);
-        
+        apiKeyManager.saveApiKey("gemini", key);
+
+        // Initialize Gemini client with the new key
+        ipcRenderer.invoke("initialize-ai-client", "gemini", key);
+
         // Auto-fetch models if key is long enough
-        if (key.length >= 32) { // Minimum length for API keys
-          apiKeyManager.validateAndFetchModels('gemini', key, geminiProvider.loadGeminiModels);
+        if (key.length >= 32) {
+          // Minimum length for API keys
+          apiKeyManager.validateAndFetchModels("gemini", key, geminiProvider.loadGeminiModels);
         }
       } else {
-        apiKeyManager.updateApiKeyStatus('gemini', 'API key is required', 'error');
+        apiKeyManager.updateApiKeyStatus("gemini", "API key is required", "error");
       }
     });
   }
 
   // Modal API key input handler
-  const modalApiKeyInput = document.getElementById('modal-api-key');
+  const modalApiKeyInput = document.getElementById("modal-api-key");
   if (modalApiKeyInput) {
-    modalApiKeyInput.addEventListener('input', (e) => {
-      const modalApiKeyStatus = document.getElementById('modal-api-key-status');
+    modalApiKeyInput.addEventListener("input", (e) => {
+      const modalApiKeyStatus = document.getElementById("modal-api-key-status");
       const key = e.target.value.trim();
       if (key) {
-        modalApiKeyStatus.textContent = '';
+        modalApiKeyStatus.textContent = "";
       } else {
-        modalApiKeyStatus.textContent = 'API key is required';
-        modalApiKeyStatus.className = 'api-key-status error';
+        modalApiKeyStatus.textContent = "API key is required";
+        modalApiKeyStatus.className = "api-key-status error";
       }
     });
   }
-  
+
   // Add toggle functionality for password fields
   function setupPasswordToggle(toggleId, inputId) {
     const toggleBtn = document.getElementById(toggleId);
     const inputField = document.getElementById(inputId);
-    
+
     if (toggleBtn && inputField) {
-      toggleBtn.addEventListener('click', () => {
-        const showIcon = toggleBtn.querySelector('.show-password-icon');
-        const hideIcon = toggleBtn.querySelector('.hide-password-icon');
-        
+      toggleBtn.addEventListener("click", () => {
+        const showIcon = toggleBtn.querySelector(".show-password-icon");
+        const hideIcon = toggleBtn.querySelector(".hide-password-icon");
+
         // Toggle password visibility
-        if (inputField.type === 'password') {
-          inputField.type = 'text';
-          showIcon.classList.add('hidden');
-          hideIcon.classList.remove('hidden');
+        if (inputField.type === "password") {
+          inputField.type = "text";
+          showIcon.classList.add("hidden");
+          hideIcon.classList.remove("hidden");
         } else {
-          inputField.type = 'password';
-          showIcon.classList.remove('hidden');
-          hideIcon.classList.add('hidden');
+          inputField.type = "password";
+          showIcon.classList.remove("hidden");
+          hideIcon.classList.add("hidden");
         }
       });
     }
   }
-  
+
   // Setup toggle buttons for all API key inputs
-  setupPasswordToggle('toggle-openai-key', 'openai-api-key');
-  setupPasswordToggle('toggle-gemini-key', 'gemini-api-key');
-  setupPasswordToggle('toggle-modal-key', 'modal-api-key');
+  setupPasswordToggle("toggle-openai-key", "openai-api-key");
+  setupPasswordToggle("toggle-gemini-key", "gemini-api-key");
+  setupPasswordToggle("toggle-modal-key", "modal-api-key");
 }
 
 // Initialize the application
 function initialize() {
   // Load saved API keys
   apiKeyManager.loadApiKeys();
-  
+
   // Set up API key input handlers
   setupApiKeyInputs();
-  
+
   // Initialize modals
   modalManager.initializeModals();
-  
+
   // Set up keyboard shortcuts
   setupKeyboardShortcuts();
-  
+
   // Listen for visibility updates from main process
   ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (event, isVisible) => {
     document.body.style.opacity = isVisible ? "1" : "0";
   });
-  
+
   // Load current settings
   loadCurrentSettings();
-  
+
   // Run once on page load to adjust UI
   utils.adjustUIForScreenSize();
-  
+
   // Handle window resize events to adjust UI
   let resizeTimeout;
   window.addEventListener("resize", () => {
@@ -461,7 +537,7 @@ function initialize() {
 }
 
 // Start initialization when DOM is loaded
-document.addEventListener('DOMContentLoaded', initialize);
+document.addEventListener("DOMContentLoaded", initialize);
 
 // Export for use in other parts of the application
 window.API_KEYS = API_KEYS;

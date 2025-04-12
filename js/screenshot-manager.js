@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
-const { app, desktopCapturer, BrowserWindow } = require("electron");
+const { app, nativeImage } = require("electron");
+const { IPC_CHANNELS } = require("./constants");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -17,7 +18,7 @@ function resetScreenshots() {
 // Initialize electron-screenshots
 function initScreenshotCapture(mainWindow) {
   const Screenshots = require("electron-screenshots");
-  
+
   screenshotInstance = new Screenshots({
     singleWindow: true,
     lang: "en",
@@ -60,123 +61,13 @@ async function captureScreenshot(mainWindow) {
     let base64Image = "";
 
     try {
-      // Get all screen sources
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-        thumbnailSize: {
-          width: require("electron").screen.getPrimaryDisplay().workAreaSize.width,
-          height: require("electron").screen.getPrimaryDisplay().workAreaSize.height,
-        },
-      });
-
-      // Get the primary display
-      const primaryDisplay = require("electron").screen.getPrimaryDisplay();
-
-      // Find the source that matches the primary display
-      const source =
-        sources.find((s) => {
-          const bounds = s.display?.bounds || s.bounds;
-          return (
-            bounds.x === 0 &&
-            bounds.y === 0 &&
-            bounds.width === primaryDisplay.size.width &&
-            bounds.height === primaryDisplay.size.height
-          );
-        }) || sources[0];
-
-      if (!source) {
-        throw new Error("No screen source found");
-      }
-
-      // Create a temporary hidden BrowserWindow to capture the screen
-      const captureWin = new BrowserWindow({
-        width: primaryDisplay.size.width,
-        height: primaryDisplay.size.height,
-        show: false,
-        webPreferences: {
-          offscreen: true,
-          nodeIntegration: true,
-          contextIsolation: false,
-        },
-      });
-
-      // Load a minimal HTML file
-      await captureWin.loadURL("data:text/html,<html><body></body></html>");
-
-      // Inject capture script
-      await captureWin.webContents.executeJavaScript(`
-        new Promise(async (resolve) => {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              audio: false,
-              video: {
-                mandatory: {
-                  chromeMediaSource: 'desktop',
-                  chromeMediaSourceId: '${source.id}',
-                  minWidth: ${primaryDisplay.size.width},
-                  maxWidth: ${primaryDisplay.size.width},
-                  minHeight: ${primaryDisplay.size.height},
-                  maxHeight: ${primaryDisplay.size.height}
-                }
-              }
-            });
-
-            const video = document.createElement('video');
-            video.style.cssText = 'position: absolute; top: -10000px; left: -10000px;';
-            video.srcObject = stream;
-
-            video.onloadedmetadata = () => {
-              video.play();
-              const canvas = document.createElement('canvas');
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(video, 0, 0);
-              
-              const imageData = canvas.toDataURL('image/png');
-              video.remove();
-              stream.getTracks()[0].stop();
-              resolve(imageData);
-            };
-
-            document.body.appendChild(video);
-          } catch (err) {
-            resolve(null);
-            console.error('Capture error:', err);
-          }
-        });
-      `);
-
-      // Get the captured image
-      const imageData = await captureWin.webContents.executeJavaScript(
-        'document.querySelector("canvas").toDataURL("image/png")',
-      );
-
-      // Close the capture window
-      captureWin.close();
-
-      if (!imageData) {
-        throw new Error("Failed to capture screen");
-      }
-
-      // Save the image
-      const base64Data = imageData.replace(/^data:image\/png;base64,/, "");
-      fs.writeFileSync(imagePath, base64Data, "base64");
-      base64Image = imageData;
+      await screenshot({ filename: imagePath });
+      const imageBuffer = fs.readFileSync(imagePath);
+      base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
       success = true;
-    } catch (captureError) {
-      console.error("Desktop capturer failed:", captureError);
-
-      // Fallback to screenshot-desktop
-      try {
-        await screenshot({ filename: imagePath });
-        const imageBuffer = fs.readFileSync(imagePath);
-        base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-        success = true;
-      } catch (fallbackError) {
-        console.error("Screenshot fallback failed:", fallbackError);
-        throw fallbackError;
-      }
+    } catch (fallbackError) {
+      console.error("Screenshot fallback failed:", fallbackError);
+      throw fallbackError;
     }
 
     // Show the main window again
@@ -197,16 +88,15 @@ async function captureScreenshot(mainWindow) {
     // Get image dimensions
     const dimensions = { width: 0, height: 0 };
     try {
-      const sizeOf = require("image-size");
-      const imageDimensions = sizeOf(imagePath);
-      dimensions.width = imageDimensions.width;
-      dimensions.height = imageDimensions.height;
+      const image = nativeImage.createFromPath(imagePath);
+      dimensions.width = image.getSize().width;
+      dimensions.height = image.getSize().height;
     } catch (dimError) {
       console.error("Error getting image dimensions:", dimError);
     }
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("notification", {
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
       body: `Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
       type: "success",
     });
@@ -230,7 +120,7 @@ async function captureWindowScreenshot(mainWindow) {
     }
 
     // Show instruction in notification
-    mainWindow.webContents.send("notification", {
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
       title: "Screenshot",
       body: "Please click on the window you want to capture.",
     });
@@ -289,16 +179,15 @@ async function captureWindowScreenshot(mainWindow) {
     // Get image dimensions
     const dimensions = { width: 0, height: 0 };
     try {
-      const sizeOf = require("image-size");
-      const imageDimensions = sizeOf(imagePath);
-      dimensions.width = imageDimensions.width;
-      dimensions.height = imageDimensions.height;
+      const image = nativeImage.createFromPath(imagePath);
+      dimensions.width = image.getSize().width;
+      dimensions.height = image.getSize().height;
     } catch (dimError) {
       console.error("Error getting image dimensions:", dimError);
     }
 
     // Notify about saved screenshot
-    mainWindow.webContents.send("notification", {
+    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
       body: `Window screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
       type: "success",
     });
@@ -339,5 +228,5 @@ module.exports = {
   addScreenshot,
   getScreenshots,
   setMultiPageMode,
-  getMultiPageMode
-}; 
+  getMultiPageMode,
+};
