@@ -5,7 +5,7 @@ const remarkParse = require("remark-parse").default;
 const remarkStringify = require("remark-stringify").default;
 const remarkRehype = require("remark-rehype").default;
 const processor = unified().use(remarkParse).use(remarkRehype).use(remarkStringify).use(remarkGfm);
-const { IPC_CHANNELS } = require("./js/constants");
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 
 const isMac = navigator.platform.includes("Mac");
 const modifierKey = isMac ? "Command" : "Ctrl";
@@ -27,6 +27,12 @@ document.addEventListener("contextmenu", (e) => {
 document.addEventListener("keydown", (e) => {
   if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
     ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
+    e.preventDefault();
+  }
+
+  // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
+    ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
     e.preventDefault();
   }
 });
@@ -185,20 +191,9 @@ async function updateModelBadge() {
         const savedSettings = localStorage.getItem("model-settings");
         if (savedSettings) {
           settings = JSON.parse(savedSettings);
-        } else {
-          // Fallback to default settings
-          settings = {
-            aiProvider: "openai",
-            currentModel: "gpt-4o-mini",
-          };
         }
       } catch (localStorageErr) {
         console.error("Error retrieving from localStorage:", localStorageErr);
-        // Fallback to default settings
-        settings = {
-          aiProvider: "openai",
-          currentModel: "gpt-4o-mini",
-        };
       }
     }
 
@@ -206,21 +201,20 @@ async function updateModelBadge() {
 
     let providerName = "";
     switch (settings.aiProvider) {
-      case "openai":
+      case AI_PROVIDERS.OPENAI:
         providerName = "OpenAI";
         break;
-      case "ollama":
+      case AI_PROVIDERS.OLLAMA:
         providerName = "Ollama";
         break;
-      case "gemini":
+      case AI_PROVIDERS.GEMINI:
         providerName = "Gemini";
         break;
-      default:
-        providerName = settings.aiProvider || "AI";
     }
 
-    const modelName = settings.currentModel || "Default Model";
-    badge.textContent = `${providerName}: ${modelName}`;
+    const modelName = settings.currentModel;
+    badge.textContent =
+      providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
 
     // Save current settings to localStorage for persistence
     try {
@@ -405,32 +399,26 @@ function showNotification(message, type = "success") {
 
   container.appendChild(notification);
 
-  // Get all existing notifications
   const notifications = container.getElementsByClassName("notification");
   const offset = (notifications.length - 1) * 10; // Stack effect
 
-  // Position the new notification
   notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
-  // Trigger reflow to ensure animation works
   void notification.offsetWidth;
   notification.classList.add("visible");
   notification.style.transform = `translateX(0) translateY(-${offset}px)`;
 
-  // Hide after 1 second
   setTimeout(() => {
     notification.classList.remove("visible");
     notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
-    // Remove from DOM after animation completes
     setTimeout(() => {
       notification.remove();
-      // Reposition remaining notifications
       Array.from(notifications).forEach((n, i) => {
         n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
       });
     }, 300);
-  }, 1000);
+  }, 3500);
 }
 
 // Initialize

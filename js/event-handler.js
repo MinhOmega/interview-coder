@@ -42,6 +42,23 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     }
   });
 
+  // Handler for manual reloading in development mode
+  ipcMain.on(IPC_CHANNELS.DEV_RELOAD, () => {
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    if (!isDev) return;
+    
+    console.log('Manual reload triggered');
+    
+    if (mainWindow) {
+      mainWindow.webContents.reloadIgnoringCache();
+    }
+    
+    const modelListWindow = windowManager.getModelListWindow();
+    if (modelListWindow) {
+      modelListWindow.webContents.reloadIgnoringCache();
+    }
+  });
+
   ipcMain.on(IPC_CHANNELS.SHOW_CONTEXT_MENU, () => {
     if (mainWindow) {
       const template = [
@@ -57,6 +74,16 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
         { label: "Copy", role: "copy" },
         { label: "Paste", role: "paste" },
       ];
+
+      // Add development-only menu items
+      if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+        template.splice(2, 0, {
+          label: "Force Reload (Dev)",
+          click: () => {
+            mainWindow.webContents.reloadIgnoringCache();
+          }
+        });
+      }
 
       const menu = Menu.buildFromTemplate(template);
       menu.popup(BrowserWindow.fromWebContents(mainWindow.webContents));

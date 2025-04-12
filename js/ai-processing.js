@@ -1,3 +1,4 @@
+const { AI_PROVIDERS, IPC_CHANNELS } = require("./constants");
 const { getScreenshots } = require("./screenshot-manager");
 
 /**
@@ -109,7 +110,7 @@ async function processScreenshots(
     mainWindow.webContents.send("loading", true);
     const screenshots = getScreenshots();
 
-    if (aiProvider === "ollama") {
+    if (aiProvider === AI_PROVIDERS.OLLAMA) {
       const modelVerification = await verifyOllamaModelFn(currentModel);
 
       if (!modelVerification.exists) {
@@ -132,7 +133,19 @@ async function processScreenshots(
 
     let result;
 
-    if (aiProvider === "openai") {
+    if (aiProvider === AI_PROVIDERS.DEFAULT) {
+      // Create model selection window when the default provider is selected
+      // This is the same action triggered by Command+M
+      const windowManager = require('./window-manager');
+      windowManager.createModelSelectionWindow();
+      
+      // Return early since we're opening the model selection window instead of processing
+      mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+      mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+      return;
+    }
+
+    if (aiProvider === AI_PROVIDERS.OPENAI) {
       if (!openai) {
         throw new Error("OpenAI client is not initialized. Please check your API key.");
       }
@@ -145,18 +158,18 @@ async function processScreenshots(
           stream: true,
         });
 
-        mainWindow.webContents.send("loading", false);
-        mainWindow.webContents.send("stream-start");
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
 
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
-            mainWindow.webContents.send("stream-chunk", content);
+            mainWindow.webContents.send(IPC_CHANNELS.STREAM_CHUNK, content);
           }
         }
 
-        mainWindow.webContents.send("stream-end");
-        mainWindow.webContents.send("hide-instruction");
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+        mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
         return;
       } else {
         const response = await openai.chat.completions.create({
@@ -167,31 +180,31 @@ async function processScreenshots(
 
         result = response.choices[0].message.content;
       }
-    } else if (aiProvider === "ollama") {
+    } else if (aiProvider === AI_PROVIDERS.OLLAMA) {
       result = await generateWithOllamaFn(messages, currentModel);
-    } else if (aiProvider === "gemini") {
+    } else if (aiProvider === AI_PROVIDERS.GEMINI) {
       if (useStreaming) {
         const streamingResult = await generateWithGeminiFn(messages, currentModel, true);
 
-        mainWindow.webContents.send("loading", false);
-        mainWindow.webContents.send("stream-start");
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
 
         let accumulatedText = "";
 
         streamingResult.emitter.on("chunk", (chunk) => {
           accumulatedText += chunk;
-          mainWindow.webContents.send("stream-update", accumulatedText);
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_UPDATE, accumulatedText);
         });
 
         streamingResult.emitter.on("complete", () => {
-          mainWindow.webContents.send("stream-end");
-          mainWindow.webContents.send("hide-instruction");
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
         });
 
         streamingResult.emitter.on("error", (error) => {
-          mainWindow.webContents.send("error", error.message);
-          mainWindow.webContents.send("stream-end");
-          mainWindow.webContents.send("hide-instruction");
+          mainWindow.webContents.send(IPC_CHANNELS.ERROR, error.message);
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
         });
 
         return;
@@ -202,11 +215,11 @@ async function processScreenshots(
       throw new Error(`Unknown AI provider: ${aiProvider}`);
     }
 
-    mainWindow.webContents.send("loading", false);
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
 
-    mainWindow.webContents.send("analysis-result", result);
+    mainWindow.webContents.send(IPC_CHANNELS.ANALYSIS_RESULT, result);
 
-    mainWindow.webContents.send("hide-instruction");
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
   } catch (err) {
     console.error("Error in processScreenshots:", err);
     console.error("Stack trace:", err.stack);
@@ -216,9 +229,9 @@ async function processScreenshots(
       console.error("Response data:", JSON.stringify(err.response.data));
     }
 
-    mainWindow.webContents.send("loading", false);
-    mainWindow.webContents.send("error", err.message);
-    mainWindow.webContents.send("hide-instruction");
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+    mainWindow.webContents.send(IPC_CHANNELS.ERROR, err.message);
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
   }
 }
 

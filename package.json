@@ -9,6 +9,8 @@
   },
   "scripts": {
     "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "dev:windows": "set NODE_ENV=development && electron .",
     "build": "electron-builder build --mac --win --linux",
     "build:mac": "electron-builder build --mac",
     "build:win": "electron-builder build --win",
@@ -30,7 +32,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ]
     },
@@ -88,7 +93,9 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
+    "chokidar": "^4.0.3",
     "electron": "^35.1.2",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "electron-reload": "^2.0.0-alpha.1"
   }
 }
