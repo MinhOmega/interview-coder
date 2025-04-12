@@ -1,4 +1,5 @@
 const { BrowserWindow, screen } = require("electron");
+const { IPC_CHANNELS } = require("./constants");
 
 let mainWindow;
 let modelListWindow;
@@ -11,8 +12,8 @@ function createMainWindow() {
   const { width: displayWidth, height: displayHeight } = primaryDisplay.workAreaSize;
 
   // Window dimensions
-  const windowWidth = 800;
-  const windowHeight = 600;
+  const windowWidth = 1000;
+  const windowHeight = 800;
 
   mainWindow = new BrowserWindow({
     width: windowWidth,
@@ -102,7 +103,7 @@ function toggleWindowVisibility(forceState) {
     }
 
     // Notify renderer about visibility change
-    mainWindow.webContents.send("update-visibility", isWindowVisible);
+    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
   }
 
   return isWindowVisible;
@@ -140,6 +141,51 @@ function moveWindow(direction) {
   mainWindow.setBounds(newPosition);
 }
 
+// Function to resize the window
+function resizeWindow(direction) {
+  if (!mainWindow) return;
+
+  const currentSize = mainWindow.getBounds();
+  const display = screen.getDisplayNearestPoint({ x: currentSize.x, y: currentSize.y });
+  const workArea = display.workArea;
+
+  // Calculate resize amount (10% of current dimensions)
+  const resizeWidth = Math.floor(currentSize.width * 0.1);
+  const resizeHeight = Math.floor(currentSize.height * 0.1);
+
+  let newSize = { ...currentSize };
+
+  switch (direction) {
+    case "increase":
+      // Increase both width and height, but keep within screen bounds
+      newSize.width = Math.min(workArea.width, currentSize.width + resizeWidth);
+      newSize.height = Math.min(workArea.height, currentSize.height + resizeHeight);
+      // Center the window if possible
+      newSize.x = Math.max(workArea.x, currentSize.x - resizeWidth / 2);
+      newSize.y = Math.max(workArea.y, currentSize.y - resizeHeight / 2);
+      break;
+    case "decrease":
+      // Decrease both width and height, with minimum size limits
+      newSize.width = Math.max(400, currentSize.width - resizeWidth);
+      newSize.height = Math.max(300, currentSize.height - resizeHeight);
+      // Recenter slightly
+      newSize.x = currentSize.x + (currentSize.width - newSize.width) / 2;
+      newSize.y = currentSize.y + (currentSize.height - newSize.height) / 2;
+      break;
+  }
+
+  mainWindow.setBounds(newSize);
+}
+
+// Function to scroll content in the result area
+function scrollContent(direction) {
+  if (!mainWindow) return;
+  
+  // Send a scroll command to the renderer process
+  const scrollAmount = direction === "up" ? -300 : 300;
+  mainWindow.webContents.send(IPC_CHANNELS.SCROLL_CONTENT, scrollAmount);
+}
+
 // Get the main window
 function getMainWindow() {
   return mainWindow;
@@ -161,10 +207,10 @@ function updateInstruction(instruction) {
   
   if (!instruction || instruction.trim() === "") {
     // If instruction is empty, hide the instruction banner
-    mainWindow.webContents.send("hide-instruction");
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
   } else {
     // Show the instruction with the provided text
-    mainWindow.webContents.send("update-instruction", instruction);
+    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_INSTRUCTION, instruction);
   }
 }
 
@@ -182,6 +228,8 @@ module.exports = {
   createModelSelectionWindow,
   toggleWindowVisibility,
   moveWindow,
+  resizeWindow,
+  scrollContent,
   getMainWindow,
   getModelListWindow,
   getWindowVisibility,

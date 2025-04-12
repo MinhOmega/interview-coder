@@ -157,6 +157,10 @@ app.whenReady().then(() => {
     MOVE_RIGHT: () => windowManager.moveWindow("right"),
     MOVE_UP: () => windowManager.moveWindow("up"),
     MOVE_DOWN: () => windowManager.moveWindow("down"),
+    SCROLL_UP: () => windowManager.scrollContent("up"),
+    SCROLL_DOWN: () => windowManager.scrollContent("down"),
+    INCREASE_WINDOW_SIZE: () => windowManager.resizeWindow("increase"),
+    DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
     TAKE_SCREENSHOT: async () => {
       try {
         windowManager.updateInstruction("Taking screenshot...");
