@@ -134,7 +134,7 @@ app.whenReady().then(() => {
   });
 
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
-  const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
+  const screenshotInstance = screenshotManager.initScreenshotCapture();
 
   // Set up hot reload for development mode with more granular control
   if (isDev) {
@@ -189,16 +189,10 @@ app.whenReady().then(() => {
     },
     AREA_SCREENSHOT: () => {
       try {
-        // Hide the main window before starting area capture
-        const wasVisible = mainWindow.isVisible();
-        if (wasVisible) {
-          mainWindow.hide();
-        }
-
         windowManager.updateInstruction("Select an area to screenshot...");
+        const wasVisible = screenshotManager.autoHideWindow(mainWindow);
         screenshotInstance.startCapture();
 
-        // Store whether window was visible in a global variable to restore later
         global.mainWindowWasVisible = wasVisible;
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
@@ -255,7 +249,6 @@ app.whenReady().then(() => {
         return;
       }
 
-      // Check if we have a valid buffer
       if (!buffer) {
         console.error("Screenshot buffer is invalid:", { event, buffer, data });
         mainWindow.webContents.send(IPC_CHANNELS.ERROR, "Failed to process screenshot: Invalid screenshot data");

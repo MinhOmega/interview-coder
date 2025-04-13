@@ -2,7 +2,6 @@ const { ipcRenderer } = require("electron");
 const unified = require("unified").unified;
 const remarkGfm = require("remark-gfm").default;
 const remarkParse = require("remark-parse").default;
-const remarkStringify = require("remark-stringify").default;
 const remarkRehype = require("remark-rehype").default;
 const rehypeRaw = require("rehype-raw").default;
 const rehypeStringify = require("rehype-stringify").default;
@@ -11,7 +10,8 @@ const processor = unified()
   .use(remarkGfm)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRaw)
-  .use(remarkStringify);
+  .use(rehypeStringify);
+
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 
 const isMac = navigator.platform.includes("Mac");
@@ -391,16 +391,7 @@ async function processMarkdown(markdown) {
     let html = "";
     if (processor) {
       try {
-        // Try using the unified processor first
-        // Create a custom processor for each run to avoid state issues
-        const customProcessor = unified()
-          .use(remarkParse)
-          .use(remarkGfm)
-          .use(remarkRehype, { allowDangerousHtml: true })
-          .use(rehypeRaw)
-          .use(rehypeStringify);
-
-        const file = await customProcessor.process(markdown);
+        const file = await processor.process(markdown);
         html = String(file);
 
         // Ensure inline code blocks are properly styled
