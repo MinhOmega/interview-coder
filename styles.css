@@ -377,7 +377,6 @@ pre {
   padding: 16px;
   margin: 0;
   overflow-x: auto;
-  background: transparent;
   color: white;
   padding: 16px;
   border-radius: 8px;
@@ -529,7 +528,7 @@ code {
 /* Updated Notification styles */
 #notification-container {
   position: fixed;
-  bottom: 0;
+  bottom: 10%;
   right: 20px;
   z-index: 100000;
   max-width: 400px;

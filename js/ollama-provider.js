@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { IPC_CHANNELS } = require("./constants");
 
 // Load models from Ollama
 async function loadOllamaModels() {
@@ -7,7 +8,7 @@ async function loadOllamaModels() {
   const ollamaModelCards = document.getElementById("ollama-model-cards");
   const ollamaModelSelect = document.getElementById("ollama-model");
   const ipcRenderer = window.ipcRenderer;
-  
+
   ollamaStatus.innerHTML = '<div class="loading"></div><span>Loading models...</span>';
   ollamaStatus.className = "status";
   visionModelsNote.style.display = "none";
@@ -17,7 +18,7 @@ async function loadOllamaModels() {
   try {
     let models = [];
     try {
-      models = await ipcRenderer.invoke("get-ollama-models");
+      models = await ipcRenderer.invoke(IPC_CHANNELS.GET_OLLAMA_MODELS);
     } catch (invokeError) {
       // Handle missing handler or other errors
       if (invokeError.message.includes("No handler registered for")) {
@@ -156,7 +157,11 @@ async function loadOllamaModels() {
     ollamaModelCards.style.display = "grid";
 
     // If the current model is set and exists in the list, select it
-    if (window.currentSettings && window.currentSettings.aiProvider === "ollama" && window.currentSettings.currentModel) {
+    if (
+      window.currentSettings &&
+      window.currentSettings.aiProvider === "ollama" &&
+      window.currentSettings.currentModel
+    ) {
       window.selectModelCard("ollama", window.currentSettings.currentModel);
     }
 
@@ -190,7 +195,7 @@ async function loadOllamaModels() {
 async function testOllamaConnection() {
   const connectionTestResult = document.getElementById("connection-test-result");
   const ollamaUrlInput = document.getElementById("ollama-url");
-  
+
   connectionTestResult.innerHTML = 'Testing connection... <span class="loading"></span>';
   connectionTestResult.className = "status";
 
@@ -224,7 +229,7 @@ async function pullOllamaModel(modelName) {
   const pullStatusDiv = document.getElementById("pull-status");
   const confirmPullBtn = document.getElementById("confirm-pull");
   const ollamaUrlInput = document.getElementById("ollama-url");
-  
+
   pullStatusDiv.innerHTML = `Pulling model ${modelName}... <span class="loading"></span>`;
   pullStatusDiv.className = "status";
   confirmPullBtn.disabled = true;
@@ -281,5 +286,5 @@ async function pullOllamaModel(modelName) {
 module.exports = {
   loadOllamaModels,
   testOllamaConnection,
-  pullOllamaModel
-}; 
+  pullOllamaModel,
+};

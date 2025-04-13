@@ -3,20 +3,9 @@ const path = require("path");
 const fs = require("fs");
 const { app } = require("electron");
 
-require("dotenv").config();
-
-// Default values - use IPv4 address explicitly for Ollama
-let OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL
-  ? process.env.OLLAMA_BASE_URL.replace("localhost", "127.0.0.1")
-  : "http://127.0.0.1:11434";
-
-// Default AI provider
+let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 let aiProvider = AI_PROVIDERS.DEFAULT;
-
-// Current model based on provider
 let currentModel = "";
-
-// Default response language is English
 let responseLanguage = "en"; // en = English
 
 // Available language options
@@ -37,10 +26,12 @@ const getSettingsFilePath = () => {
   return path.join(userDataPath, "interview-coder-settings.json");
 };
 
-// Load settings from file
+/**
+ * Loads settings from file
+ * @returns {boolean} True if settings were loaded successfully, false otherwise
+ */
 function loadSettingsFromFile() {
   try {
-    // Only proceed if we have app access (main process)
     if (!app) return false;
 
     const settingsFilePath = getSettingsFilePath();
@@ -49,7 +40,6 @@ function loadSettingsFromFile() {
       const settingsData = fs.readFileSync(settingsFilePath, "utf8");
       const settings = JSON.parse(settingsData);
 
-      // Update current values
       if (settings.aiProvider) aiProvider = settings.aiProvider;
       if (settings.currentModel) currentModel = settings.currentModel;
       if (settings.ollamaUrl) OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
@@ -64,18 +54,90 @@ function loadSettingsFromFile() {
   return false;
 }
 
-// Save settings to file
+/**
+ * Saves settings to file
+ * @param {Object} settings - The settings to save
+ * @returns {boolean} True if settings were saved successfully, false otherwise
+ */
 function saveSettingsToFile(settings) {
   try {
-    // Only proceed if we have app access (main process)
     if (!app) return false;
 
     const settingsFilePath = getSettingsFilePath();
-    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), "utf8");
+
+    let existingSettings = {};
+    if (fs.existsSync(settingsFilePath)) {
+      try {
+        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+        existingSettings = JSON.parse(settingsData);
+      } catch (parseError) {
+        console.error("Error parsing existing settings file:", parseError);
+      }
+    }
+
+    const settingsToSave = {
+      ...settings,
+      apiKey: existingSettings.apiKey,
+    };
+
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settingsToSave, null, 2), "utf8");
     return true;
   } catch (error) {
     console.error("Error saving settings to file:", error);
     return false;
+  }
+}
+
+/**
+ * Saves API key to settings file
+ * @param {string} apiKey - The API key to save
+ * @returns {boolean} True if API key was saved successfully, false otherwise
+ */
+function saveApiKey(apiKey) {
+  try {
+    if (!app) return false;
+
+    const settingsFilePath = getSettingsFilePath();
+
+    let settings = {};
+    if (fs.existsSync(settingsFilePath)) {
+      try {
+        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+        settings = JSON.parse(settingsData);
+      } catch (parseError) {
+        console.error("Error parsing settings file:", parseError);
+      }
+    }
+
+    settings.apiKey = apiKey;
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), "utf8");
+    return true;
+  } catch (error) {
+    console.error("Error saving API key to settings:", error);
+    return false;
+  }
+}
+
+/**
+ * Gets API key from settings
+ * @returns {string|null} The API key or null if it doesn't exist
+ */
+function getApiKey() {
+  try {
+    if (!app) return null;
+
+    const settingsFilePath = getSettingsFilePath();
+
+    if (fs.existsSync(settingsFilePath)) {
+      const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+      const settings = JSON.parse(settingsData);
+      return settings.apiKey || null;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error getting API key from settings:", error);
+    return null;
   }
 }
 
@@ -120,7 +182,6 @@ function getCurrentSettings() {
   };
 }
 
-// Update settings
 function updateSettings(settings) {
   let hasChanges = false;
 
@@ -147,7 +208,6 @@ function updateSettings(settings) {
     hasChanges = true;
   }
 
-  // Only save to file system if there were actual changes
   if (hasChanges) {
     saveSettingsToFile(getCurrentSettings());
   }
@@ -155,7 +215,6 @@ function updateSettings(settings) {
   return getCurrentSettings();
 }
 
-// Try to load settings from file when module is loaded
 loadSettingsFromFile();
 
 module.exports = {
@@ -170,4 +229,7 @@ module.exports = {
   updateSettings,
   loadSettingsFromFile,
   saveSettingsToFile,
+  getSettingsFilePath,
+  saveApiKey,
+  getApiKey,
 };
