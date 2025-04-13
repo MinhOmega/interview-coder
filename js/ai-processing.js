@@ -1,16 +1,22 @@
 const { AI_PROVIDERS, IPC_CHANNELS } = require("./constants");
 const { getScreenshots } = require("./screenshot-manager");
+const configManager = require("./config-manager");
 
 /**
- * Creates a prompt for the AI based on the number of screenshots
+ * Creates a prompt for the AI based on the number of screenshots and preferred language
  *
  * @param {number} screenshotsCount - The number of screenshots
+ * @param {string} language - The preferred language for the response (e.g., 'en', 'vi')
  * @returns {string} The prompt for the AI
  */
-function createPrompt(screenshotsCount) {
-  let promptText = "";
+function createPrompt(screenshotsCount, language = 'en') {
+  // Instructions to return multiple solutions
+  const multiSolutionsInstructions = `IMPORTANT: Please provide at least 2 different solution approaches with their respective code implementations.`;
+  
+  // Base prompt text that applies to all languages
+  let basePrompt = "";
   if (screenshotsCount === 1) {
-    promptText = `The screenshot shows a programming problem or question. 
+    basePrompt = `The screenshot shows a programming problem or question. 
 I need you to provide the best possible solution with excellent performance and readability.
 
 Guidelines:
@@ -18,9 +24,9 @@ Guidelines:
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
 3. Structure your code with clean architecture principles.
 4. Include robust error handling and edge case considerations.
-5. If multiple solutions exist, present the optimal approach and explain your decision.
+5. ${multiSolutionsInstructions}
 
-Your response MUST follow this exact structure with these three main sections:
+Your response MUST follow this exact structure with these main sections:
 
 # Analyzing the Problem
 Provide a clear understanding of what the problem is asking, including:
@@ -29,23 +35,24 @@ Provide a clear understanding of what the problem is asking, including:
 - Important edge cases to consider
 - Any implicit assumptions
 
-# My Thoughts
-Explain your strategy and implementation, including:
+# Approach 1
+Explain your first strategy and implementation, including:
 - Your overall approach to solving the problem
 - Key algorithms, data structures, or patterns you're using
 - The complete, well-commented implementation
-- Any trade-offs or alternative approaches you considered
+- Time and space complexity analysis
 
-# Complexity
-Analyze the efficiency of your solution:
-- Time complexity with explanation
-- Space complexity with explanation
-- Potential bottlenecks
-- Any further optimization possibilities
+# Approach 2
+Explain an alternative strategy and implementation, including:
+- How this approach differs from the first one
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Time and space complexity analysis
+- Comparison with the first approach (pros and cons)
 
 Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
   } else {
-    promptText = `These ${screenshotsCount} screenshots show a multi-part programming problem. 
+    basePrompt = `These ${screenshotsCount} screenshots show a multi-part programming problem. 
 I need you to provide the best possible solution with excellent performance and readability.
 
 Guidelines:
@@ -53,9 +60,9 @@ Guidelines:
 2. Use modern practices, efficient algorithms, and optimize for both time and space complexity.
 3. Structure your code with clean architecture principles.
 4. Include robust error handling and edge case considerations.
-5. If multiple solutions exist, present the optimal approach and explain your decision.
+5. ${multiSolutionsInstructions}
 
-Your response MUST follow this exact structure with these three main sections:
+Your response MUST follow this exact structure with these main sections:
 
 # Analyzing the Problem
 Provide a clear understanding of what the problem is asking, including:
@@ -64,24 +71,44 @@ Provide a clear understanding of what the problem is asking, including:
 - Important edge cases to consider
 - Any implicit assumptions
 
-# My Thoughts
-Explain your strategy and implementation, including:
+# Approach 1
+Explain your first strategy and implementation, including:
 - Your overall approach to solving the problem
 - Key algorithms, data structures, or patterns you're using
 - The complete, well-commented implementation
-- Any trade-offs or alternative approaches you considered
+- Time and space complexity analysis
 
-# Complexity
-Analyze the efficiency of your solution:
-- Time complexity with explanation
-- Space complexity with explanation
-- Potential bottlenecks
-- Any further optimization possibilities
+# Approach 2
+Explain an alternative strategy and implementation, including:
+- How this approach differs from the first one
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Time and space complexity analysis
+- Comparison with the first approach (pros and cons)
 
 Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
   }
 
-  return promptText;
+  // Language-specific adaptations
+  switch (language) {
+    case 'vi':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Vietnamese language.`;
+    case 'es':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Spanish language.`;
+    case 'fr':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in French language.`;
+    case 'de':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in German language.`;
+    case 'ja':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Japanese language.`;
+    case 'ko':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Korean language.`;
+    case 'zh':
+      return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Chinese language.`;
+    case 'en':
+    default:
+      return basePrompt;
+  }
 }
 
 /**
@@ -109,6 +136,9 @@ async function processScreenshots(
   try {
     mainWindow.webContents.send("loading", true);
     const screenshots = getScreenshots();
+    
+    // Get the user's preferred response language
+    const responseLanguage = configManager.getResponseLanguage();
 
     if (aiProvider === AI_PROVIDERS.OLLAMA) {
       const modelVerification = await verifyOllamaModelFn(currentModel);
@@ -119,7 +149,7 @@ async function processScreenshots(
       }
     }
 
-    const promptText = createPrompt(screenshots.length);
+    const promptText = createPrompt(screenshots.length, responseLanguage);
 
     const messages = [{ type: "text", text: promptText }];
 

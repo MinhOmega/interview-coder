@@ -37,20 +37,26 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
   - Local Ollama compatibility
   - Real-time streaming responses
 
+- 🌐 **Multilingual Support**
+  - Responses in 8 different languages
+  - English, Vietnamese, Spanish, French, German, Japanese, Korean, and Chinese
+  - Language preferences persist across sessions
+
 - 🎯 **User-Friendly Interface**
   - Transparent, always-on-top window
   - Markdown-rendered responses
   - Customizable positioning
   - Platform-aware keyboard shortcuts
+  - Collapsible settings sections
 
 ## 🛠️ Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18 or later recommended)
 - [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- One of the following:
+- For AI functionality (one of the following):
   - OpenAI API key
   - Google Gemini API key
-  - [Ollama](https://ollama.ai/) (for local AI processing)
+  - [Ollama](https://ollama.ai/) running locally
 
 ## 📦 Installation
 
@@ -65,17 +71,22 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
    npm install
    ```
 
-3. **Configure Environment**
-   Create a `.env` file in the project root:
-   ```env
-   OPENAI_API_KEY=YOUR_OPENAI_API_KEY
-   OPENAI_MODEL=gpt-4o-mini
-   GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-   GEMINI_MODEL=gemini-2.0-flash
-   AI_PROVIDER=openai
-   OLLAMA_BASE_URL=http://127.0.0.1:11434
-   OLLAMA_MODEL=deepseek-r1:14b
+3. **Run the Application**
+   ```bash
+   npm start
    ```
+
+## 🔧 AI Configuration
+
+No environment configuration is required to get started. API keys can be entered directly in the application:
+
+1. Launch Interview Coder
+2. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+3. Choose your preferred AI provider (OpenAI, Google Gemini, or Ollama)
+4. Enter your API key when prompted
+5. Select your preferred model
+6. Choose your preferred response language
+7. Save settings and start using!
 
 ## 🔧 Using with Ollama
 
@@ -86,37 +97,66 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
    ollama pull deepseek-r1:14b
    ```
 4. Launch Interview Coder
-5. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open settings
-6. Select "Ollama" and your preferred model
-7. Save settings and start using!
+5. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+6. Select "Ollama" as your AI provider
+7. Configure the Ollama base URL if needed (default: http://127.0.0.1:11434)
+8. Choose your preferred model from the dropdown
+9. Save settings and start using!
+
+## 🌐 Language Settings
+
+Choose your preferred language for AI responses:
+
+1. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+2. Scroll down to the "Response Language" section
+3. Select your language from the available options:
+   - English (default)
+   - Vietnamese (Tiếng Việt)
+   - Spanish (Español)
+   - French (Français)
+   - German (Deutsch)
+   - Japanese (日本語)
+   - Korean (한국어)
+   - Chinese (中文)
+4. Save settings to apply your language preference
+
+The application will generate all AI responses in your selected language, with solution approaches tailored to your language preference.
 
 ## ⌨️ Keyboard Shortcuts
 
 ### macOS
-| Shortcut | Action |
-|----------|--------|
-| `⌘ + H` | Capture window screenshot |
-| `⌘ + D` | Capture selected area |
-| `⌘ + A` | Add screenshot (multi-page) |
-| `⌘ + ↵` | Process screenshots |
-| `⌘ + R` | Reset current process |
-| `⌘ + M` | Open model selector |
-| `⌘ + Q` | Quit application |
-| `⌘ + B` | Toggle window visibility |
-| `⌘ + ↑↓←→` | Move window |
+| Shortcut           | Action                      |
+| ------------------ | --------------------------- |
+| `⌘ + H`            | Capture window screenshot   |
+| `⌘ + D`            | Capture selected area       |
+| `⌘ + A`            | Add screenshot (multi-page) |
+| `⌘ + Enter`        | Process screenshots         |
+| `⌘ + R`            | Reset current process       |
+| `⌘ + M`            | Open model selector         |
+| `⌘ + ,`            | Open settings               |
+| `⌘ + Q`            | Quit application            |
+| `⌘ + B`            | Toggle window visibility    |
+| `⌘ + Shift + ↑↓←→` | Move window                 |
+| `Shift + ↑↓`       | Scroll up/down              |
+| `⌘ + Shift + =`    | Increase window size        |
+| `⌘ + Shift + -`    | Decrease window size        |
 
 ### Windows/Linux
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + H` | Capture window screenshot |
-| `Ctrl + D` | Capture selected area |
-| `Ctrl + A` | Add screenshot (multi-page) |
-| `Ctrl + Enter` | Process screenshots |
-| `Ctrl + R` | Reset current process |
-| `Ctrl + M` | Open model selector |
-| `Ctrl + Q` | Quit application |
-| `Ctrl + B` | Toggle window visibility |
-| `Ctrl + ↑↓←→` | Move window |
+| Shortcut              | Action                      |
+| --------------------- | --------------------------- |
+| `Ctrl + H`            | Capture window screenshot   |
+| `Ctrl + D`            | Capture selected area       |
+| `Ctrl + A`            | Add screenshot (multi-page) |
+| `Ctrl + Enter`        | Process screenshots         |
+| `Ctrl + R`            | Reset current process       |
+| `Ctrl + M`            | Open model selector         |
+| `Ctrl + ,`            | Open settings               |
+| `Ctrl + Q`            | Quit application            |
+| `Ctrl + B`            | Toggle window visibility    |
+| `Ctrl + Shift + ↑↓←→` | Move window                 |
+| `Shift + ↑↓`          | Scroll up/down              |
+| `Ctrl + Shift + =`    | Increase window size        |
+| `Ctrl + Shift + -`    | Decrease window size        |
 
 ## 🤖 Supported AI Models
 
