@@ -177,6 +177,17 @@ The application will generate all AI responses in your selected language, with s
 
 This project is under active development. While core features are functional, you may encounter occasional bugs or incomplete features. Your feedback and contributions are welcome!
 
+## ⚠️ Development Mode Notice
+
+**IMPORTANT:** This application is currently only available in development mode. There are no pre-built packages or installers yet.
+
+To use Interview Coder:
+1. You must clone the repository and run it locally in development mode
+2. Follow the installation instructions above and use `npm run dev` (macOS/Linux) or `npm run dev:windows` (Windows)
+3. Packaged releases will be available in the future when the application reaches a more stable state
+
+The application is not yet ready for production use and is actively being developed. Please report any issues on GitHub.
+
 ## 💭 Personal Note
 
 Inspired by interviewcoder.co but with a twist - making the tool openly available rather than behind paywalls. This project aims to challenge the status quo of technical interviews and encourage companies to explore more comprehensive ways of assessing candidates beyond traditional coding challenges.
