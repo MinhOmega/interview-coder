@@ -67,24 +67,90 @@ ipcRenderer.on(IPC_CHANNELS.ERROR, (_, message) => {
 });
 
 ipcRenderer.on(IPC_CHANNELS.LOADING, (_, isLoading) => {
-  document.getElementById("loading-content").style.display = isLoading ? "flex" : "none";
-  document.getElementById("result-content").style.display = isLoading ? "none" : "block";
+  try {
+    // Get the containers
+    const loadingContent = document.getElementById("loading-content");
+    const resultContentWrapper = document.getElementById("result-content-wrapper");
+
+    // Update visibility - hide result content while loading
+    loadingContent.style.display = isLoading ? "flex" : "none";
+    resultContentWrapper.style.display = isLoading ? "none" : "block";
+
+    // If we're showing loading state, prepare a clean container for later use
+    if (isLoading) {
+      // Clear out any content while hidden
+      resultContentWrapper.innerHTML = "";
+
+      // Create fresh content container
+      const newContent = document.createElement("div");
+      newContent.id = "result-content";
+      resultContentWrapper.appendChild(newContent);
+    }
+  } catch (error) {
+    console.error("Error in LOADING handler:", error);
+  }
 });
 
+// Add a function to clean up the DOM properly
+function cleanupResultContent() {
+  try {
+    // Get the wrapper
+    const wrapper = document.getElementById("result-content-wrapper");
+    if (!wrapper) return;
+
+    // Remove all children completely
+    while (wrapper.firstChild) {
+      wrapper.removeChild(wrapper.firstChild);
+    }
+
+    // Create a fresh content element
+    const newContent = document.createElement("div");
+    newContent.id = "result-content";
+    wrapper.appendChild(newContent);
+
+    // Force a repaint
+    wrapper.offsetHeight;
+  } catch (error) {
+    console.error("Error in cleanupResultContent:", error);
+  }
+}
+
 ipcRenderer.on(IPC_CHANNELS.ANALYSIS_RESULT, async (_, markdown) => {
-  const html = await processMarkdown(markdown);
-  document.getElementById("result-content").innerHTML = html;
+  try {
+    // Clean up the DOM first
+    cleanupResultContent();
 
-  // Setup code copy buttons after content is added
-  setupCodeCopyButtons();
+    // Process the markdown
+    const html = await processMarkdown(markdown);
 
-  // Scroll to top
-  window.scrollTo(0, 0);
+    // Get the new content element
+    const resultContent = document.getElementById("result-content");
+    if (resultContent) {
+      resultContent.innerHTML = html;
+    }
+
+    // Setup code copy buttons
+    setupCodeCopyButtons();
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+  } catch (error) {
+    console.error("Error in ANALYSIS_RESULT handler:", error);
+    showNotification("Error rendering content: " + error.message, "error");
+  }
 });
 
 // Setup for streaming results
 ipcRenderer.on(IPC_CHANNELS.STREAM_START, () => {
-  document.getElementById("result-content").innerHTML = "";
+  try {
+    // Clear the buffer
+    streamBuffer = "";
+
+    // Clean up the DOM
+    cleanupResultContent();
+  } catch (error) {
+    console.error("Error in STREAM_START handler:", error);
+  }
 });
 
 // Track current markdown accumulation state for improved streaming
@@ -97,7 +163,12 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_CHUNK, async (_, chunk) => {
 
     // Process the full accumulated text to ensure proper markdown rendering
     const html = await processMarkdown(streamBuffer);
-    document.getElementById("result-content").innerHTML = html;
+
+    // Get the content element
+    const resultContent = document.getElementById("result-content");
+    if (resultContent) {
+      resultContent.innerHTML = html;
+    }
 
     // Setup code copy buttons
     setupCodeCopyButtons();
@@ -116,7 +187,6 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_CHUNK, async (_, chunk) => {
 });
 
 ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, async (_, fullText) => {
-  // Replace the content with the full updated text (better for Gemini streaming)
   try {
     // Update the stream buffer
     streamBuffer = fullText;
@@ -126,10 +196,16 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, async (_, fullText) => {
       return;
     }
 
+    // Process the markdown
     const html = await processMarkdown(fullText);
-    document.getElementById("result-content").innerHTML = html;
 
-    // Setup code copy buttons after content is updated
+    // Get the content element
+    const resultContent = document.getElementById("result-content");
+    if (resultContent) {
+      resultContent.innerHTML = html;
+    }
+
+    // Setup code copy buttons
     setupCodeCopyButtons();
 
     // Auto-scroll to the bottom if user is already at the bottom
@@ -147,25 +223,36 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, async (_, fullText) => {
 });
 
 ipcRenderer.on(IPC_CHANNELS.STREAM_END, () => {
-  // Streaming is complete, reset buffer
-  streamBuffer = "";
+  try {
+    // Streaming is complete, reset buffer
+    streamBuffer = "";
 
-  // Make sure all code blocks have copy buttons
-  setupCodeCopyButtons();
+    // No need to replace content here as we've been replacing it with each update
 
-  // Hide instruction banner when streaming is complete
-  const banner = document.getElementById("instruction-banner");
-  banner.style.display = "none";
+    // Make sure all code blocks have copy buttons
+    setupCodeCopyButtons();
 
-  // Add a small scroll to ensure visible buttons if needed
-  const resultContent = document.getElementById("result-content");
-  if (resultContent.scrollHeight > resultContent.clientHeight) {
-    resultContent.scrollBy({ top: 1, behavior: "smooth" });
+    // Hide instruction banner when streaming is complete
+    const banner = document.getElementById("instruction-banner");
+    banner.style.display = "none";
+
+    // Add a small scroll to ensure visible buttons if needed
+    const resultContent = document.getElementById("result-content");
+    if (resultContent && resultContent.scrollHeight > resultContent.clientHeight) {
+      resultContent.scrollBy({ top: 1, behavior: "smooth" });
+    }
+  } catch (error) {
+    console.error("Error in STREAM_END handler:", error);
   }
 });
 
 ipcRenderer.on(IPC_CHANNELS.CLEAR_RESULT, () => {
-  document.getElementById("result-content").innerHTML = "";
+  try {
+    // Clean up the DOM completely
+    cleanupResultContent();
+  } catch (error) {
+    console.error("Error in CLEAR_RESULT handler:", error);
+  }
 });
 
 // Update AI provider/model badge display
@@ -189,7 +276,7 @@ ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, (_, scrollAmount) => {
   if (resultContent) {
     resultContent.scrollBy({
       top: scrollAmount,
-      behavior: "smooth"
+      behavior: "smooth",
     });
   }
 });
@@ -263,10 +350,10 @@ function markdownProcess(markdown) {
     .replace(/`([^`]+)`/g, (_, code) => {
       return "`" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "`";
     });
-  
+
   // Create a temp div to handle HTML strings safely
   const tempDiv = document.createElement("div");
-  
+
   // Process the markdown with HTML preserved
   let processedContent = safeMarkdown
     // Code blocks with language
@@ -293,9 +380,9 @@ function markdownProcess(markdown) {
     .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
     // Paragraphs
     .replace(/\n\n/g, "</p><p>");
-    
+
   tempDiv.innerHTML = processedContent;
-  
+
   // Fix any broken HTML structure
   if (!processedContent.startsWith("<p>")) {
     processedContent = "<p>" + processedContent;
@@ -303,7 +390,7 @@ function markdownProcess(markdown) {
   if (!processedContent.endsWith("</p>")) {
     processedContent = processedContent + "</p>";
   }
-  
+
   return processedContent;
 }
 
@@ -325,14 +412,14 @@ async function processMarkdown(markdown) {
           .use(remarkRehype, { allowDangerousHtml: true })
           .use(rehypeRaw)
           .use(rehypeStringify);
-        
+
         const file = await customProcessor.process(markdown);
         html = String(file);
-        
+
         // Ensure inline code blocks are properly styled
         const tempWrapper = document.createElement("div");
         tempWrapper.innerHTML = html;
-        
+
         // Add class to inline code elements if not already present
         tempWrapper.querySelectorAll("code:not([class])").forEach((codeEl) => {
           // Skip if inside a pre element (block code)
@@ -340,7 +427,7 @@ async function processMarkdown(markdown) {
             codeEl.classList.add("inline-code");
           }
         });
-        
+
         html = tempWrapper.innerHTML;
       } catch (err) {
         console.error("Error using unified processor:", err);
@@ -351,7 +438,7 @@ async function processMarkdown(markdown) {
       // Use our custom markdown processor if unified isn't available
       html = markdownProcess(markdown);
     }
-    
+
     // Add copy buttons to code blocks and language tags
     const wrapper = document.createElement("div");
     wrapper.innerHTML = html;
@@ -359,12 +446,12 @@ async function processMarkdown(markdown) {
     // Find all pre > code elements and wrap them with copy button and language tag
     wrapper.querySelectorAll("pre > code").forEach((codeBlock) => {
       const pre = codeBlock.parentNode;
-      
+
       // Skip if already processed
       if (pre.parentNode && pre.parentNode.classList.contains("code-block-container")) {
         return;
       }
-      
+
       const container = document.createElement("div");
       container.className = "code-block-container";
 
