@@ -351,7 +351,7 @@ saveBtn.addEventListener("click", async () => {
 
     // Initialize OpenAI client with the current key
     try {
-      await ipcRenderer.invoke("initialize-ai-client", "openai", openaiKey);
+      await ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, AI_PROVIDERS.OPENAI, openaiKey);
     } catch (err) {
       console.error("Failed to initialize OpenAI client:", err);
       messageDiv.textContent = "Failed to initialize OpenAI client";
@@ -372,7 +372,7 @@ saveBtn.addEventListener("click", async () => {
 
     // Initialize Gemini client with the current key
     try {
-      await ipcRenderer.invoke("initialize-ai-client", "gemini", geminiKey);
+      await ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, AI_PROVIDERS.GEMINI, geminiKey);
     } catch (err) {
       console.error("Failed to initialize Gemini client:", err);
       messageDiv.textContent = "Failed to initialize Gemini client";
@@ -538,6 +538,8 @@ function setupApiKeyInputs() {
       if (key) {
         // Store the full key
         API_KEYS.openai.key = key;
+        // Also update gemini key with the same value for consistency
+        API_KEYS.gemini.key = key;
 
         // Mask the key in the input
         const maskedKey = apiKeyManager.maskApiKey(key);
@@ -545,11 +547,17 @@ function setupApiKeyInputs() {
           openaiApiKeyInput.value = maskedKey;
         }
 
+        // Update gemini input field if it exists
+        const geminiApiKeyInput = document.getElementById(API_KEYS.gemini.inputId);
+        if (geminiApiKeyInput) {
+          geminiApiKeyInput.value = maskedKey;
+        }
+
         // Save the key
         apiKeyManager.saveApiKey("openai", key);
 
         // Initialize OpenAI client with the new key
-        ipcRenderer.invoke("initialize-ai-client", "openai", key);
+        ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, AI_PROVIDERS.OPENAI, key);
 
         // Auto-fetch models if key is long enough
         if (key.length >= 32) {
@@ -572,6 +580,8 @@ function setupApiKeyInputs() {
       if (key) {
         // Store the full key
         API_KEYS.gemini.key = key;
+        // Also update openai key with the same value for consistency
+        API_KEYS.openai.key = key;
 
         // Mask the key in the input
         const maskedKey = apiKeyManager.maskApiKey(key);
@@ -579,11 +589,17 @@ function setupApiKeyInputs() {
           geminiApiKeyInput.value = maskedKey;
         }
 
+        // Update openai input field if it exists
+        const openaiApiKeyInput = document.getElementById(API_KEYS.openai.inputId);
+        if (openaiApiKeyInput) {
+          openaiApiKeyInput.value = maskedKey;
+        }
+
         // Save the key
         apiKeyManager.saveApiKey("gemini", key);
 
         // Initialize Gemini client with the new key
-        ipcRenderer.invoke("initialize-ai-client", "gemini", key);
+        ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, AI_PROVIDERS.GEMINI, key);
 
         // Auto-fetch models if key is long enough
         if (key.length >= 32) {
@@ -650,7 +666,7 @@ function initialize() {
   setupApiKeyInputs();
 
   // Initialize modals
-  modalManager.initializeModals();
+  initializeModals();
 
   // Set up keyboard shortcuts
   setupKeyboardShortcuts();
@@ -683,6 +699,47 @@ function initialize() {
     resizeTimeout = setTimeout(() => {
       utils.adjustUIForScreenSize();
     }, 250);
+  });
+}
+
+// Initialize modal event listeners
+function initializeModals() {
+  const apiKeyModal = document.getElementById('api-key-modal');
+  const saveApiKeyBtn = document.getElementById('save-api-key');
+  const cancelApiKeyBtn = document.getElementById('cancel-api-key');
+  const closeModalBtn = document.querySelector('.close-modal');
+  
+  // Save API key button
+  saveApiKeyBtn.addEventListener('click', () => {
+    modalManager.saveApiKeyFromModal();
+  });
+  
+  // Cancel and close buttons
+  cancelApiKeyBtn.addEventListener('click', () => {
+    modalManager.closeApiKeyModal();
+  });
+  
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', () => {
+      modalManager.closeApiKeyModal();
+    });
+  }
+  
+  // Close modal when clicking outside
+  window.addEventListener('click', (e) => {
+    if (e.target === apiKeyModal) {
+      modalManager.closeApiKeyModal();
+    }
+  });
+  
+  // Add keyboard shortcuts for modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && apiKeyModal.style.display === 'block') {
+      modalManager.closeApiKeyModal();
+    }
+    if (e.key === 'Enter' && apiKeyModal.style.display === 'block') {
+      saveApiKeyBtn.click();
+    }
   });
 }
 

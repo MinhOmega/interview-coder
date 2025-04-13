@@ -1,8 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { OpenAI } = require("openai");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const configManager = require("./js/config-manager");
 const windowManager = require("./js/window-manager");
@@ -12,47 +10,30 @@ const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
-require("dotenv").config();
 
 // Set up hot reload for development
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 if (isDev) {
   try {
-    require('electron-reload')(__dirname, {
-      electron: path.join(__dirname, 'node_modules', '.bin', 'electron'),
-      hardResetMethod: 'exit',
-      ignored: [
-        /node_modules/,
-        /[\/\\]\./,
-        /\.git/,
-        /\.map$/,
-        /package-lock\.json$/
-      ]
+    require("electron-reload")(__dirname, {
+      electron: path.join(__dirname, "node_modules", ".bin", "electron"),
+      hardResetMethod: "exit",
+      ignored: [/node_modules/, /[\/\\]\./, /\.git/, /\.map$/, /package-lock\.json$/],
     });
-    console.log('Hot reload enabled for development');
+    console.log("Hot reload enabled for development");
   } catch (err) {
-    console.error('Failed to initialize hot reload:', err);
+    console.error("Failed to initialize hot reload:", err);
   }
 }
 
 // Development mode notification
 if (isDev) {
-  console.log('Running in development mode with hot reload');
+  console.log("Running in development mode with hot reload");
 }
 
 axios.defaults.family = 4;
 
 let openai = null;
-
-try {
-  // No longer initializing from environment variables
-  // Clients will be initialized through API key inputs in the UI
-  
-  // Still calling initializeAIClients for backward compatibility
-  aiProviders.initializeAIClients();
-} catch (err) {
-  console.error("Error setting up AI clients:", err);
-}
 
 function resetProcess() {
   screenshotManager.resetScreenshots();
@@ -89,7 +70,6 @@ async function processScreenshotsWithAI() {
       aiProviders.verifyOllamaModel,
       aiProviders.generateWithOllama,
       aiProviders.generateWithGemini,
-      openai,
       true,
     );
   } catch (error) {
@@ -107,36 +87,63 @@ async function processScreenshotsWithAI() {
 
 app.whenReady().then(() => {
   const mainWindow = windowManager.createMainWindow();
-  
+
+  // Initialize AI clients from saved config
+  const initStatus = aiProviders.initializeFromConfig();
+  console.log("AI clients initialization status:", initStatus);
+  if (initStatus.openai) {
+    openai = aiProviders.getOpenAI();
+  }
+
   // Handle API key initialization from UI
-  ipcMain.handle("initialize-ai-client", async (event, provider, apiKey) => {
+  ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey) => {
     try {
       console.log(`Initializing ${provider} client with provided API key`);
       const result = aiProviders.updateAIClients(provider, apiKey);
-      
+
       if (provider === AI_PROVIDERS.OPENAI && result) {
         // Update the openai reference for use in processScreenshots
         openai = aiProviders.getOpenAI();
       }
-      
+
       return { success: result };
     } catch (error) {
       console.error(`Error initializing ${provider} client:`, error);
       return { success: false, error: error.message };
     }
   });
-  
+
+  // Handle saving API key to settings file
+  ipcMain.handle(IPC_CHANNELS.SAVE_API_KEY, async (_, apiKey) => {
+    try {
+      return configManager.saveApiKey(apiKey);
+    } catch (error) {
+      console.error("Error saving API key:", error);
+      return false;
+    }
+  });
+
+  // Handle getting API key from settings file
+  ipcMain.handle(IPC_CHANNELS.GET_API_KEY, async (event) => {
+    try {
+      return configManager.getApiKey();
+    } catch (error) {
+      console.error("Error getting API key:", error);
+      return null;
+    }
+  });
+
   eventHandler.setupEventHandlers(mainWindow, configManager, windowManager, aiProviders);
   const screenshotInstance = screenshotManager.initScreenshotCapture(mainWindow);
 
   // Set up hot reload for development mode with more granular control
   if (isDev) {
     try {
-      const devConfig = require('./js/dev-config');
+      const devConfig = require("./js/dev-config");
       // Pass windows to the hot reload module for targeted reloading
       devConfig.setupHotReload(mainWindow, windowManager.getModelListWindow());
     } catch (err) {
-      console.error('Error setting up dev hot reload:', err);
+      console.error("Error setting up dev hot reload:", err);
     }
   }
 
