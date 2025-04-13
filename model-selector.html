@@ -12,134 +12,193 @@
   <h1>Select AI Model</h1>
 
   <div class="section" id="provider-section">
-    <h2>AI Provider</h2>
-    <div class="radio-group">
-      <label class="radio-label" id="openai-radio-label">
-        <input type="radio" name="aiProvider" value="openai">
-        <span>OpenAI</span>
-        <span class="provider-badge openai">Requires API Key</span>
-      </label>
-      <label class="radio-label" id="ollama-radio-label">
-        <input type="radio" name="aiProvider" value="ollama">
-        <span>Ollama</span>
-        <span class="provider-badge ollama">Local, free</span>
-      </label>
-      <label class="radio-label" id="gemini-radio-label">
-        <input type="radio" name="aiProvider" value="gemini">
-        <span>Gemini</span>
-        <span class="provider-badge gemini">Google AI, Requires API Key</span>
-      </label>
+    <div class="section-header">
+      <h2>AI Provider</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    </div>
+    <div class="section-content">
+      <div class="radio-group">
+        <label class="radio-label" id="openai-radio-label">
+          <input type="radio" name="aiProvider" value="openai">
+          <span>OpenAI</span>
+          <span class="provider-badge openai">Requires API Key</span>
+        </label>
+        <label class="radio-label" id="ollama-radio-label">
+          <input type="radio" name="aiProvider" value="ollama">
+          <span>Ollama</span>
+          <span class="provider-badge ollama">Local, free</span>
+        </label>
+        <label class="radio-label" id="gemini-radio-label">
+          <input type="radio" name="aiProvider" value="gemini">
+          <span>Gemini</span>
+          <span class="provider-badge gemini">Google AI, Requires API Key</span>
+        </label>
+      </div>
     </div>
   </div>
 
   <div class="section" id="openai-section" style="display: none;">
-    <h2>OpenAI Models</h2>
-
-    <div class="api-key-section">
-      <h3>OpenAI API Key</h3>
-      <div class="api-key-input-container">
-        <input type="password" id="openai-api-key" placeholder="Enter your OpenAI API key" class="api-key-input">
-      </div>
-      <div class="api-key-status" id="openai-key-status"></div>
-      <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
+    <div class="section-header">
+      <h2>OpenAI Models</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
     </div>
+    <div class="section-content">
+      <div class="api-key-section">
+        <h3>OpenAI API Key</h3>
+        <div class="api-key-input-container">
+          <input type="password" id="openai-api-key" placeholder="Enter your OpenAI API key" class="api-key-input">
+        </div>
+        <div class="api-key-status" id="openai-key-status"></div>
+        <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
+      </div>
 
-    <div class="model-cards" id="openai-model-cards">
-      <div class="model-card" data-model="gpt-4o-mini">
-        <div class="model-card-title">GPT-4o Mini</div>
-        <div class="model-card-description">Smaller, faster version of GPT-4o</div>
+      <div class="model-cards" id="openai-model-cards">
+        <div class="model-card" data-model="gpt-4o-mini">
+          <div class="model-card-title">GPT-4o Mini</div>
+          <div class="model-card-description">Smaller, faster version of GPT-4o</div>
+        </div>
+        <div class="model-card" data-model="gpt-4o">
+          <div class="model-card-title">GPT-4o</div>
+          <div class="model-card-description">Latest multimodal model with vision</div>
+          <div class="model-card-badge vision">Vision</div>
+        </div>
+        <div class="model-card" data-model="gpt-4-vision-preview">
+          <div class="model-card-title">GPT-4 Vision</div>
+          <div class="model-card-description">Specialized for vision tasks</div>
+          <div class="model-card-badge vision">Vision</div>
+        </div>
+        <div class="model-card" data-model="gpt-4-turbo">
+          <div class="model-card-title">GPT-4 Turbo</div>
+          <div class="model-card-description">Powerful, cost-effective GPT-4</div>
+        </div>
       </div>
-      <div class="model-card" data-model="gpt-4o">
-        <div class="model-card-title">GPT-4o</div>
-        <div class="model-card-description">Latest multimodal model with vision</div>
-        <div class="model-card-badge vision">Vision</div>
-      </div>
-      <div class="model-card" data-model="gpt-4-vision-preview">
-        <div class="model-card-title">GPT-4 Vision</div>
-        <div class="model-card-description">Specialized for vision tasks</div>
-        <div class="model-card-badge vision">Vision</div>
-      </div>
-      <div class="model-card" data-model="gpt-4-turbo">
-        <div class="model-card-title">GPT-4 Turbo</div>
-        <div class="model-card-description">Powerful, cost-effective GPT-4</div>
-      </div>
+      <select id="openai-model" style="display: none;">
+        <option value="gpt-4o-mini">gpt-4o-mini</option>
+        <option value="gpt-4o">gpt-4o</option>
+        <option value="gpt-4-vision-preview">gpt-4-vision-preview</option>
+        <option value="gpt-4-turbo">gpt-4-turbo</option>
+      </select>
     </div>
-    <select id="openai-model" style="display: none;">
-      <option value="gpt-4o-mini">gpt-4o-mini</option>
-      <option value="gpt-4o">gpt-4o</option>
-      <option value="gpt-4-vision-preview">gpt-4-vision-preview</option>
-      <option value="gpt-4-turbo">gpt-4-turbo</option>
-    </select>
   </div>
 
   <div class="section" id="gemini-section" style="display: none;">
-    <h2>Gemini Models</h2>
-
-    <div class="api-key-section">
-      <h3>Gemini API Key</h3>
-      <div class="api-key-input-container">
-        <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key" class="api-key-input">
+    <div class="section-header">
+      <h2>Gemini Models</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    </div>
+    <div class="section-content">
+      <div class="api-key-section">
+        <h3>Gemini API Key</h3>
+        <div class="api-key-input-container">
+          <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key" class="api-key-input">
+        </div>
+        <div class="api-key-status" id="gemini-key-status"></div>
+        <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
       </div>
-      <div class="api-key-status" id="gemini-key-status"></div>
-      <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
-    </div>
 
-    <div id="gemini-loading" class="flex justify-between items-center">
-      <span>Loading Gemini models... <span class="loading"></span></span>
+      <div id="gemini-loading" class="flex justify-between items-center">
+        <span>Loading Gemini models... <span class="loading"></span></span>
+      </div>
+      <div class="model-cards" id="gemini-model-cards" style="display: none;">
+        <!-- Model cards will be added dynamically -->
+      </div>
+      <select id="gemini-model" style="display: none;">
+        <option value="loading">Loading models...</option>
+      </select>
+      <div class="helper-text mt-2">All Gemini models have excellent vision and streaming capabilities.</div>
     </div>
-    <div class="model-cards" id="gemini-model-cards" style="display: none;">
-      <!-- Model cards will be added dynamically -->
-    </div>
-    <select id="gemini-model" style="display: none;">
-      <option value="loading">Loading models...</option>
-    </select>
-    <div class="helper-text mt-2">All Gemini models have excellent vision and streaming capabilities.</div>
   </div>
 
   <div class="section" id="ollama-section" style="display: none;">
-    <h2>Ollama Models</h2>
-    <div class="flex justify-between items-center">
-      <span id="ollama-status">Checking for Ollama models...</span>
-      <button id="refresh-models" class="btn-primary">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-          style="margin-right: 6px;">
-          <path d="M20 12C20 16.4183 16.4183 20 12 20C7.58172 20 4 16.4183 4 12C4 7.58172 7.58172 4 12 4"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          <path d="M16 4H12V8H16V4Z" fill="currentColor" />
+    <div class="section-header">
+      <h2>Ollama Models</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
-        Refresh Models
       </button>
     </div>
+    <div class="section-content">
+      <div class="flex justify-between items-center">
+        <span id="ollama-status">Checking for Ollama models...</span>
+        <button id="refresh-models" class="btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+            style="margin-right: 6px;">
+            <path d="M20 12C20 16.4183 16.4183 20 12 20C7.58172 20 4 16.4183 4 12C4 7.58172 7.58172 4 12 4"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <path d="M16 4H12V8H16V4Z" fill="currentColor" />
+          </svg>
+          Refresh Models
+        </button>
+      </div>
 
-    <div class="model-cards mt-4" id="ollama-model-cards" style="display: none;">
-      <!-- Model cards will be added dynamically -->
+      <div class="model-cards mt-4" id="ollama-model-cards" style="display: none;">
+        <!-- Model cards will be added dynamically -->
+      </div>
+
+      <select id="ollama-model" class="mt-2">
+        <option value="loading">Loading...</option>
+      </select>
+
+      <div id="vision-models-note" class="helper-text mt-1 mb-2" style="display: none;">
+        For image processing, it's recommended to use multi-modal models like:
+        llava, bakllava, deepseek-r1, or moondream
+      </div>
+
+      <h3>Ollama URL</h3>
+      <input type="text" id="ollama-url" placeholder="http://127.0.0.1:11434" value="http://127.0.0.1:11434">
+      <div class="helper-text">Use 127.0.0.1 instead of localhost to avoid IPv6 connection issues</div>
+
+      <div id="connection-test-result" class="status"></div>
+      <div class="flex justify-between mt-4">
+        <button id="test-connection" class="btn-primary">Test Connection</button>
+        <button id="pull-model-btn" class="btn-warning">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+            style="margin-right: 6px;">
+            <path d="M12 4V16M12 16L7 11M12 16L17 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M20 20H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          Pull Model
+        </button>
+      </div>
     </div>
+  </div>
 
-    <select id="ollama-model" class="mt-2">
-      <option value="loading">Loading...</option>
-    </select>
-
-    <div id="vision-models-note" class="helper-text mt-1 mb-2" style="display: none;">
-      For image processing, it's recommended to use multi-modal models like:
-      llava, bakllava, deepseek-r1, or moondream
-    </div>
-
-    <h3>Ollama URL</h3>
-    <input type="text" id="ollama-url" placeholder="http://127.0.0.1:11434" value="http://127.0.0.1:11434">
-    <div class="helper-text">Use 127.0.0.1 instead of localhost to avoid IPv6 connection issues</div>
-
-    <div id="connection-test-result" class="status"></div>
-    <div class="flex justify-between mt-4">
-      <button id="test-connection" class="btn-primary">Test Connection</button>
-      <button id="pull-model-btn" class="btn-warning">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-          style="margin-right: 6px;">
-          <path d="M12 4V16M12 16L7 11M12 16L17 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-            stroke-linejoin="round" />
-          <path d="M20 20H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+  <div class="section" id="language-section">
+    <div class="section-header">
+      <h2>Response Language</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
-        Pull Model
       </button>
+    </div>
+    <div class="section-content">
+      <p class="helper-text mb-2">Choose the language for AI responses. The AI will generate solutions in this language.</p>
+      
+      <div class="language-selector">
+        <label for="response-language">Language:</label>
+        <select id="response-language" class="language-select">
+          <!-- Languages will be populated dynamically from the LANGUAGES object -->
+        </select>
+      </div>
+      
+      <div class="language-cards" id="language-cards">
+        <!-- Language cards will be populated dynamically from the LANGUAGES object -->
+      </div>
     </div>
   </div>
 

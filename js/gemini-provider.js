@@ -1,12 +1,12 @@
 const axios = require("axios");
-const { API_KEYS } = require('./config');
+const { API_KEYS } = require("./config");
 
 // Function to fetch Gemini models from the API
 async function fetchGeminiModels() {
   const geminiLoading = document.getElementById("gemini-loading");
   const geminiModelSelect = document.getElementById("gemini-model");
   const geminiModelCards = document.getElementById("gemini-model-cards");
-  
+
   geminiLoading.innerHTML = 'Loading Gemini models... <span class="loading"></span>';
   geminiModelSelect.innerHTML = '<option value="loading">Loading models...</option>';
   geminiModelCards.style.display = "none";
@@ -180,13 +180,17 @@ async function fetchGeminiModels() {
       geminiLoading.innerHTML = `<span>${geminiModels.length} Gemini models available</span>`;
 
       // Select the current model if it exists
-      if (window.currentSettings && window.currentSettings.aiProvider === "gemini" && window.currentSettings.currentModel) {
+      if (
+        window.currentSettings &&
+        window.currentSettings.aiProvider === "gemini" &&
+        window.currentSettings.currentModel
+      ) {
         window.selectModelCard("gemini", window.currentSettings.currentModel);
       } else {
         // Select a default model - prefer gemini-2.0-flash if available
-        const defaultModel = geminiModels.find(
-          (model) => model.name.includes("gemini-2.0-flash") || model.name.includes("gemini-pro"),
-        );
+        const defaultModel =
+          geminiModels.find((model) => model.name.includes("gemini-2.0-flash")) ||
+          geminiModels.find((model) => model.name.includes("gemini-pro"));
 
         if (defaultModel) {
           const modelId = defaultModel.name.replace("models/", "");
@@ -218,5 +222,5 @@ function loadGeminiModels() {
 
 module.exports = {
   loadGeminiModels,
-  fetchGeminiModels
-}; 
+  fetchGeminiModels,
+};

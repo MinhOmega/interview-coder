@@ -28,6 +28,11 @@ const pullStatusDiv = document.getElementById("pull-status");
 const confirmPullBtn = document.getElementById("confirm-pull");
 const cancelPullBtn = document.getElementById("cancel-pull");
 
+// Language selector elements
+const languageSelect = document.getElementById("response-language");
+const languageCardsContainer = document.getElementById("language-cards");
+const sectionToggles = document.querySelectorAll(".section-toggle");
+
 let currentSettings = {};
 
 window.currentSettings = currentSettings;
@@ -50,13 +55,13 @@ async function loadCurrentSettings() {
   // Set UI based on current settings
   // Update radio buttons and label styling
   radioLabels.forEach((label) => label.classList.remove("selected"));
-  
+
   // Only select a radio button if a provider is specified
   if (currentSettings.aiProvider && currentSettings.aiProvider !== "AI") {
     const selectedRadioLabel = document.getElementById(`${currentSettings.aiProvider}-radio-label`);
     if (selectedRadioLabel) {
       selectedRadioLabel.classList.add("selected");
-      
+
       // Check the radio button
       const radioInput = document.querySelector(`input[name="aiProvider"][value="${currentSettings.aiProvider}"]`);
       if (radioInput) {
@@ -74,6 +79,16 @@ async function loadCurrentSettings() {
     utils.selectModelCard("openai", currentSettings.currentModel);
   } else if (currentSettings.aiProvider === "gemini") {
     geminiProvider.loadGeminiModels();
+  }
+
+  // Set language selection based on settings
+  if (currentSettings.responseLanguage) {
+    languageSelect.value = currentSettings.responseLanguage;
+    selectLanguageCard(currentSettings.responseLanguage);
+  } else {
+    // Default to English
+    languageSelect.value = "en";
+    selectLanguageCard("en");
   }
 
   // Update visibility based on provider
@@ -170,17 +185,157 @@ window.addEventListener("click", (event) => {
   }
 });
 
+/**
+ * Select a language card and deselect others
+ * @param {string} languageCode The language code to select (e.g., 'en', 'vi')
+ */
+function selectLanguageCard(languageCode) {
+  // Deselect all cards
+  languageCardsContainer.querySelectorAll(".language-card").forEach((card) => {
+    card.classList.remove("selected");
+  });
+
+  // Select the matching card
+  const cardToSelect = languageCardsContainer.querySelector(`.language-card[data-language="${languageCode}"]`);
+  if (cardToSelect) {
+    cardToSelect.classList.add("selected");
+  }
+}
+
+// Function to populate language options dynamically
+function populateLanguageOptions() {
+  // Clear any existing options
+  languageSelect.innerHTML = "";
+  languageCardsContainer.innerHTML = "";
+
+  // Get available languages from the config manager
+  const languages = configManager.getAvailableLanguages();
+
+  // Add options to the select dropdown
+  for (const code in languages) {
+    const language = languages[code];
+    const option = document.createElement("option");
+    option.value = code;
+
+    // Create localized display name (e.g., "Spanish (Español)")
+    let displayName = language.name;
+    if (code !== "en" && language.nativeName) {
+      displayName += ` (${language.nativeName})`;
+    }
+
+    option.textContent = displayName;
+    languageSelect.appendChild(option);
+
+    // Create language card
+    const card = document.createElement("div");
+    card.className = "language-card";
+    card.setAttribute("data-language", code);
+    card.setAttribute("tabindex", "0"); // Make it focusable for accessibility
+
+    const title = document.createElement("div");
+    title.className = "language-card-title";
+    title.textContent = language.name;
+    card.appendChild(title);
+
+    // Add native name if available and not English
+    if (code !== "en" && language.nativeName) {
+      const description = document.createElement("div");
+      description.className = "language-card-description";
+      description.textContent = language.nativeName;
+      card.appendChild(description);
+    }
+
+    // Add language code badge
+    const codeBadge = document.createElement("div");
+    codeBadge.className = "language-code";
+    codeBadge.textContent = code.toUpperCase();
+    card.appendChild(codeBadge);
+
+    // Add click handler
+    card.addEventListener("click", () => {
+      selectLanguageCard(code);
+      languageSelect.value = code;
+    });
+
+    // Add keyboard support
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        selectLanguageCard(code);
+        languageSelect.value = code;
+      }
+    });
+
+    languageCardsContainer.appendChild(card);
+  }
+}
+
+// Set up section toggle functionality
+function setupSectionToggles() {
+  sectionToggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+      const section = toggle.closest(".section");
+      const content = section.querySelector(".section-content");
+
+      // Toggle collapsed state
+      toggle.classList.toggle("collapsed");
+      content.classList.toggle("collapsed");
+
+      // Save the state to localStorage for persistence
+      const sectionId = section.id;
+      const isCollapsed = toggle.classList.contains("collapsed");
+
+      try {
+        const collapsedSections = JSON.parse(localStorage.getItem("collapsed-sections") || "{}");
+        collapsedSections[sectionId] = isCollapsed;
+        localStorage.setItem("collapsed-sections", JSON.stringify(collapsedSections));
+      } catch (err) {
+        console.error("Error saving section state", err);
+      }
+    });
+  });
+}
+
+// Restore collapsed state of sections
+function restoreSectionStates() {
+  try {
+    const collapsedSections = JSON.parse(localStorage.getItem("collapsed-sections") || "{}");
+
+    for (const sectionId in collapsedSections) {
+      if (collapsedSections[sectionId]) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+          const toggle = section.querySelector(".section-toggle");
+          const content = section.querySelector(".section-content");
+
+          if (toggle && content) {
+            toggle.classList.add("collapsed");
+            content.classList.add("collapsed");
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error restoring section states", err);
+  }
+}
+
+// Event listener for language select dropdown
+languageSelect.addEventListener("change", () => {
+  selectLanguageCard(languageSelect.value);
+});
+
 // Save button handler
 saveBtn.addEventListener("click", async () => {
   const selectedRadio = document.querySelector('input[name="aiProvider"]:checked');
-  
+
   // Check if a provider has been selected
   if (!selectedRadio) {
     messageDiv.textContent = "Please select an AI provider first";
     messageDiv.className = "status error";
     return;
   }
-  
+
   const aiProvider = selectedRadio.value;
   let currentModel;
 
@@ -193,7 +348,7 @@ saveBtn.addEventListener("click", async () => {
       messageDiv.className = "status error";
       return;
     }
-    
+
     // Initialize OpenAI client with the current key
     try {
       await ipcRenderer.invoke("initialize-ai-client", "openai", openaiKey);
@@ -203,7 +358,7 @@ saveBtn.addEventListener("click", async () => {
       messageDiv.className = "status error";
       return;
     }
-    
+
     const selectedCard = openaiModelCards.querySelector(".model-card.selected");
     currentModel = selectedCard ? selectedCard.getAttribute("data-model") : openaiModelSelect.value;
   } else if (aiProvider === AI_PROVIDERS.GEMINI) {
@@ -214,7 +369,7 @@ saveBtn.addEventListener("click", async () => {
       messageDiv.className = "status error";
       return;
     }
-    
+
     // Initialize Gemini client with the current key
     try {
       await ipcRenderer.invoke("initialize-ai-client", "gemini", geminiKey);
@@ -224,7 +379,7 @@ saveBtn.addEventListener("click", async () => {
       messageDiv.className = "status error";
       return;
     }
-    
+
     const selectedCard = document.getElementById("gemini-model-cards").querySelector(".model-card.selected");
     currentModel = selectedCard
       ? selectedCard.getAttribute("data-model")
@@ -245,7 +400,7 @@ saveBtn.addEventListener("click", async () => {
     messageDiv.className = "status error";
     return;
   }
-  
+
   // Validate that a model is selected
   if (!currentModel) {
     messageDiv.textContent = "Please select a model";
@@ -282,6 +437,9 @@ saveBtn.addEventListener("click", async () => {
     }
   }
 
+  // Get selected language
+  const responseLanguage = languageSelect.value;
+
   // Disable the save button to prevent multiple clicks
   saveBtn.disabled = true;
 
@@ -290,22 +448,16 @@ saveBtn.addEventListener("click", async () => {
     aiProvider,
     currentModel,
     ollamaUrl,
+    responseLanguage,
   };
 
   try {
-    // Update settings
+    // Update settings through the IPC channel to be persisted in the main process
     ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, settings);
 
     // Show success message
     messageDiv.textContent = "Settings saved!";
     messageDiv.className = "status success";
-
-    // Try to save settings to localStorage as fallback
-    try {
-      localStorage.setItem("model-settings", JSON.stringify(settings));
-    } catch (storageErr) {
-      console.error("Could not save to localStorage:", storageErr);
-    }
 
     // For better synchronization, force the main window to refresh model badge
     try {
@@ -323,20 +475,9 @@ saveBtn.addEventListener("click", async () => {
     }, 800);
   } catch (error) {
     console.error("Error saving settings:", error);
-
-    // Try to save settings to localStorage as fallback
-    try {
-      localStorage.setItem("model-settings", JSON.stringify(settings));
-      messageDiv.textContent = "Settings saved locally (fallback mode).";
-      messageDiv.className = "status success";
-
-      // Re-enable save button
-      saveBtn.disabled = false;
-    } catch (storageErr) {
-      messageDiv.textContent = "Could not save settings: " + error.message;
-      messageDiv.className = "status error";
-      saveBtn.disabled = false;
-    }
+    messageDiv.textContent = "Could not save settings: " + error.message;
+    messageDiv.className = "status error";
+    saveBtn.disabled = false;
   }
 });
 
@@ -514,6 +655,12 @@ function initialize() {
   // Set up keyboard shortcuts
   setupKeyboardShortcuts();
 
+  // Populate language options
+  populateLanguageOptions();
+
+  // Set up section toggles
+  setupSectionToggles();
+
   // Listen for visibility updates from main process
   ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (event, isVisible) => {
     document.body.style.opacity = isVisible ? "1" : "0";
@@ -521,6 +668,9 @@ function initialize() {
 
   // Load current settings
   loadCurrentSettings();
+
+  // Restore collapsed section states
+  restoreSectionStates();
 
   // Run once on page load to adjust UI
   utils.adjustUIForScreenSize();
