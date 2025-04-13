@@ -30,6 +30,12 @@ const IPC_CHANNELS = {
   GET_OLLAMA_MODELS: "get-ollama-models",
   DEV_RELOAD: "dev-reload",
   SCROLL_CONTENT: "scroll-content",
+  RESIZE_WINDOW: "resize-window",
+  MOVE_WINDOW: "move-window",
+  QUIT_APP: "quit-app",
+  SAVE_API_KEY: "save-api-key",
+  GET_API_KEY: "get-api-key",
+  INITIALIZE_AI_CLIENT: "initialize-ai-client",
 };
 
 module.exports = {
