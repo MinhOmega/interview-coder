@@ -109,11 +109,17 @@ body {
   overflow: hidden;
   position: relative;
   border-radius: 12px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transform: translateZ(0);
+  will-change: contents;
+  backface-visibility: hidden;
+  contain: layout style paint;
 }
 
 #instruction-banner {
   position: fixed;
-  top: 60px;
+  top: 0;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(20, 20, 20, 0.9);
@@ -126,16 +132,38 @@ body {
   user-select: none;
 }
 
+#result-content-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform: translateZ(0);
+  will-change: contents;
+  backface-visibility: hidden;
+  contain: content;
+  isolation: isolate;
+}
+
 #result-content {
   width: 100%;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 20px;
   box-sizing: border-box;
   border-radius: 8px;
   overflow-x: hidden;
-  background-color: var(--bg-transparent);
   height: 100vh;
-  padding-top: 70px;
+  will-change: contents, transform, opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  position: relative;
+  transition: none;
+  contain: content;
+  isolation: isolate;
+}
+
+/* Remove the clearing class as we're using a new approach */
+#result-content.clearing {
+  display: none;
 }
 
 #result-content pre {
@@ -158,6 +186,9 @@ body {
   max-width: 100%;
   overflow: hidden;
   border-radius: 6px;
+  transform: translateZ(0);
+  contain: content;
+  isolation: isolate;
 }
 
 .code-block-container pre {
@@ -445,13 +476,13 @@ code {
 
 .model-badge {
   position: fixed;
-  bottom: 12px;
+  bottom: 10%;
   right: 12px;
   background: rgba(30, 30, 30, 0.8);
   color: #fff;
   padding: 6px 12px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   user-select: none;
   max-width: 300px;
   overflow: hidden;
@@ -494,7 +525,7 @@ code {
 /* Updated Notification styles */
 #notification-container {
   position: fixed;
-  bottom: 20px;
+  bottom: 0;
   right: 20px;
   z-index: 100000;
   max-width: 400px;
@@ -630,12 +661,21 @@ body.invisible-mode:hover {
   box-sizing: border-box;
   position: relative;
   background: var(--bg-main);
+  will-change: transform;
+  transform: translateZ(0);
+  contain: layout style paint;
+  z-index: 1;
 }
 
 #main-content {
-  margin: 60px auto 20px auto;
+  margin-bottom: 30px;
   color: white;
   position: relative;
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  isolation: isolate;
+  contain: content;
 }
 
 code.inline-code {
