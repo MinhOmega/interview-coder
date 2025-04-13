@@ -180,10 +180,7 @@ function resizeWindow(direction) {
 // Function to scroll content in the result area
 function scrollContent(direction) {
   if (!mainWindow) return;
-  
-  // Send a scroll command to the renderer process
   const scrollAmount = direction === "up" ? -300 : 300;
-  console.log("🚀 ~ window-manager.js:186 ~ scrollContent ~ scrollAmount:", scrollAmount)
   mainWindow.webContents.send(IPC_CHANNELS.SCROLL_CONTENT, scrollAmount);
 }
 
@@ -205,7 +202,6 @@ function getWindowVisibility() {
 // Update the instruction in the main window
 function updateInstruction(instruction) {
   if (!mainWindow) return;
-  
   if (!instruction || instruction.trim() === "") {
     // If instruction is empty, hide the instruction banner
     mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
@@ -235,5 +231,5 @@ module.exports = {
   getModelListWindow,
   getWindowVisibility,
   updateInstruction,
-  getDefaultInstructions
-}; 
+  getDefaultInstructions,
+};

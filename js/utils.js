@@ -1,18 +1,24 @@
-// Helper function to select a model card and update the select element
+const { AI_PROVIDERS } = require("./constants");
+
+/**
+ * Selects a model card and updates the select element
+ * @param {string} provider - The provider
+ * @param {string} modelId - The model ID
+ */
 function selectModelCard(provider, modelId) {
   let modelCards;
   let selectElement;
 
   switch (provider) {
-    case "openai":
+    case AI_PROVIDERS.OPENAI:
       modelCards = document.getElementById("openai-model-cards");
       selectElement = document.getElementById("openai-model");
       break;
-    case "gemini":
+    case AI_PROVIDERS.GEMINI:
       modelCards = document.getElementById("gemini-model-cards");
       selectElement = document.getElementById("gemini-model");
       break;
-    case "ollama":
+    case AI_PROVIDERS.OLLAMA:
       modelCards = document.getElementById("ollama-model-cards");
       selectElement = document.getElementById("ollama-model");
       break;
@@ -115,5 +121,5 @@ function adjustUIForScreenSize() {
 module.exports = {
   selectModelCard,
   updateSectionVisibility,
-  adjustUIForScreenSize
-}; 
+  adjustUIForScreenSize,
+};

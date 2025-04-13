@@ -272,9 +272,9 @@ ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, () => {
 
 // Handle content scrolling from keyboard shortcuts
 ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, (_, scrollAmount) => {
-  const resultContent = document.getElementById("result-content");
-  if (resultContent) {
-    resultContent.scrollBy({
+  const resultContentWrapper = document.getElementById("result-content-wrapper");
+  if (resultContentWrapper) {
+    resultContentWrapper.scrollBy({
       top: scrollAmount,
       behavior: "smooth",
     });
