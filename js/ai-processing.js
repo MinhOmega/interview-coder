@@ -1,6 +1,8 @@
 const { AI_PROVIDERS, IPC_CHANNELS } = require("./constants");
 const { getScreenshots } = require("./screenshot-manager");
 const configManager = require("./config-manager");
+const aiProviders = require("./ai-providers");
+const windowManager = require("./window-manager");
 
 /**
  * Creates a prompt for the AI based on the number of screenshots and preferred language
@@ -9,10 +11,10 @@ const configManager = require("./config-manager");
  * @param {string} language - The preferred language for the response (e.g., 'en', 'vi')
  * @returns {string} The prompt for the AI
  */
-function createPrompt(screenshotsCount, language = 'en') {
+function createPrompt(screenshotsCount, language = "en") {
   // Instructions to return multiple solutions
   const multiSolutionsInstructions = `IMPORTANT: Please provide at least 2 different solution approaches with their respective code implementations.`;
-  
+
   // Base prompt text that applies to all languages
   let basePrompt = "";
   if (screenshotsCount === 1) {
@@ -50,6 +52,20 @@ Explain an alternative strategy and implementation, including:
 - Time and space complexity analysis
 - Comparison with the first approach (pros and cons)
 
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
 Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
   } else {
     basePrompt = `These ${screenshotsCount} screenshots show a multi-part programming problem. 
@@ -86,26 +102,40 @@ Explain an alternative strategy and implementation, including:
 - Time and space complexity analysis
 - Comparison with the first approach (pros and cons)
 
+# My Thoughts
+Explain your strategy and implementation, including:
+- Your overall approach to solving the problem
+- Key algorithms, data structures, or patterns you're using
+- The complete, well-commented implementation
+- Any trade-offs or alternative approaches you considered
+
+# Complexity
+Analyze the efficiency of your solution:
+- Time complexity with explanation
+- Space complexity with explanation
+- Potential bottlenecks
+- Any further optimization possibilities
+
 Format your response in clear, well-structured Markdown with proper code blocks for all code.`;
   }
 
   // Language-specific adaptations
   switch (language) {
-    case 'vi':
+    case "vi":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Vietnamese language.`;
-    case 'es':
+    case "es":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Spanish language.`;
-    case 'fr':
+    case "fr":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in French language.`;
-    case 'de':
+    case "de":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in German language.`;
-    case 'ja':
+    case "ja":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Japanese language.`;
-    case 'ko':
+    case "ko":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Korean language.`;
-    case 'zh':
+    case "zh":
       return `${basePrompt}\n\nIMPORTANT: Please respond entirely in Chinese language.`;
-    case 'en':
+    case "en":
     default:
       return basePrompt;
   }
@@ -120,7 +150,6 @@ Format your response in clear, well-structured Markdown with proper code blocks 
  * @param {function} verifyOllamaModelFn - The function to verify the Ollama model
  * @param {function} generateWithOllamaFn - The function to generate with Ollama
  * @param {function} generateWithGeminiFn - The function to generate with Gemini
- * @param {OpenAI} openai - The OpenAI client
  * @param {boolean} useStreaming - Whether to use streaming
  */
 async function processScreenshots(
@@ -130,13 +159,12 @@ async function processScreenshots(
   verifyOllamaModelFn,
   generateWithOllamaFn,
   generateWithGeminiFn,
-  openai,
   useStreaming = false,
 ) {
   try {
     mainWindow.webContents.send("loading", true);
     const screenshots = getScreenshots();
-    
+
     // Get the user's preferred response language
     const responseLanguage = configManager.getResponseLanguage();
 
@@ -166,9 +194,8 @@ async function processScreenshots(
     if (aiProvider === AI_PROVIDERS.DEFAULT) {
       // Create model selection window when the default provider is selected
       // This is the same action triggered by Command+M
-      const windowManager = require('./window-manager');
       windowManager.createModelSelectionWindow();
-      
+
       // Return early since we're opening the model selection window instead of processing
       mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
       mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
@@ -176,6 +203,9 @@ async function processScreenshots(
     }
 
     if (aiProvider === AI_PROVIDERS.OPENAI) {
+      // Get OpenAI client from AI providers module
+      const openai = aiProviders.getOpenAI();
+
       if (!openai) {
         throw new Error("OpenAI client is not initialized. Please go to Settings and enter your API key.");
       }
@@ -213,6 +243,13 @@ async function processScreenshots(
     } else if (aiProvider === AI_PROVIDERS.OLLAMA) {
       result = await generateWithOllamaFn(messages, currentModel);
     } else if (aiProvider === AI_PROVIDERS.GEMINI) {
+      // Get Gemini client from AI providers module if not provided
+      const geminiAI = aiProviders.getGeminiAI();
+
+      if (!geminiAI) {
+        throw new Error("Gemini AI client is not initialized. Please go to Settings and enter your API key.");
+      }
+
       if (useStreaming) {
         const streamingResult = await generateWithGeminiFn(messages, currentModel, true);
 

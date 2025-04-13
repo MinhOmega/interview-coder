@@ -1,4 +1,7 @@
 const { API_KEYS } = require('./config');
+const { saveApiKey: saveApiKeyToSettings, getApiKey: getApiKeyFromSettings } = require('./config-manager');
+const { ipcRenderer } = require('electron');
+const { IPC_CHANNELS } = require('./constants');
 
 function maskApiKey(key) {
   if (!key || key.length < 8) return key;
@@ -18,21 +21,36 @@ function updateApiKeyStatus(provider, message, type = 'info') {
 
 function saveApiKey(provider, key) {
   API_KEYS[provider].key = key;
-  localStorage.setItem(API_KEYS[provider].storageKey, key);
-  updateApiKeyStatus(provider, 'API key saved successfully', 'success');
+
+  // Save to settings file via IPC
+  ipcRenderer.invoke(IPC_CHANNELS.SAVE_API_KEY, key).then((success) => {
+    if (success) {
+      updateApiKeyStatus(provider, "API key saved successfully", "success");
+    } else {
+      updateApiKeyStatus(provider, 'Failed to save API key', 'error');
+    }
+  }).catch(err => {
+    console.error('Error saving API key:', err);
+    updateApiKeyStatus(provider, 'Error saving API key', 'error');
+  });
 }
 
 function loadApiKeys() {
-  Object.keys(API_KEYS).forEach(provider => {
-    const savedKey = localStorage.getItem(API_KEYS[provider].storageKey);
-    if (savedKey) {
-      API_KEYS[provider].key = savedKey;
-      const input = document.getElementById(API_KEYS[provider].inputId);
-      if (input) {
-        input.value = maskApiKey(savedKey);
-        updateApiKeyStatus(provider, 'Loaded from local storage', 'success');
-      }
+  // Request the API key from the main process
+  ipcRenderer.invoke(IPC_CHANNELS.GET_API_KEY).then(apiKey => {
+    if (apiKey) {
+      // Set the key for all providers
+      Object.keys(API_KEYS).forEach(provider => {
+        API_KEYS[provider].key = apiKey;
+        const input = document.getElementById(API_KEYS[provider].inputId);
+        if (input) {
+          input.value = maskApiKey(apiKey);
+          updateApiKeyStatus(provider, 'API key loaded successfully', 'success');
+        }
+      });
     }
+  }).catch(err => {
+    console.error('Error loading API key:', err);
   });
 }
 

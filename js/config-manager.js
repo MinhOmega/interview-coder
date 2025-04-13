@@ -3,20 +3,9 @@ const path = require("path");
 const fs = require("fs");
 const { app } = require("electron");
 
-require("dotenv").config();
-
-// Default values - use IPv4 address explicitly for Ollama
-let OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL
-  ? process.env.OLLAMA_BASE_URL.replace("localhost", "127.0.0.1")
-  : "http://127.0.0.1:11434";
-
-// Default AI provider
+let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 let aiProvider = AI_PROVIDERS.DEFAULT;
-
-// Current model based on provider
 let currentModel = "";
-
-// Default response language is English
 let responseLanguage = "en"; // en = English
 
 // Available language options
@@ -71,11 +60,76 @@ function saveSettingsToFile(settings) {
     if (!app) return false;
 
     const settingsFilePath = getSettingsFilePath();
-    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), "utf8");
+
+    // First, check if there's an existing file with API keys
+    let existingSettings = {};
+    if (fs.existsSync(settingsFilePath)) {
+      try {
+        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+        existingSettings = JSON.parse(settingsData);
+      } catch (parseError) {
+        console.error("Error parsing existing settings file:", parseError);
+      }
+    }
+
+    // Preserve API key from existing settings
+    const settingsToSave = {
+      ...settings,
+      // Keep existing API key if it exists
+      apiKey: existingSettings.apiKey,
+    };
+
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settingsToSave, null, 2), "utf8");
     return true;
   } catch (error) {
     console.error("Error saving settings to file:", error);
     return false;
+  }
+}
+
+// Add a function to save API key to settings file
+function saveApiKey(apiKey) {
+  try {
+    if (!app) return false;
+
+    const settingsFilePath = getSettingsFilePath();
+
+    let settings = {};
+    if (fs.existsSync(settingsFilePath)) {
+      try {
+        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+        settings = JSON.parse(settingsData);
+      } catch (parseError) {
+        console.error("Error parsing settings file:", parseError);
+      }
+    }
+
+    settings.apiKey = apiKey;
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), "utf8");
+    return true;
+  } catch (error) {
+    console.error("Error saving API key to settings:", error);
+    return false;
+  }
+}
+
+// Get API key from settings
+function getApiKey() {
+  try {
+    if (!app) return null;
+
+    const settingsFilePath = getSettingsFilePath();
+
+    if (fs.existsSync(settingsFilePath)) {
+      const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+      const settings = JSON.parse(settingsData);
+      return settings.apiKey || null;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error getting API key from settings:", error);
+    return null;
   }
 }
 
@@ -170,4 +224,7 @@ module.exports = {
   updateSettings,
   loadSettingsFromFile,
   saveSettingsToFile,
+  getSettingsFilePath,
+  saveApiKey,
+  getApiKey,
 };

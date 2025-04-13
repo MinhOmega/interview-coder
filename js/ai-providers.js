@@ -3,6 +3,8 @@ const { OpenAI } = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const EventEmitter = require("events");
 const { AI_PROVIDERS } = require("./constants");
+const { getSettingsFilePath, saveApiKey } = require("./config-manager");
+const fs = require("fs");
 
 axios.defaults.family = 4;
 
@@ -10,18 +12,70 @@ let openai = null;
 let geminiAI = null;
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
+// Add a flag to track initialization status
+let isInitialized = false;
+
 /**
- * Initializes the AI clients
- * This function is kept for backward compatibility but doesn't initialize from env vars anymore
+ * Initializes AI clients based on stored configuration
+ * This function should be called when the app starts
+ *
+ * @returns {Object} Status of initialization for each provider
  */
-function initializeAIClients() {
-  // No longer initializing from environment variables
-  // Clients will be initialized through updateAIClients when API keys are provided
-  console.log("AI clients will be initialized when API keys are provided");
+function initializeFromConfig() {
+  if (isInitialized) {
+    return { openai: !!openai, gemini: !!geminiAI };
+  }
+
+  try {
+    // Get the settings file path
+    const settingsFilePath = getSettingsFilePath();
+
+    // Check if settings file exists
+    if (fs.existsSync(settingsFilePath)) {
+      try {
+        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+        const settings = JSON.parse(settingsData);
+
+        // Check for API key
+        if (settings.apiKey) {
+          try {
+            // Initialize based on current AI provider
+            if (settings.aiProvider === AI_PROVIDERS.OPENAI) {
+              openai = new OpenAI({ apiKey: settings.apiKey });
+              console.log("OpenAI client initialized automatically from saved settings");
+            } else if (settings.aiProvider === AI_PROVIDERS.GEMINI) {
+              geminiAI = new GoogleGenerativeAI(settings.apiKey);
+              console.log("Gemini AI client initialized automatically from saved settings");
+            } else {
+              // Initialize both by default
+              openai = new OpenAI({ apiKey: settings.apiKey });
+              geminiAI = new GoogleGenerativeAI(settings.apiKey);
+              console.log("Both AI clients initialized with the same API key");
+            }
+          } catch (err) {
+            console.error("Error initializing AI clients from saved settings:", err);
+          }
+        }
+
+        // Update Ollama URL if available
+        if (settings.ollamaUrl) {
+          OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+        }
+      } catch (parseError) {
+        console.error("Error parsing settings file:", parseError);
+      }
+    }
+
+    isInitialized = true;
+    return { openai: !!openai, gemini: !!geminiAI };
+  } catch (error) {
+    console.error("Error in initializeFromConfig:", error);
+    return { openai: false, gemini: false };
+  }
 }
 
 /**
- * Updates the AI clients with new API keys
+ * Updates the AI clients with new API key
  *
  * @param {string} provider - The provider to update
  * @param {string} apiKey - The new API key
@@ -32,10 +86,18 @@ function updateAIClients(provider, apiKey) {
     if (provider === AI_PROVIDERS.OPENAI && apiKey) {
       openai = new OpenAI({ apiKey });
       console.log("OpenAI client initialized successfully");
+
+      // Save API key to settings file
+      saveApiKey(apiKey);
+
       return true;
     } else if (provider === AI_PROVIDERS.GEMINI && apiKey) {
       geminiAI = new GoogleGenerativeAI(apiKey);
       console.log("Gemini AI client initialized successfully");
+
+      // Save API key to settings file
+      saveApiKey(apiKey);
+
       return true;
     }
     return false;
@@ -474,7 +536,6 @@ async function generateWithGemini(messages, model, streaming = false) {
 
 // Export functions
 module.exports = {
-  initializeAIClients,
   updateAIClients,
   setOllamaBaseURL,
   getOllamaModels,
@@ -483,4 +544,5 @@ module.exports = {
   generateWithGemini,
   getOpenAI: () => openai,
   getGeminiAI: () => geminiAI,
+  initializeFromConfig,
 };

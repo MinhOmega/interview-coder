@@ -529,7 +529,7 @@ code {
 /* Updated Notification styles */
 #notification-container {
   position: fixed;
-  bottom: 0;
+  bottom: 10%;
   right: 20px;
   z-index: 100000;
   max-width: 400px;

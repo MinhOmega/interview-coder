@@ -183,6 +183,7 @@ function scrollContent(direction) {
   
   // Send a scroll command to the renderer process
   const scrollAmount = direction === "up" ? -300 : 300;
+  console.log("🚀 ~ window-manager.js:186 ~ scrollContent ~ scrollAmount:", scrollAmount)
   mainWindow.webContents.send(IPC_CHANNELS.SCROLL_CONTENT, scrollAmount);
 }
 
