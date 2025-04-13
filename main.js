@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
@@ -187,22 +187,31 @@ app.whenReady().then(() => {
         );
       }
     },
-    // AREA_SCREENSHOT: () => {
-    //   try {
-    //     windowManager.updateInstruction("Select an area to screenshot...");
-    //     screenshotInstance.startCapture();
-    //   } catch (error) {
-    //     console.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
-    //     mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error starting area capture: ${error.message}`);
-    //     windowManager.updateInstruction(
-    //       windowManager.getDefaultInstructions(
-    //         screenshotManager.getMultiPageMode(),
-    //         screenshotManager.getScreenshots().length,
-    //         hotkeyManager.getModifierKey(),
-    //       ),
-    //     );
-    //   }
-    // },
+    AREA_SCREENSHOT: () => {
+      try {
+        // Hide the main window before starting area capture
+        const wasVisible = mainWindow.isVisible();
+        if (wasVisible) {
+          mainWindow.hide();
+        }
+
+        windowManager.updateInstruction("Select an area to screenshot...");
+        screenshotInstance.startCapture();
+
+        // Store whether window was visible in a global variable to restore later
+        global.mainWindowWasVisible = wasVisible;
+      } catch (error) {
+        console.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
+        mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error starting area capture: ${error.message}`);
+        windowManager.updateInstruction(
+          windowManager.getDefaultInstructions(
+            screenshotManager.getMultiPageMode(),
+            screenshotManager.getScreenshots().length,
+            hotkeyManager.getModifierKey(),
+          ),
+        );
+      }
+    },
     MULTI_PAGE: async () => {
       try {
         if (!screenshotManager.getMultiPageMode()) {
@@ -233,20 +242,74 @@ app.whenReady().then(() => {
     MODEL_SELECTION: () => windowManager.createModelSelectionWindow(),
   });
 
-  screenshotInstance.on("ok", async (data) => {
+  screenshotInstance.on("ok", async (event, buffer, data) => {
     try {
-      const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-      const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+      // Show the main window if it was visible before
+      if (global.mainWindowWasVisible) {
+        mainWindow.show();
+        global.mainWindowWasVisible = undefined;
+      }
 
-      fs.writeFileSync(imagePath, data.buffer);
-      const base64Image = `data:image/png;base64,${data.buffer.toString("base64")}`;
+      // If the event is already prevented, don't proceed
+      if (event && event.defaultPrevented) {
+        return;
+      }
+
+      // Check if we have a valid buffer
+      if (!buffer) {
+        console.error("Screenshot buffer is invalid:", { event, buffer, data });
+        mainWindow.webContents.send(IPC_CHANNELS.ERROR, "Failed to process screenshot: Invalid screenshot data");
+        windowManager.updateInstruction(
+          windowManager.getDefaultInstructions(
+            screenshotManager.getMultiPageMode(),
+            screenshotManager.getScreenshots().length,
+            hotkeyManager.getModifierKey(),
+          ),
+        );
+        return;
+      }
+
+      // Generate filename for the screenshot
+      const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+      const imagePath = path.join(app.getPath("pictures"), `area-screenshot-${timestamp}.png`);
+
+      // Save the image to disk first
+      fs.writeFileSync(imagePath, buffer);
+
+      // Verify the screenshot was saved correctly
+      if (!fs.existsSync(imagePath)) {
+        throw new Error("Screenshot file was not created");
+      }
+
+      const stats = fs.statSync(imagePath);
+      if (stats.size < 1000) {
+        throw new Error("Screenshot file is too small, likely empty");
+      }
+
+      // Read the image back to get the base64 string (same as captureScreenshot)
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+
+      // Get image dimensions using nativeImage
+      const dimensions = { width: 0, height: 0 };
+      try {
+        const image = nativeImage.createFromPath(imagePath);
+        dimensions.width = image.getSize().width;
+        dimensions.height = image.getSize().height;
+      } catch (dimError) {
+        console.error("Error getting image dimensions:", dimError);
+      }
+
+      // Add screenshot to the manager
       screenshotManager.addScreenshot(base64Image);
-      const dimensions = { width: data.bounds.width, height: data.bounds.height };
+
+      // Show notification
       mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-        body: `Window screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
+        body: `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
         type: "success",
       });
 
+      // Process the screenshot with AI
       await processScreenshotsWithAI();
     } catch (error) {
       console.error("Error handling screenshot:", error);
@@ -255,7 +318,13 @@ app.whenReady().then(() => {
     }
   });
 
-  screenshotInstance.on("cancel", () => {});
+  screenshotInstance.on("cancel", () => {
+    // Show the main window if it was visible before
+    if (global.mainWindowWasVisible) {
+      mainWindow.show();
+      global.mainWindowWasVisible = undefined;
+    }
+  });
   eventHandler.setupScreenCaptureDetection(mainWindow, windowManager);
   hotkeyManager.updateHotkeys(true);
 
