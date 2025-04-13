@@ -452,19 +452,12 @@ saveBtn.addEventListener("click", async () => {
   };
 
   try {
-    // Update settings
+    // Update settings through the IPC channel to be persisted in the main process
     ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, settings);
 
     // Show success message
     messageDiv.textContent = "Settings saved!";
     messageDiv.className = "status success";
-
-    // Try to save settings to localStorage as fallback
-    try {
-      localStorage.setItem("model-settings", JSON.stringify(settings));
-    } catch (storageErr) {
-      console.error("Could not save to localStorage:", storageErr);
-    }
 
     // For better synchronization, force the main window to refresh model badge
     try {
@@ -482,20 +475,9 @@ saveBtn.addEventListener("click", async () => {
     }, 800);
   } catch (error) {
     console.error("Error saving settings:", error);
-
-    // Try to save settings to localStorage as fallback
-    try {
-      localStorage.setItem("model-settings", JSON.stringify(settings));
-      messageDiv.textContent = "Settings saved locally (fallback mode).";
-      messageDiv.className = "status success";
-
-      // Re-enable save button
-      saveBtn.disabled = false;
-    } catch (storageErr) {
-      messageDiv.textContent = "Could not save settings: " + error.message;
-      messageDiv.className = "status error";
-      saveBtn.disabled = false;
-    }
+    messageDiv.textContent = "Could not save settings: " + error.message;
+    messageDiv.className = "status error";
+    saveBtn.disabled = false;
   }
 });
 

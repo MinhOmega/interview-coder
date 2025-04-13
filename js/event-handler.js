@@ -3,7 +3,7 @@ const { IPC_CHANNELS } = require("./constants");
 
 /**
  * Sets up event handlers for the application's IPC communication
- * 
+ *
  * @param {BrowserWindow} mainWindow - The main application window
  * @param {Object} configManager - Manager for application configuration
  * @param {Object} windowManager - Manager for window visibility and state
@@ -16,10 +16,12 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
   });
 
   ipcMain.on(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, (_, settings) => {
-    configManager.updateSettings(settings);
+    // Update settings and get the result
+    const updatedSettings = configManager.updateSettings(settings);
 
-    if (mainWindow) {
-      mainWindow.webContents.send("model-changed");
+    // Notify main window only if settings were updated
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);
     }
   });
 
@@ -44,15 +46,15 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
 
   // Handler for manual reloading in development mode
   ipcMain.on(IPC_CHANNELS.DEV_RELOAD, () => {
-    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
     if (!isDev) return;
-    
-    console.log('Manual reload triggered');
-    
+
+    console.log("Manual reload triggered");
+
     if (mainWindow) {
       mainWindow.webContents.reloadIgnoringCache();
     }
-    
+
     const modelListWindow = windowManager.getModelListWindow();
     if (modelListWindow) {
       modelListWindow.webContents.reloadIgnoringCache();
@@ -76,12 +78,12 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
       ];
 
       // Add development-only menu items
-      if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+      if (process.env.NODE_ENV === "development" || !app.isPackaged) {
         template.splice(2, 0, {
           label: "Force Reload (Dev)",
           click: () => {
             mainWindow.webContents.reloadIgnoringCache();
-          }
+          },
         });
       }
 
@@ -95,7 +97,7 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
 
 /**
  * Sets up screen capture detection to hide the application when screen sharing is detected
- * 
+ *
  * @param {BrowserWindow} mainWindow - The main application window
  * @param {Object} windowManager - Manager for window visibility and state
  */

@@ -37,11 +37,17 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
   - Local Ollama compatibility
   - Real-time streaming responses
 
+- 🌐 **Multilingual Support**
+  - Responses in 8 different languages
+  - English, Vietnamese, Spanish, French, German, Japanese, Korean, and Chinese
+  - Language preferences persist across sessions
+
 - 🎯 **User-Friendly Interface**
   - Transparent, always-on-top window
   - Markdown-rendered responses
   - Customizable positioning
   - Platform-aware keyboard shortcuts
+  - Collapsible settings sections
 
 ## 🛠️ Prerequisites
 
@@ -79,7 +85,8 @@ No environment configuration is required to get started. API keys can be entered
 3. Choose your preferred AI provider (OpenAI, Google Gemini, or Ollama)
 4. Enter your API key when prompted
 5. Select your preferred model
-6. Save settings and start using!
+6. Choose your preferred response language
+7. Save settings and start using!
 
 ## 🔧 Using with Ollama
 
@@ -95,6 +102,25 @@ No environment configuration is required to get started. API keys can be entered
 7. Configure the Ollama base URL if needed (default: http://127.0.0.1:11434)
 8. Choose your preferred model from the dropdown
 9. Save settings and start using!
+
+## 🌐 Language Settings
+
+Choose your preferred language for AI responses:
+
+1. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+2. Scroll down to the "Response Language" section
+3. Select your language from the available options:
+   - English (default)
+   - Vietnamese (Tiếng Việt)
+   - Spanish (Español)
+   - French (Français)
+   - German (Deutsch)
+   - Japanese (日本語)
+   - Korean (한국어)
+   - Chinese (中文)
+4. Save settings to apply your language preference
+
+The application will generate all AI responses in your selected language, with solution approaches tailored to your language preference.
 
 ## ⌨️ Keyboard Shortcuts
 

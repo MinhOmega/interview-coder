@@ -290,16 +290,10 @@ async function updateModelBadge() {
       settings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
     } catch (error) {
       console.error("Error getting model settings from main process:", error);
-
-      // Try to get settings from localStorage as fallback
-      try {
-        const savedSettings = localStorage.getItem("model-settings");
-        if (savedSettings) {
-          settings = JSON.parse(savedSettings);
-        }
-      } catch (localStorageErr) {
-        console.error("Error retrieving from localStorage:", localStorageErr);
-      }
+      // Set default badge text to indicate error
+      const badge = document.getElementById("model-badge");
+      badge.textContent = `Press ${modifierKey}+M to set model`;
+      return;
     }
 
     const badge = document.getElementById("model-badge");
@@ -320,13 +314,6 @@ async function updateModelBadge() {
     const modelName = settings.currentModel;
     badge.textContent =
       providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
-
-    // Save current settings to localStorage for persistence
-    try {
-      localStorage.setItem("model-settings", JSON.stringify(settings));
-    } catch (err) {
-      console.error("Error saving settings to localStorage:", err);
-    }
   } catch (error) {
     console.error("Error updating model badge:", error);
     // Ensure badge always shows something useful even on complete failure
@@ -600,6 +587,7 @@ updateModelBadge();
 // Listen for postMessage from model-selector window
 window.addEventListener("message", (event) => {
   if (event.data && event.data.type === "model-settings-updated") {
+    // Simply refresh the model badge from current settings
     updateModelBadge();
   }
 });
