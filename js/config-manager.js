@@ -122,24 +122,35 @@ function getCurrentSettings() {
 
 // Update settings
 function updateSettings(settings) {
-  if (settings.aiProvider) {
+  let hasChanges = false;
+
+  if (settings.aiProvider && settings.aiProvider !== aiProvider) {
     aiProvider = settings.aiProvider;
+    hasChanges = true;
   }
 
-  if (settings.currentModel) {
+  if (settings.currentModel && settings.currentModel !== currentModel) {
     currentModel = settings.currentModel;
+    hasChanges = true;
   }
 
   if (settings.ollamaUrl) {
-    OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+    const normalizedUrl = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+    if (normalizedUrl !== OLLAMA_BASE_URL) {
+      OLLAMA_BASE_URL = normalizedUrl;
+      hasChanges = true;
+    }
   }
 
-  if (settings.responseLanguage) {
+  if (settings.responseLanguage && settings.responseLanguage !== responseLanguage) {
     responseLanguage = settings.responseLanguage;
+    hasChanges = true;
   }
 
-  // Save to file system for persistent storage
-  saveSettingsToFile(getCurrentSettings());
+  // Only save to file system if there were actual changes
+  if (hasChanges) {
+    saveSettingsToFile(getCurrentSettings());
+  }
 
   return getCurrentSettings();
 }
