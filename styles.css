@@ -134,13 +134,14 @@ body {
 
 #result-content-wrapper {
   width: 100%;
-  height: 100%;
+  height: calc(100vh - 120px);
   position: relative;
   transform: translateZ(0);
   will-change: contents;
   backface-visibility: hidden;
   contain: content;
   isolation: isolate;
+  overflow-y: auto;
 }
 
 #result-content {
@@ -150,7 +151,9 @@ body {
   box-sizing: border-box;
   border-radius: 8px;
   overflow-x: hidden;
-  height: 100vh;
+  overflow-y: visible;
+  height: auto;
+  min-height: calc(100% - 40px);
   will-change: contents, transform, opacity;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
@@ -159,6 +162,7 @@ body {
   transition: none;
   contain: content;
   isolation: isolate;
+  padding-bottom: 60px;
 }
 
 /* Remove the clearing class as we're using a new approach */
