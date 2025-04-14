@@ -1,10 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
-const { nativeImage } = require("electron");
+const { nativeImage, desktopCapturer } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 const Screenshots = require("electron-screenshots");
-const { getAppPath } = require("./utils");
+const { getAppPath, isCommandAvailable } = require("./utils");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -97,14 +97,81 @@ async function captureScreenshot(mainWindow) {
     let success = false;
     let base64Image = "";
 
-    try {
-      await screenshot({ filename: imagePath });
-      const imageBuffer = fs.readFileSync(imagePath);
-      base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-      success = true;
-    } catch (fallbackError) {
-      console.error("Screenshot fallback failed:", fallbackError);
-      throw fallbackError;
+    // If on Linux, first check if ImageMagick is installed
+    if (process.platform === 'linux' && !isCommandAvailable('import')) {
+      console.log("ImageMagick not found. Using Electron's desktopCapturer as fallback for screenshot on Linux");
+      // Use Electron's desktopCapturer as a fallback for Linux without ImageMagick
+      try {
+        // Get sources (screens)
+        const sources = await desktopCapturer.getSources({ types: ['screen'] });
+        
+        if (sources.length > 0) {
+          // Take screenshot of the primary screen (first in the array)
+          const primarySource = sources[0];
+          
+          // Get the thumbnail as a native image
+          const thumbnail = primarySource.thumbnail;
+          
+          // Convert to PNG buffer
+          const pngBuffer = thumbnail.toPNG();
+          
+          // Save to disk
+          fs.writeFileSync(imagePath, pngBuffer);
+          
+          // Convert to base64
+          base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+          success = true;
+        } else {
+          throw new Error("No screen sources found");
+        }
+      } catch (electronError) {
+        console.error("Electron screenshot fallback failed:", electronError);
+        throw electronError;
+      }
+    } else {
+      try {
+        await screenshot({ filename: imagePath });
+        const imageBuffer = fs.readFileSync(imagePath);
+        base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+        success = true;
+      } catch (fallbackError) {
+        console.error("Screenshot fallback failed:", fallbackError);
+        
+        // If on Linux and the error is about the 'import' command not found, use Electron's desktopCapturer as fallback
+        if (process.platform === 'linux' && fallbackError.message.includes("import: not found")) {
+          console.log("Using Electron's desktopCapturer as fallback for screenshot on Linux");
+          try {
+            // Get sources (screens)
+            const sources = await desktopCapturer.getSources({ types: ['screen'] });
+            
+            if (sources.length > 0) {
+              // Take screenshot of the primary screen (first in the array)
+              const primarySource = sources[0];
+              
+              // Get the thumbnail as a native image
+              const thumbnail = primarySource.thumbnail;
+              
+              // Convert to PNG buffer
+              const pngBuffer = thumbnail.toPNG();
+              
+              // Save to disk
+              fs.writeFileSync(imagePath, pngBuffer);
+              
+              // Convert to base64
+              base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+              success = true;
+            } else {
+              throw new Error("No screen sources found");
+            }
+          } catch (electronError) {
+            console.error("Electron screenshot fallback failed:", electronError);
+            throw electronError;
+          }
+        } else {
+          // For other errors or platforms, just propagate the error
+          throw fallbackError;
+        }
+      }
     }
 
     if (wasVisible) {

@@ -10,7 +10,7 @@ const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
-const { getAppPath } = require("./js/utils");
+const { getAppPath, isCommandAvailable } = require("./js/utils");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -190,6 +190,20 @@ app.whenReady().then(() => {
     },
     AREA_SCREENSHOT: () => {
       try {
+        // Check if we're on Linux and warn about ImageMagick requirement
+        if (process.platform === 'linux') {
+          // Check if ImageMagick's import command is available
+          if (!isCommandAvailable('import')) {
+            // import command not found - show notification with installation instructions
+            mainWindow.webContents.send(IPC_CHANNELS.WARNING, 
+              "Area screenshot requires ImageMagick. Please install it with: sudo apt-get install imagemagick");
+            windowManager.updateInstruction(
+              "Area screenshot requires ImageMagick. Please install with: sudo apt-get install imagemagick"
+            );
+            return;
+          }
+        }
+        
         windowManager.updateInstruction("Select an area to screenshot...");
         const wasVisible = screenshotManager.autoHideWindow(mainWindow);
         screenshotInstance.startCapture();
