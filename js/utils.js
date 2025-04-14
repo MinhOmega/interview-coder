@@ -1,4 +1,38 @@
 const { AI_PROVIDERS } = require("./constants");
+const { app } = require("electron");
+const path = require("path");
+
+/**
+ * Safely gets a path from Electron's app.getPath
+ * This is cross-platform compatible across Windows, Linux, and MacOS
+ * @param {string} pathName - The path name to get (e.g., "userData", "documents", "pictures")
+ * @param {string} defaultPath - Default path to use if app is not available (e.g., in renderer process)
+ * @returns {string} The resolved path or empty string if not available
+ */
+const getAppPath = (pathName, defaultPath = "") => {
+  try {
+    // Check if app is available and properly initialized
+    if (app && typeof app.getPath === 'function') {
+      return app.getPath(pathName);
+    }
+    
+    // Return default path if provided
+    return defaultPath;
+  } catch (error) {
+    console.error(`Error getting ${pathName} path:`, error);
+    return defaultPath;
+  }
+};
+
+/**
+ * Gets the full path to a file in the user data directory
+ * @param {string} filename - The filename to join with user data path
+ * @returns {string} The full path to the file
+ */
+const getUserDataPath = (filename) => {
+  const userDataPath = getAppPath("userData", "");
+  return path.join(userDataPath, filename);
+};
 
 /**
  * Selects a model card and updates the select element
@@ -122,4 +156,6 @@ module.exports = {
   selectModelCard,
   updateSectionVisibility,
   adjustUIForScreenSize,
+  getAppPath,
+  getUserDataPath,
 };
