@@ -1,9 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
-const { app, nativeImage } = require("electron");
+const { nativeImage } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 const Screenshots = require("electron-screenshots");
+const { getAppPath } = require("./utils");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -48,7 +49,8 @@ const getImageDimensions = (imagePath) => {
 const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
   // Generate filename for the screenshot
   const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-  const imagePath = path.join(app.getPath("pictures"), `${filenamePrefix}-${timestamp}.png`);
+  const picturesPath = getAppPath("pictures", "");
+  const imagePath = path.join(picturesPath, `${filenamePrefix}-${timestamp}.png`);
 
   // Save the image to disk
   fs.writeFileSync(imagePath, buffer);
@@ -87,7 +89,8 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
 async function captureScreenshot(mainWindow) {
   try {
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-    const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+    const picturesPath = getAppPath("pictures", "");
+    const imagePath = path.join(picturesPath, `screenshot-${timestamp}.png`);
 
     const wasVisible = await autoHideWindow(mainWindow);
 

@@ -10,6 +10,7 @@ const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
+const { getAppPath } = require("./js/utils");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -264,7 +265,8 @@ app.whenReady().then(() => {
 
       // Generate filename for the screenshot
       const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-      const imagePath = path.join(app.getPath("pictures"), `area-screenshot-${timestamp}.png`);
+      const picturesPath = getAppPath("pictures", "");
+      const imagePath = path.join(picturesPath, `area-screenshot-${timestamp}.png`);
 
       // Save the image to disk first
       fs.writeFileSync(imagePath, buffer);
