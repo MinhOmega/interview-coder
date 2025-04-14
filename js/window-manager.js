@@ -83,30 +83,77 @@ function createModelSelectionWindow() {
 
 // Toggle the main window visibility
 function toggleWindowVisibility(forceState) {
-  isWindowVisible = typeof forceState === "boolean" ? forceState : !isWindowVisible;
+  try {
+    isWindowVisible = typeof forceState === "boolean" ? forceState : !isWindowVisible;
 
-  if (mainWindow) {
-    if (isWindowVisible) {
-      mainWindow.show();
-      mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
-      if (modelListWindow) {
-        modelListWindow.show();
-        modelListWindow.setOpacity(1);
+    if (mainWindow) {
+      if (isWindowVisible) {
+        // Show the window
+        try {
+          mainWindow.show();
+          // On Linux, setAlwaysOnTop can sometimes cause issues
+          if (process.platform !== "linux") {
+            mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+          } else {
+            // For Linux, we use a different approach
+            setTimeout(() => {
+              try {
+                mainWindow.setAlwaysOnTop(true);
+              } catch (err) {
+                console.error("Linux setAlwaysOnTop error:", err);
+              }
+            }, 100);
+          }
+
+          // Show model list window if it exists
+          if (modelListWindow && !modelListWindow.isDestroyed()) {
+            try {
+              modelListWindow.show();
+              modelListWindow.setOpacity(1);
+            } catch (err) {
+              console.error("Error showing model list window:", err);
+            }
+          }
+        } catch (showError) {
+          console.error("Error showing window:", showError);
+        }
+      } else {
+        // Hide the window
+        try {
+          mainWindow.hide();
+          // On Linux, setAlwaysOnTop can sometimes cause issues
+          if (process.platform !== "linux") {
+            mainWindow.setAlwaysOnTop(false);
+          }
+
+          // Hide model list window if it exists
+          if (modelListWindow && !modelListWindow.isDestroyed()) {
+            try {
+              modelListWindow.hide();
+              modelListWindow.setOpacity(0);
+            } catch (err) {
+              console.error("Error hiding model list window:", err);
+            }
+          }
+        } catch (hideError) {
+          console.error("Error hiding window:", hideError);
+        }
       }
-    } else {
-      mainWindow.hide();
-      mainWindow.setAlwaysOnTop(false);
-      if (modelListWindow) {
-        modelListWindow.hide();
-        modelListWindow.setOpacity(0);
+
+      // Notify renderer about visibility change
+      try {
+        mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
+      } catch (sendError) {
+        console.error("Error sending visibility update:", sendError);
       }
     }
 
-    // Notify renderer about visibility change
-    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
+    return isWindowVisible;
+  } catch (error) {
+    console.error("Error in toggleWindowVisibility:", error);
+    // Default to visible in case of error
+    return true;
   }
-
-  return isWindowVisible;
 }
 
 // Function to move window to different positions on screen
