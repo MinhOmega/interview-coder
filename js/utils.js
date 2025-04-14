@@ -152,10 +152,26 @@ function adjustUIForScreenSize() {
   }
 }
 
+/**
+ * Checks if a command is available in the system
+ * @param {string} command - The command to check
+ * @returns {boolean} True if the command is available, false otherwise
+ */
+const isCommandAvailable = (command) => {
+  try {
+    const { execSync } = require('child_process');
+    execSync(`which ${command}`, { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 module.exports = {
   selectModelCard,
   updateSectionVisibility,
   adjustUIForScreenSize,
   getAppPath,
   getUserDataPath,
+  isCommandAvailable,
 };
