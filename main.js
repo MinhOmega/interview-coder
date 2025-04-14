@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage, desktopCapturer } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
@@ -10,6 +10,8 @@ const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
+const { getAppPath, isCommandAvailable } = require("./js/utils");
+const { isLinux, isMac } = require("./js/config");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -85,6 +87,51 @@ async function processScreenshotsWithAI() {
   }
 }
 
+/**
+ * Captures a fallback screenshot of the entire screen using Electron's desktopCapturer
+ * Used when area screenshot is not available
+ */
+async function captureFullScreenFallback() {
+  try {
+    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+    const picturesPath = getAppPath("pictures", "");
+    const imagePath = path.join(picturesPath, `fullscreen-${timestamp}.png`);
+
+    // Get screen sources with high resolution thumbnails
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 3840, height: 2160 }, // Request higher resolution thumbnail
+      fetchWindowIcons: false,
+    });
+
+    if (sources.length === 0) {
+      throw new Error("No screen sources found");
+    }
+
+    // Take screenshot of the primary screen
+    const primarySource = sources[0];
+    const thumbnail = primarySource.thumbnail;
+
+    // Convert to PNG with high quality
+    const pngBuffer = thumbnail.toPNG({ scaleFactor: 1.0 });
+
+    // Save to disk
+    fs.writeFileSync(imagePath, pngBuffer);
+
+    return {
+      buffer: pngBuffer,
+      path: imagePath,
+      dimensions: {
+        width: thumbnail.getSize().width,
+        height: thumbnail.getSize().height,
+      },
+    };
+  } catch (error) {
+    console.error("Error capturing fallback screenshot:", error);
+    throw error;
+  }
+}
+
 app.whenReady().then(() => {
   const mainWindow = windowManager.createMainWindow();
 
@@ -93,6 +140,21 @@ app.whenReady().then(() => {
   console.log("AI clients initialization status:", initStatus);
   if (initStatus.openai) {
     openai = aiProviders.getOpenAI();
+  }
+
+  // Linux-specific initialization
+  if (isLinux) {
+    // Verify that hotkeys are properly registered, especially Ctrl+B
+    setTimeout(() => {
+      try {
+        const isRegistered = hotkeyManager.validateHotkeys();
+        if (!isRegistered) {
+          console.warn("Hotkeys may not be properly registered on Linux. Using fallback mechanisms.");
+        }
+      } catch (error) {
+        console.error("Error validating hotkeys on Linux:", error);
+      }
+    }, 2000);
   }
 
   // Handle API key initialization from UI
@@ -149,8 +211,30 @@ app.whenReady().then(() => {
 
   hotkeyManager.registerHandlers({
     TOGGLE_VISIBILITY: () => {
-      const isVisible = windowManager.toggleWindowVisibility();
-      hotkeyManager.updateHotkeys(isVisible);
+      try {
+        console.log("Toggle visibility hotkey triggered");
+        // For Linux, ensure we're not calling this rapidly
+        const isVisible = windowManager.toggleWindowVisibility();
+
+        // Wrap in try/catch for Linux stability
+        try {
+          hotkeyManager.updateHotkeys(isVisible);
+        } catch (hotkeyError) {
+          console.error("Error updating hotkeys after visibility toggle:", hotkeyError);
+          // Force re-register on Linux in case of issues
+          if (isLinux) {
+            setTimeout(() => {
+              try {
+                hotkeyManager.updateHotkeys(isVisible);
+              } catch (err) {
+                console.error("Failed to recover hotkeys:", err);
+              }
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error("Error in TOGGLE_VISIBILITY handler:", error);
+      }
     },
     PROCESS_SCREENSHOTS: () => {
       if (screenshotManager.getScreenshots().length === 0) {
@@ -189,6 +273,54 @@ app.whenReady().then(() => {
     },
     AREA_SCREENSHOT: () => {
       try {
+        if (isLinux) {
+          // Check if ImageMagick's import command is available
+          if (!isCommandAvailable("import")) {
+            mainWindow.webContents.send(
+              IPC_CHANNELS.WARNING,
+              "Area screenshot requires ImageMagick. Please install it with: sudo apt-get install imagemagick",
+            );
+            windowManager.updateInstruction(
+              "Area screenshot requires ImageMagick. Please install with: sudo apt-get install imagemagick",
+            );
+
+            // Use fallback full screen capture
+            (async () => {
+              try {
+                windowManager.updateInstruction("Taking full screen screenshot as fallback...");
+                const result = await captureFullScreenFallback();
+
+                // Convert to base64 string format expected by the app
+                const base64Image = `data:image/png;base64,${result.buffer.toString("base64")}`;
+
+                // Add screenshot to the manager
+                screenshotManager.addScreenshot(base64Image);
+
+                // Show notification
+                mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+                  body: `Fullscreen screenshot saved to ${result.path} (${result.dimensions.width}x${result.dimensions.height})`,
+                  type: "success",
+                });
+
+                // Process the screenshot with AI
+                windowManager.updateInstruction("Processing screenshot with AI...");
+                await processScreenshotsWithAI();
+              } catch (fallbackError) {
+                console.error("Fallback screenshot failed:", fallbackError);
+                mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Fallback screenshot failed: ${fallbackError.message}`);
+                windowManager.updateInstruction(
+                  windowManager.getDefaultInstructions(
+                    screenshotManager.getMultiPageMode(),
+                    screenshotManager.getScreenshots().length,
+                    hotkeyManager.getModifierKey(),
+                  ),
+                );
+              }
+            })();
+            return;
+          }
+        }
+
         windowManager.updateInstruction("Select an area to screenshot...");
         const wasVisible = screenshotManager.autoHideWindow(mainWindow);
         screenshotInstance.startCapture();
@@ -264,7 +396,8 @@ app.whenReady().then(() => {
 
       // Generate filename for the screenshot
       const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-      const imagePath = path.join(app.getPath("pictures"), `area-screenshot-${timestamp}.png`);
+      const picturesPath = getAppPath("pictures", "");
+      const imagePath = path.join(picturesPath, `area-screenshot-${timestamp}.png`);
 
       // Save the image to disk first
       fs.writeFileSync(imagePath, buffer);
@@ -279,19 +412,25 @@ app.whenReady().then(() => {
         throw new Error("Screenshot file is too small, likely empty");
       }
 
-      // Read the image back to get the base64 string (same as captureScreenshot)
-      const imageBuffer = fs.readFileSync(imagePath);
-      const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      // Get a higher quality version of the image using nativeImage
+      const image = nativeImage.createFromBuffer(buffer);
 
-      // Get image dimensions using nativeImage
-      const dimensions = { width: 0, height: 0 };
-      try {
-        const image = nativeImage.createFromPath(imagePath);
-        dimensions.width = image.getSize().width;
-        dimensions.height = image.getSize().height;
-      } catch (dimError) {
-        console.error("Error getting image dimensions:", dimError);
-      }
+      // Create dimensions object
+      const dimensions = {
+        width: image.getSize().width,
+        height: image.getSize().height,
+      };
+
+      // Convert to high-quality PNG (with proper scale factor)
+      const highQualityPngBuffer = image.toPNG({
+        scaleFactor: 2.0,
+      });
+
+      // Overwrite the original file with the higher quality version
+      fs.writeFileSync(imagePath, highQualityPngBuffer);
+
+      // Convert to base64 for the app
+      const base64Image = `data:image/png;base64,${highQualityPngBuffer.toString("base64")}`;
 
       // Add screenshot to the manager
       screenshotManager.addScreenshot(base64Image);
@@ -338,7 +477,7 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   hotkeyManager.unregisterAll();
-  if (process.platform !== "darwin") {
+  if (!isMac) {
     app.quit();
   }
 });

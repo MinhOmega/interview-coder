@@ -1,7 +1,7 @@
 const { AI_PROVIDERS } = require("./constants");
-const path = require("path");
 const fs = require("fs");
 const { app } = require("electron");
+const { getUserDataPath } = require("./utils");
 
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 let aiProvider = AI_PROVIDERS.DEFAULT;
@@ -22,8 +22,7 @@ const LANGUAGES = {
 
 // Get user data directory for settings file
 const getSettingsFilePath = () => {
-  const userDataPath = app ? app.getPath("userData") : "";
-  return path.join(userDataPath, "interview-coder-settings.json");
+  return getUserDataPath("interview-coder-settings.json");
 };
 
 /**

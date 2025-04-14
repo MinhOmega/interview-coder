@@ -1,9 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
-const { app, nativeImage } = require("electron");
+const { nativeImage, desktopCapturer } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 const Screenshots = require("electron-screenshots");
+const { getAppPath, isCommandAvailable } = require("./utils");
+const { isLinux } = require("./config");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -48,7 +50,8 @@ const getImageDimensions = (imagePath) => {
 const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
   // Generate filename for the screenshot
   const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-  const imagePath = path.join(app.getPath("pictures"), `${filenamePrefix}-${timestamp}.png`);
+  const picturesPath = getAppPath("pictures", "");
+  const imagePath = path.join(picturesPath, `${filenamePrefix}-${timestamp}.png`);
 
   // Save the image to disk
   fs.writeFileSync(imagePath, buffer);
@@ -82,26 +85,89 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
 };
 
 /**
+ * Capture full resolution screenshot using Electron's desktopCapturer API
+ * @param {string} imagePath - Path to save the screenshot
+ * @returns {Promise<string>} - Base64 encoded image data
+ */
+const captureElectronScreenshot = async (imagePath) => {
+  // Get sources (screens)
+  const sources = await desktopCapturer.getSources({
+    types: ["screen"],
+    thumbnailSize: { width: 3840, height: 2160 }, // Request higher resolution thumbnail
+    fetchWindowIcons: false,
+  });
+
+  if (sources.length === 0) {
+    throw new Error("No screen sources found");
+  }
+
+  // Take screenshot of the primary screen (first in the array)
+  const primarySource = sources[0];
+
+  // Get high-res thumbnail
+  const thumbnail = primarySource.thumbnail;
+
+  // Convert to PNG buffer with higher quality
+  const pngBuffer = thumbnail.toPNG({
+    scaleFactor: 1.0,
+  });
+
+  // Save to disk
+  fs.writeFileSync(imagePath, pngBuffer);
+
+  // Convert to base64
+  return `data:image/png;base64,${pngBuffer.toString("base64")}`;
+};
+
+/**
  * Capture a screenshot of the entire screen or active window using the most reliable method for the platform
  */
 async function captureScreenshot(mainWindow) {
   try {
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-    const imagePath = path.join(app.getPath("pictures"), `screenshot-${timestamp}.png`);
+    const picturesPath = getAppPath("pictures", "");
+    const imagePath = path.join(picturesPath, `screenshot-${timestamp}.png`);
 
     const wasVisible = await autoHideWindow(mainWindow);
 
     let success = false;
     let base64Image = "";
 
-    try {
-      await screenshot({ filename: imagePath });
-      const imageBuffer = fs.readFileSync(imagePath);
-      base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-      success = true;
-    } catch (fallbackError) {
-      console.error("Screenshot fallback failed:", fallbackError);
-      throw fallbackError;
+    // If on Linux, first check if ImageMagick is installed
+    if (isLinux && !isCommandAvailable("import")) {
+      console.log("ImageMagick not found. Using Electron's desktopCapturer as fallback for screenshot on Linux");
+      // Use Electron's desktopCapturer as a fallback for Linux without ImageMagick
+      try {
+        base64Image = await captureElectronScreenshot(imagePath);
+        success = true;
+      } catch (electronError) {
+        console.error("Electron screenshot fallback failed:", electronError);
+        throw electronError;
+      }
+    } else {
+      try {
+        await screenshot({ filename: imagePath });
+        const imageBuffer = fs.readFileSync(imagePath);
+        base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+        success = true;
+      } catch (fallbackError) {
+        console.error("Screenshot fallback failed:", fallbackError);
+
+        // If on Linux and the error is about the 'import' command not found, use Electron's desktopCapturer as fallback
+        if (isLinux && fallbackError.message.includes("import: not found")) {
+          console.log("Using Electron's desktopCapturer as fallback for screenshot on Linux");
+          try {
+            base64Image = await captureElectronScreenshot(imagePath);
+            success = true;
+          } catch (electronError) {
+            console.error("Electron screenshot fallback failed:", electronError);
+            throw electronError;
+          }
+        } else {
+          // For other errors or platforms, just propagate the error
+          throw fallbackError;
+        }
+      }
     }
 
     if (wasVisible) {

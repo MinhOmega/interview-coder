@@ -5,17 +5,15 @@ const remarkParse = require("remark-parse").default;
 const remarkRehype = require("remark-rehype").default;
 const rehypeRaw = require("rehype-raw").default;
 const rehypeStringify = require("rehype-stringify").default;
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
+const { isMac, isLinux, modifierKey } = require("./js/config");
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRaw)
   .use(rehypeStringify);
-
-const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
-
-const isMac = navigator.platform.includes("Mac");
-const modifierKey = isMac ? "Command" : "Ctrl";
 
 let isWindowVisible = true;
 
@@ -41,6 +39,18 @@ document.addEventListener("keydown", (e) => {
   if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
     ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
     e.preventDefault();
+  }
+
+  // Linux-specific fallback for toggling visibility
+  if (isLinux) {
+    // Handle both Ctrl+B and Alt+B as fallbacks for Linux
+    const isCtrlB = e.ctrlKey && e.key.toLowerCase() === "b";
+    const isAltB = e.altKey && e.key.toLowerCase() === "b";
+
+    if (isCtrlB || isAltB) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   }
 });
 
