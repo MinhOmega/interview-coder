@@ -1,4 +1,3 @@
-// API Key Management configuration
 const API_KEYS = {
   openai: {
     key: "",
@@ -20,10 +19,15 @@ const API_KEYS = {
   },
 };
 
-// Detect platform for correct key labels
 const isMac = process.platform === "darwin";
+const isLinux = process.platform === "linux";
+const isWindows = process.platform === "win32";
+const modifierKey = isMac ? "Command" : "Ctrl";
 
 module.exports = {
   API_KEYS,
   isMac,
+  isLinux,
+  isWindows,
+  modifierKey,
 };

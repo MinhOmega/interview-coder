@@ -5,6 +5,9 @@ const remarkParse = require("remark-parse").default;
 const remarkRehype = require("remark-rehype").default;
 const rehypeRaw = require("rehype-raw").default;
 const rehypeStringify = require("rehype-stringify").default;
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
+const { isMac, isLinux, modifierKey } = require("./js/config");
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
@@ -12,67 +15,7 @@ const processor = unified()
   .use(rehypeRaw)
   .use(rehypeStringify);
 
-const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
-
-// Get platform from Electron rather than deprecated navigator.platform
-const isMac = process.platform === "darwin";
-const isLinux = process.platform === "linux";
-const modifierKey = isMac ? "Command" : "Ctrl";
-
 let isWindowVisible = true;
-
-// Initialize Linux-specific UI elements if needed
-function initLinuxSpecificUI() {
-  if (!isLinux) return;
-
-  try {
-    // Create a visibility toggle button as a fallback for Linux users
-    const visibilityBtn = document.createElement("button");
-    visibilityBtn.id = "linux-toggle-btn";
-    visibilityBtn.innerHTML = `<span class="icon">👁️</span>`;
-    visibilityBtn.title = "Toggle Visibility (Alternative to Ctrl+B)";
-    visibilityBtn.classList.add("linux-toggle-btn");
-
-    // Style the button
-    visibilityBtn.style.position = "fixed";
-    visibilityBtn.style.bottom = "10px";
-    visibilityBtn.style.right = "10px";
-    visibilityBtn.style.zIndex = "9999";
-    visibilityBtn.style.padding = "8px";
-    visibilityBtn.style.borderRadius = "50%";
-    visibilityBtn.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-    visibilityBtn.style.color = "white";
-    visibilityBtn.style.border = "none";
-    visibilityBtn.style.cursor = "pointer";
-    visibilityBtn.style.opacity = "0.7";
-    visibilityBtn.style.transition = "opacity 0.2s";
-
-    // Add hover effect
-    visibilityBtn.addEventListener("mouseenter", () => {
-      visibilityBtn.style.opacity = "1";
-    });
-
-    visibilityBtn.addEventListener("mouseleave", () => {
-      visibilityBtn.style.opacity = "0.7";
-    });
-
-    // Add click handler to toggle visibility
-    visibilityBtn.addEventListener("click", () => {
-      // Send IPC message to toggle visibility
-      ipcRenderer.send("manual-toggle-visibility");
-    });
-
-    // Add to document
-    document.body.appendChild(visibilityBtn);
-
-    console.log("Linux-specific UI elements initialized");
-  } catch (error) {
-    console.error("Error initializing Linux UI:", error);
-  }
-}
-
-// Initialize the Linux UI when document is ready
-document.addEventListener("DOMContentLoaded", initLinuxSpecificUI);
 
 ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, (_, instruction) => {
   const banner = document.getElementById("instruction-banner");
@@ -105,13 +48,8 @@ document.addEventListener("keydown", (e) => {
     const isAltB = e.altKey && e.key.toLowerCase() === "b";
 
     if (isCtrlB || isAltB) {
-      // Send manual toggle request
-      ipcRenderer.send("manual-toggle-visibility");
       e.preventDefault();
       e.stopPropagation();
-
-      // Log the keypress
-      console.log("Linux fallback keyboard shortcut activated:", isCtrlB ? "Ctrl+B" : "Alt+B");
     }
   }
 });
