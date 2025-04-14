@@ -84,6 +84,41 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
 };
 
 /**
+ * Capture full resolution screenshot using Electron's desktopCapturer API
+ * @param {string} imagePath - Path to save the screenshot
+ * @returns {Promise<string>} - Base64 encoded image data
+ */
+const captureElectronScreenshot = async (imagePath) => {
+  // Get sources (screens)
+  const sources = await desktopCapturer.getSources({ 
+    types: ['screen'],
+    thumbnailSize: { width: 3840, height: 2160 }, // Request higher resolution thumbnail
+    fetchWindowIcons: false
+  });
+  
+  if (sources.length === 0) {
+    throw new Error("No screen sources found");
+  }
+
+  // Take screenshot of the primary screen (first in the array)
+  const primarySource = sources[0];
+  
+  // Get high-res thumbnail
+  const thumbnail = primarySource.thumbnail;
+  
+  // Convert to PNG buffer with higher quality
+  const pngBuffer = thumbnail.toPNG({
+    scaleFactor: 1.0
+  });
+  
+  // Save to disk
+  fs.writeFileSync(imagePath, pngBuffer);
+  
+  // Convert to base64
+  return `data:image/png;base64,${pngBuffer.toString("base64")}`;
+};
+
+/**
  * Capture a screenshot of the entire screen or active window using the most reliable method for the platform
  */
 async function captureScreenshot(mainWindow) {
@@ -102,28 +137,8 @@ async function captureScreenshot(mainWindow) {
       console.log("ImageMagick not found. Using Electron's desktopCapturer as fallback for screenshot on Linux");
       // Use Electron's desktopCapturer as a fallback for Linux without ImageMagick
       try {
-        // Get sources (screens)
-        const sources = await desktopCapturer.getSources({ types: ['screen'] });
-        
-        if (sources.length > 0) {
-          // Take screenshot of the primary screen (first in the array)
-          const primarySource = sources[0];
-          
-          // Get the thumbnail as a native image
-          const thumbnail = primarySource.thumbnail;
-          
-          // Convert to PNG buffer
-          const pngBuffer = thumbnail.toPNG();
-          
-          // Save to disk
-          fs.writeFileSync(imagePath, pngBuffer);
-          
-          // Convert to base64
-          base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
-          success = true;
-        } else {
-          throw new Error("No screen sources found");
-        }
+        base64Image = await captureElectronScreenshot(imagePath);
+        success = true;
       } catch (electronError) {
         console.error("Electron screenshot fallback failed:", electronError);
         throw electronError;
@@ -141,28 +156,8 @@ async function captureScreenshot(mainWindow) {
         if (process.platform === 'linux' && fallbackError.message.includes("import: not found")) {
           console.log("Using Electron's desktopCapturer as fallback for screenshot on Linux");
           try {
-            // Get sources (screens)
-            const sources = await desktopCapturer.getSources({ types: ['screen'] });
-            
-            if (sources.length > 0) {
-              // Take screenshot of the primary screen (first in the array)
-              const primarySource = sources[0];
-              
-              // Get the thumbnail as a native image
-              const thumbnail = primarySource.thumbnail;
-              
-              // Convert to PNG buffer
-              const pngBuffer = thumbnail.toPNG();
-              
-              // Save to disk
-              fs.writeFileSync(imagePath, pngBuffer);
-              
-              // Convert to base64
-              base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
-              success = true;
-            } else {
-              throw new Error("No screen sources found");
-            }
+            base64Image = await captureElectronScreenshot(imagePath);
+            success = true;
           } catch (electronError) {
             console.error("Electron screenshot fallback failed:", electronError);
             throw electronError;
