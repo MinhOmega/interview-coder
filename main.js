@@ -143,25 +143,12 @@ app.whenReady().then(() => {
 
   // Linux-specific initialization
   if (process.platform === "linux") {
-    console.log("Running on Linux - applying platform-specific optimizations");
-
-    // Add IPC handler for manual toggle visibility (as a backup method)
-    ipcMain.on("manual-toggle-visibility", () => {
-      try {
-        const isVisible = windowManager.toggleWindowVisibility();
-        hotkeyManager.updateHotkeys(isVisible);
-      } catch (error) {
-        console.error("Error in manual visibility toggle:", error);
-      }
-    });
-
     // Verify that hotkeys are properly registered, especially Ctrl+B
     setTimeout(() => {
       try {
         const isRegistered = hotkeyManager.validateHotkeys();
         if (!isRegistered) {
           console.warn("Hotkeys may not be properly registered on Linux. Using fallback mechanisms.");
-          // Additional fallback mechanisms can be implemented here
         }
       } catch (error) {
         console.error("Error validating hotkeys on Linux:", error);

@@ -1,8 +1,5 @@
 const { globalShortcut } = require("electron");
-
-const isMac = process.platform === "darwin";
-const isLinux = process.platform === "linux";
-const modifierKey = isMac ? "Command" : "Ctrl";
+const { isLinux, modifierKey } = require("./config");
 
 // Track last toggle time to prevent rapid firing
 let lastToggleTime = 0;
@@ -11,7 +8,6 @@ const TOGGLE_DEBOUNCE_MS = 300; // Prevent multiple toggles within 300ms
 const SHORTCUTS = {
   TOGGLE_VISIBILITY: {
     key: `${modifierKey}+B`,
-    // For Linux, we'll use a different alternative if needed
     altKey: isLinux ? "Alt+B" : null,
     handler: null,
     alwaysActive: true,
