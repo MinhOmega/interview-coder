@@ -5,6 +5,7 @@ const { nativeImage, desktopCapturer } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 const Screenshots = require("electron-screenshots");
 const { getAppPath, isCommandAvailable } = require("./utils");
+const { isLinux } = require("./config");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -90,30 +91,30 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
  */
 const captureElectronScreenshot = async (imagePath) => {
   // Get sources (screens)
-  const sources = await desktopCapturer.getSources({ 
-    types: ['screen'],
+  const sources = await desktopCapturer.getSources({
+    types: ["screen"],
     thumbnailSize: { width: 3840, height: 2160 }, // Request higher resolution thumbnail
-    fetchWindowIcons: false
+    fetchWindowIcons: false,
   });
-  
+
   if (sources.length === 0) {
     throw new Error("No screen sources found");
   }
 
   // Take screenshot of the primary screen (first in the array)
   const primarySource = sources[0];
-  
+
   // Get high-res thumbnail
   const thumbnail = primarySource.thumbnail;
-  
+
   // Convert to PNG buffer with higher quality
   const pngBuffer = thumbnail.toPNG({
-    scaleFactor: 1.0
+    scaleFactor: 1.0,
   });
-  
+
   // Save to disk
   fs.writeFileSync(imagePath, pngBuffer);
-  
+
   // Convert to base64
   return `data:image/png;base64,${pngBuffer.toString("base64")}`;
 };
@@ -133,7 +134,7 @@ async function captureScreenshot(mainWindow) {
     let base64Image = "";
 
     // If on Linux, first check if ImageMagick is installed
-    if (process.platform === 'linux' && !isCommandAvailable('import')) {
+    if (isLinux && !isCommandAvailable("import")) {
       console.log("ImageMagick not found. Using Electron's desktopCapturer as fallback for screenshot on Linux");
       // Use Electron's desktopCapturer as a fallback for Linux without ImageMagick
       try {
@@ -151,9 +152,9 @@ async function captureScreenshot(mainWindow) {
         success = true;
       } catch (fallbackError) {
         console.error("Screenshot fallback failed:", fallbackError);
-        
+
         // If on Linux and the error is about the 'import' command not found, use Electron's desktopCapturer as fallback
-        if (process.platform === 'linux' && fallbackError.message.includes("import: not found")) {
+        if (isLinux && fallbackError.message.includes("import: not found")) {
           console.log("Using Electron's desktopCapturer as fallback for screenshot on Linux");
           try {
             base64Image = await captureElectronScreenshot(imagePath);
