@@ -62,15 +62,6 @@ ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, () => {
 ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (_, isVisible) => {
   isWindowVisible = isVisible;
   document.body.classList.toggle("invisible-mode", !isWindowVisible);
-
-  // Update Linux toggle button if it exists
-  if (isLinux) {
-    const toggleBtn = document.getElementById("linux-toggle-btn");
-    if (toggleBtn) {
-      toggleBtn.innerHTML = isVisible ? `<span class="icon">👁️</span>` : `<span class="icon">🔍</span>`;
-      toggleBtn.title = isVisible ? "Hide Window (Alt+B)" : "Show Window (Alt+B)";
-    }
-  }
 });
 
 ipcRenderer.on(IPC_CHANNELS.NOTIFICATION, (_, data) => {

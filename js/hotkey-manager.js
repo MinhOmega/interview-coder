@@ -1,9 +1,8 @@
 const { globalShortcut } = require("electron");
 const { isLinux, modifierKey } = require("./config");
 
-// Track last toggle time to prevent rapid firing
 let lastToggleTime = 0;
-const TOGGLE_DEBOUNCE_MS = 300; // Prevent multiple toggles within 300ms
+const TOGGLE_DEBOUNCE_MS = 300;
 
 const SHORTCUTS = {
   TOGGLE_VISIBILITY: {

@@ -1,5 +1,6 @@
 const { BrowserWindow, screen } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
+const { isLinux } = require("./config");
 
 let mainWindow;
 let modelListWindow;
@@ -92,7 +93,7 @@ function toggleWindowVisibility(forceState) {
         try {
           mainWindow.show();
           // On Linux, setAlwaysOnTop can sometimes cause issues
-          if (process.platform !== "linux") {
+          if (!isLinux) {
             mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
           } else {
             // For Linux, we use a different approach
@@ -122,7 +123,7 @@ function toggleWindowVisibility(forceState) {
         try {
           mainWindow.hide();
           // On Linux, setAlwaysOnTop can sometimes cause issues
-          if (process.platform !== "linux") {
+          if (!isLinux) {
             mainWindow.setAlwaysOnTop(false);
           }
 

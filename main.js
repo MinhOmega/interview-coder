@@ -11,6 +11,7 @@ const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
+const { isLinux, isMac } = require("./js/config");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -142,7 +143,7 @@ app.whenReady().then(() => {
   }
 
   // Linux-specific initialization
-  if (process.platform === "linux") {
+  if (isLinux) {
     // Verify that hotkeys are properly registered, especially Ctrl+B
     setTimeout(() => {
       try {
@@ -221,7 +222,7 @@ app.whenReady().then(() => {
         } catch (hotkeyError) {
           console.error("Error updating hotkeys after visibility toggle:", hotkeyError);
           // Force re-register on Linux in case of issues
-          if (process.platform === "linux") {
+          if (isLinux) {
             setTimeout(() => {
               try {
                 hotkeyManager.updateHotkeys(isVisible);
@@ -272,14 +273,15 @@ app.whenReady().then(() => {
     },
     AREA_SCREENSHOT: () => {
       try {
-        // Check if we're on Linux and warn about ImageMagick requirement
-        if (process.platform === "linux") {
+        if (isLinux) {
           // Check if ImageMagick's import command is available
           if (!isCommandAvailable("import")) {
-            // import command not found - show notification with installation instructions
             mainWindow.webContents.send(
               IPC_CHANNELS.WARNING,
-              "Area screenshot requires ImageMagick. Using full screen capture instead.",
+              "Area screenshot requires ImageMagick. Please install it with: sudo apt-get install imagemagick",
+            );
+            windowManager.updateInstruction(
+              "Area screenshot requires ImageMagick. Please install with: sudo apt-get install imagemagick",
             );
 
             // Use fallback full screen capture
@@ -475,7 +477,7 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   hotkeyManager.unregisterAll();
-  if (process.platform !== "darwin") {
+  if (!isMac) {
     app.quit();
   }
 });
