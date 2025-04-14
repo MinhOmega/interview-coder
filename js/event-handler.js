@@ -1,5 +1,6 @@
 const { ipcMain, app, desktopCapturer, Menu, BrowserWindow, systemPreferences } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
+const { isLinux, isWindows, isMac } = require("./config");
 
 /**
  * Sets up event handlers for the application's IPC communication
@@ -102,7 +103,7 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
  * @param {Object} windowManager - Manager for window visibility and state
  */
 function setupScreenCaptureDetection(mainWindow, windowManager) {
-  if (process.platform === "darwin") {
+  if (isMac) {
     try {
       const hasScreenCapturePermission = systemPreferences.getMediaAccessStatus("screen");
 
@@ -123,7 +124,7 @@ function setupScreenCaptureDetection(mainWindow, windowManager) {
     }
   }
 
-  if (process.platform === "win32" || process.platform === "linux") {
+  if (isWindows || isLinux) {
     try {
       let checkInterval = setInterval(() => {
         desktopCapturer
