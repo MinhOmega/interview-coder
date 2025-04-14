@@ -14,10 +14,65 @@ const processor = unified()
 
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 
-const isMac = navigator.platform.includes("Mac");
+// Get platform from Electron rather than deprecated navigator.platform
+const isMac = process.platform === "darwin";
+const isLinux = process.platform === "linux";
 const modifierKey = isMac ? "Command" : "Ctrl";
 
 let isWindowVisible = true;
+
+// Initialize Linux-specific UI elements if needed
+function initLinuxSpecificUI() {
+  if (!isLinux) return;
+
+  try {
+    // Create a visibility toggle button as a fallback for Linux users
+    const visibilityBtn = document.createElement("button");
+    visibilityBtn.id = "linux-toggle-btn";
+    visibilityBtn.innerHTML = `<span class="icon">👁️</span>`;
+    visibilityBtn.title = "Toggle Visibility (Alternative to Ctrl+B)";
+    visibilityBtn.classList.add("linux-toggle-btn");
+
+    // Style the button
+    visibilityBtn.style.position = "fixed";
+    visibilityBtn.style.bottom = "10px";
+    visibilityBtn.style.right = "10px";
+    visibilityBtn.style.zIndex = "9999";
+    visibilityBtn.style.padding = "8px";
+    visibilityBtn.style.borderRadius = "50%";
+    visibilityBtn.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+    visibilityBtn.style.color = "white";
+    visibilityBtn.style.border = "none";
+    visibilityBtn.style.cursor = "pointer";
+    visibilityBtn.style.opacity = "0.7";
+    visibilityBtn.style.transition = "opacity 0.2s";
+
+    // Add hover effect
+    visibilityBtn.addEventListener("mouseenter", () => {
+      visibilityBtn.style.opacity = "1";
+    });
+
+    visibilityBtn.addEventListener("mouseleave", () => {
+      visibilityBtn.style.opacity = "0.7";
+    });
+
+    // Add click handler to toggle visibility
+    visibilityBtn.addEventListener("click", () => {
+      // Send IPC message to toggle visibility
+      ipcRenderer.send("manual-toggle-visibility");
+    });
+
+    // Add to document
+    document.body.appendChild(visibilityBtn);
+
+    console.log("Linux-specific UI elements initialized");
+  } catch (error) {
+    console.error("Error initializing Linux UI:", error);
+  }
+}
+
+// Initialize the Linux UI when document is ready
+document.addEventListener("DOMContentLoaded", initLinuxSpecificUI);
 
 ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, (_, instruction) => {
   const banner = document.getElementById("instruction-banner");
@@ -42,6 +97,23 @@ document.addEventListener("keydown", (e) => {
     ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
     e.preventDefault();
   }
+
+  // Linux-specific fallback for toggling visibility
+  if (isLinux) {
+    // Handle both Ctrl+B and Alt+B as fallbacks for Linux
+    const isCtrlB = e.ctrlKey && e.key.toLowerCase() === "b";
+    const isAltB = e.altKey && e.key.toLowerCase() === "b";
+
+    if (isCtrlB || isAltB) {
+      // Send manual toggle request
+      ipcRenderer.send("manual-toggle-visibility");
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Log the keypress
+      console.log("Linux fallback keyboard shortcut activated:", isCtrlB ? "Ctrl+B" : "Alt+B");
+    }
+  }
 });
 
 ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, () => {
@@ -52,6 +124,15 @@ ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, () => {
 ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (_, isVisible) => {
   isWindowVisible = isVisible;
   document.body.classList.toggle("invisible-mode", !isWindowVisible);
+
+  // Update Linux toggle button if it exists
+  if (isLinux) {
+    const toggleBtn = document.getElementById("linux-toggle-btn");
+    if (toggleBtn) {
+      toggleBtn.innerHTML = isVisible ? `<span class="icon">👁️</span>` : `<span class="icon">🔍</span>`;
+      toggleBtn.title = isVisible ? "Hide Window (Alt+B)" : "Show Window (Alt+B)";
+    }
+  }
 });
 
 ipcRenderer.on(IPC_CHANNELS.NOTIFICATION, (_, data) => {
