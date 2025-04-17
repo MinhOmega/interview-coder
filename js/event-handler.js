@@ -1,6 +1,11 @@
 const { ipcMain, app, desktopCapturer, Menu, BrowserWindow, systemPreferences } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
-const { isLinux, isWindows, isMac } = require("./config");
+const { isLinux, isWindows, isMac, modifierKey } = require("./config");
+const ChatHandler = require("./chat-handler");
+const fs = require("fs");
+const { getUserDataPath } = require("./utils");
+
+let chatHandler;
 
 /**
  * Sets up event handlers for the application's IPC communication
@@ -12,6 +17,13 @@ const { isLinux, isWindows, isMac } = require("./config");
  * @returns {Object} The configured ipcMain object
  */
 function setupEventHandlers(mainWindow, configManager, windowManager, aiProviders) {
+  // Make sure AI providers are initialized first
+  const initStatus = aiProviders.initializeFromConfig();
+  console.log("AI initialization status in event handler:", initStatus);
+
+  // Initialize the chat handler
+  chatHandler = new ChatHandler(aiProviders, configManager);
+
   ipcMain.handle(IPC_CHANNELS.GET_CURRENT_SETTINGS, () => {
     return configManager.getCurrentSettings();
   });
@@ -90,6 +102,94 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
 
       const menu = Menu.buildFromTemplate(template);
       menu.popup(BrowserWindow.fromWebContents(mainWindow.webContents));
+    }
+  });
+
+  // Handle chat messages
+  ipcMain.on(IPC_CHANNELS.SEND_CHAT_MESSAGE, async (event, messages, systemPrompt) => {
+    try {
+      const senderWindow = BrowserWindow.fromWebContents(event.sender);
+      if (!senderWindow) return;
+
+      const windowId = senderWindow.id;
+
+      // Lazy-initialize if needed
+      if (!chatHandler) {
+        console.log("Creating new chat handler instance");
+        chatHandler = new ChatHandler(aiProviders, configManager);
+      }
+
+      // Check if we need to show settings window due to no API keys
+      const apiKey = configManager.getApiKey();
+      const provider = configManager.getAiProvider();
+      if (!apiKey) {
+        console.warn("No API key found, suggesting Settings window");
+        // Only suggest settings if we're not using Ollama
+        if (provider !== "ollama") {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
+            role: "assistant",
+            content: `No API key has been configured. Please go to Settings (${modifierKey}+,) and enter your API key.`,
+          });
+
+          // Open settings window
+          windowManager.createModelSelectionWindow();
+          return;
+        }
+      }
+
+      // Process the message with system prompt if provided
+      const response = await chatHandler.processMessage(messages, windowId, systemPrompt);
+
+      // Send response back to the renderer
+      event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
+    } catch (error) {
+      console.error("Error processing chat message:", error);
+
+      // Send error response
+      event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
+        role: "assistant",
+        content: `Error: ${
+          error.message || "Failed to process your message"
+        }. Please check your settings or try again later.`,
+      });
+    }
+  });
+
+  // Handle system prompt getting and updating
+  ipcMain.handle(IPC_CHANNELS.GET_SYSTEM_PROMPT, async () => {
+    try {
+      if (chatHandler) {
+        return chatHandler.loadSystemPrompt();
+      }
+      return "";
+    } catch (error) {
+      console.error("Error getting system prompt:", error);
+      return "";
+    }
+  });
+  
+  ipcMain.on(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, (event, prompt) => {
+    try {
+      const systemPromptFile = getUserDataPath('systemPrompt.txt');
+      fs.writeFileSync(systemPromptFile, prompt, 'utf8');
+      
+      // Update in all chat handlers
+      if (chatHandler) {
+        // Update system prompt for all windows
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(window => {
+          const windowId = window.id;
+          chatHandler.systemPrompts.set(windowId, prompt);
+        });
+      }
+      
+      event.sender.send(IPC_CHANNELS.NOTIFICATION, {
+        body: "System prompt updated successfully",
+        type: "success"
+      });
+    } catch (error) {
+      console.error("Error updating system prompt:", error);
+      event.sender.send(IPC_CHANNELS.ERROR, "Failed to update system prompt: " + error.message);
     }
   });
 
