@@ -75,6 +75,10 @@ const SHORTCUTS = {
     key: `${modifierKey}+M`,
     handler: null,
   },
+  TOGGLE_SPLIT_VIEW: {
+    key: `${modifierKey}+T`,
+    handler: null,
+  },
 };
 
 // Register shortcut handlers
