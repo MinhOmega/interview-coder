@@ -62,6 +62,20 @@ ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, () => {
 ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (_, isVisible) => {
   isWindowVisible = isVisible;
   document.body.classList.toggle("invisible-mode", !isWindowVisible);
+
+  // Disable all UI interactions when invisible
+  const clickableElements = document.querySelectorAll("button, a, input, textarea, .toolbar-button");
+  clickableElements.forEach((el) => {
+    if (!isWindowVisible) {
+      el.setAttribute("disabled", "disabled");
+      if (el.tagName.toLowerCase() !== "input" && el.tagName.toLowerCase() !== "textarea") {
+        el.style.pointerEvents = "none";
+      }
+    } else {
+      el.removeAttribute("disabled");
+      el.style.pointerEvents = "";
+    }
+  });
 });
 
 ipcRenderer.on(IPC_CHANNELS.NOTIFICATION, (_, data) => {
@@ -561,7 +575,7 @@ function showNotification(message, type = "success") {
   container.appendChild(notification);
 
   const notifications = container.getElementsByClassName("notification");
-  const offset = (notifications.length - 1) * 10; // Stack effect
+  const offset = (notifications.length - 1) * 20;
 
   notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
 
@@ -576,10 +590,10 @@ function showNotification(message, type = "success") {
     setTimeout(() => {
       notification.remove();
       Array.from(notifications).forEach((n, i) => {
-        n.style.transform = `translateX(0) translateY(-${i * 10}px)`;
+        n.style.transform = `translateX(0) translateY(-${i * 20}px)`;
       });
     }, 300);
-  }, 3500);
+  }, 15000);
 }
 
 // Initialize
@@ -598,3 +612,388 @@ document.querySelectorAll(".shortcut").forEach((el) => {
   const text = el.textContent;
   el.textContent = text.replace("⌘", isMac ? "⌘" : "Ctrl");
 });
+
+let messageHistory = [];
+let isSplitView = false;
+let isChatMode = false;
+
+document.addEventListener("keydown", (e) => {
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "T") {
+    e.preventDefault();
+    toggleSplitView();
+  }
+});
+
+ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, () => {
+  toggleSplitView();
+});
+
+ipcRenderer.on(IPC_CHANNELS.SET_CHAT_MODE, (_, enabled) => {
+  isChatMode = enabled;
+  if (isChatMode) {
+    isSplitView = true;
+
+    // Update display
+    document.getElementById("standard-view").style.display = "none";
+    document.getElementById("split-view").style.display = "flex";
+
+    // Make sure the chat interface in split view is visible
+    document.getElementById("right-chat-interface").style.display = "flex";
+
+    // Focus split chat input
+    document.getElementById("split-chat-input").focus();
+
+    // Initialize settings
+    checkSettings();
+  }
+});
+
+// Toggle split view functionality
+function toggleSplitView() {
+  if (isChatMode) return; // Don't allow toggling split view in chat-only mode
+
+  isSplitView = !isSplitView;
+
+  const standardView = document.getElementById("standard-view");
+  const splitView = document.getElementById("split-view");
+
+  if (isSplitView) {
+    // Show split view
+    standardView.style.display = "none";
+    splitView.style.display = "flex";
+
+    // Clone content from main view to left pane if needed
+    const leftContent = document.getElementById("left-result-content");
+    const mainContent = document.getElementById("result-content");
+    if (leftContent && mainContent && leftContent.innerHTML === "") {
+      leftContent.innerHTML = mainContent.innerHTML;
+    }
+
+    // Setup resize handle
+    setupResizeHandle();
+
+    // Focus split chat input
+    document.getElementById("split-chat-input").focus();
+  } else {
+    // Show standard view
+    standardView.style.display = "block";
+    splitView.style.display = "none";
+  }
+
+  // Notify about toggle
+  showNotification("Split view " + (isSplitView ? "enabled" : "disabled"), "success");
+}
+
+// Setup resize handle for split view
+function setupResizeHandle() {
+  const handle = document.getElementById("resize-handle");
+  const container = document.getElementById("split-view");
+  const leftPane = document.querySelector(".split-pane.left");
+  let isResizing = false;
+
+  handle.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    handle.classList.add("active");
+    document.body.style.cursor = "col-resize";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+
+    const containerWidth = container.clientWidth;
+    const newX = e.clientX;
+    const containerRect = container.getBoundingClientRect();
+    const newRatio = (newX - containerRect.left) / containerWidth;
+
+    // Limit the resize ratio
+    if (newRatio < 0.2 || newRatio > 0.8) return;
+
+    splitViewRatio = newRatio;
+    leftPane.style.flex = `0 0 ${newRatio * 100}%`;
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      handle.classList.remove("active");
+      document.body.style.cursor = "";
+    }
+  });
+}
+
+// Button event listeners
+document.addEventListener("DOMContentLoaded", async () => {
+  const splitSendBtn = document.getElementById("split-send-btn");
+  const splitChatInput = document.getElementById("split-chat-input");
+  const toggleSystemPromptBtn = document.getElementById("toggle-system-prompt-btn");
+
+  // Send message for split view chat interface
+  if (splitSendBtn && splitChatInput) {
+    splitSendBtn.addEventListener("click", () => sendMessage(splitChatInput));
+
+    // Auto-resize textarea as user types
+    splitChatInput.addEventListener("input", () => {
+      splitChatInput.style.height = "auto";
+      splitChatInput.style.height = splitChatInput.scrollHeight + "px";
+    });
+
+    // Send message on Command+Enter or Ctrl+Enter or just Enter
+    splitChatInput.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        sendMessage(splitChatInput);
+      } else if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage(splitChatInput);
+      }
+    });
+  }
+
+  // System prompt button functionality
+  const systemPromptBtn = document.getElementById("btn-system-prompt");
+  const updateSystemPromptBtn = document.getElementById("update-system-prompt");
+  const cancelSystemPromptBtn = document.getElementById("cancel-system-prompt");
+  const clearSystemPromptBtn = document.getElementById("clear-system-prompt");
+
+  if (systemPromptBtn) {
+    systemPromptBtn.addEventListener("click", toggleSystemPrompt);
+  }
+
+  if (updateSystemPromptBtn) {
+    updateSystemPromptBtn.addEventListener("click", updateSystemPrompt);
+  }
+
+  if (cancelSystemPromptBtn) {
+    cancelSystemPromptBtn.addEventListener("click", cancelSystemPrompt);
+  }
+
+  if (clearSystemPromptBtn) {
+    clearSystemPromptBtn.addEventListener("click", clearSystemPrompt);
+  }
+
+  // Add keyboard shortcut for system prompt (Cmd/Ctrl+P)
+  document.addEventListener("keydown", (e) => {
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "p") {
+      e.preventDefault();
+      toggleSystemPrompt();
+    }
+  });
+
+  // Load saved system prompt if available
+  await loadSystemPrompt();
+
+  // Add event listener for inline toggle system prompt button
+  if (toggleSystemPromptBtn) {
+    toggleSystemPromptBtn.addEventListener("click", toggleSystemPrompt);
+  }
+});
+
+// Check if settings are configured
+function checkSettings() {
+  ipcRenderer
+    .invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS)
+    .then((settings) => {
+      console.log("Current settings:", settings);
+      if (!settings || !settings.aiProvider || settings.aiProvider === AI_PROVIDERS.DEFAULT) {
+        // Add a message that settings need to be configured
+        addMessage(
+          `It looks like you haven't configured your AI settings yet. Please click the Settings button to configure an AI provider.`,
+          "ai",
+        );
+      }
+    })
+    .catch((err) => {
+      console.error("Error checking settings:", err);
+    });
+}
+
+// Add global variables for system prompt
+let systemPrompt = "";
+let isSystemPromptVisible = false;
+
+// Function to send message
+function sendMessage(inputElement) {
+  const message = inputElement.value.trim();
+  if (!message) return;
+
+  // Add user message to UI
+  addMessage(message, "user");
+
+  // Add to message history
+  messageHistory.push({ role: "user", content: message });
+
+  // Clear input and reset height
+  inputElement.value = "";
+  inputElement.style.height = "auto";
+
+  // Scroll to bottom
+  const messagesContainer = document.getElementById("split-messages-container");
+  scrollToBottom(messagesContainer);
+
+  // Create message array with system prompt if available
+  const messageArray = [...messageHistory];
+  if (systemPrompt) {
+    messageArray.unshift({ role: "system", content: systemPrompt });
+  }
+
+  // Send to main process with system prompt information
+  ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, messageArray, systemPrompt);
+}
+
+// Receive response from AI
+ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, async (_, response) => {
+  // Hide typing indicator before showing the AI message
+  const typingIndicator = document.getElementById("split-typing-indicator");
+  typingIndicator.classList.remove("visible");
+
+  // Add AI message to UI using the markdown processor
+  await addAIMessage(response.content);
+
+  // Add to message history
+  messageHistory.push(response);
+
+  // Scroll to bottom
+  scrollToBottom(document.getElementById("split-messages-container"));
+});
+
+// Add a user message to the UI
+async function addMessage(text, sender) {
+  const messagesContainer = document.getElementById("split-messages-container");
+
+  const messageDiv = document.createElement("div");
+  messageDiv.classList.add("message", sender === "user" ? "user-message" : "ai-message");
+
+  // Process markdown for both user and AI messages
+  try {
+    const html = await processMarkdown(text);
+    messageDiv.innerHTML = html;
+
+    // Setup code copy buttons if needed
+    setupCodeCopyButtons(messageDiv);
+  } catch (error) {
+    console.error("Error processing markdown:", error);
+    // Fallback to basic formatting if markdown processing fails
+    const formattedText = text.replace(/\n/g, "<br>");
+    messageDiv.innerHTML = formattedText;
+  }
+
+  messagesContainer.appendChild(messageDiv);
+
+  // If this is a user message, show the typing indicator right after it
+  if (sender === "user") {
+    // Ensure the typing indicator is in the correct position
+    const typingIndicator = document.getElementById("split-typing-indicator");
+    messagesContainer.appendChild(typingIndicator);
+    typingIndicator.classList.add("visible");
+  }
+
+  scrollToBottom(messagesContainer);
+}
+
+// Add an AI message with proper markdown processing
+async function addAIMessage(text) {
+  const messagesContainer = document.getElementById("split-messages-container");
+
+  const messageDiv = document.createElement("div");
+  messageDiv.classList.add("message", "ai-message");
+
+  // Use the advanced markdown processor
+  try {
+    const html = await processMarkdown(text);
+    messageDiv.innerHTML = html;
+
+    // Setup code copy buttons if needed
+    setupCodeCopyButtons(messageDiv);
+  } catch (error) {
+    console.error("Error processing markdown:", error);
+    messageDiv.textContent = text;
+  }
+
+  messagesContainer.appendChild(messageDiv);
+  scrollToBottom(messagesContainer);
+}
+
+// Scroll to the bottom of the messages container
+function scrollToBottom(container) {
+  if (container) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+// Toggle system prompt visibility
+function toggleSystemPrompt() {
+  const systemPromptContainer = document.getElementById("system-prompt-container");
+  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
+  const chatInput = document.getElementById("split-chat-input");
+
+  isSystemPromptVisible = !isSystemPromptVisible;
+
+  if (isSystemPromptVisible) {
+    // Show system prompt
+    systemPromptContainer.style.display = "flex";
+    systemPromptTextarea.value = systemPrompt || "";
+    systemPromptTextarea.focus();
+
+    // Hide input container temporarily
+    chatInput.parentElement.style.display = "none";
+  } else {
+    // Hide system prompt
+    systemPromptContainer.style.display = "none";
+
+    // Show input container
+    chatInput.parentElement.style.display = "flex";
+    chatInput.focus();
+  }
+}
+
+// Update system prompt
+function updateSystemPrompt() {
+  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
+  systemPrompt = systemPromptTextarea.value.trim();
+
+  // Save the prompt
+  saveSystemPrompt(systemPrompt);
+
+  // Hide system prompt UI
+  toggleSystemPrompt();
+}
+
+// Cancel system prompt update
+function cancelSystemPrompt() {
+  // Hide system prompt UI without saving
+  toggleSystemPrompt();
+}
+
+// Clear system prompt
+function clearSystemPrompt() {
+  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
+  systemPromptTextarea.value = "";
+  systemPromptTextarea.focus();
+
+  // Show notification
+  showNotification("System prompt cleared", "warning");
+}
+
+// Save system prompt to file via IPC
+function saveSystemPrompt(prompt) {
+  try {
+    ipcRenderer.send(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, prompt);
+  } catch (error) {
+    console.error("Error saving system prompt:", error);
+    showNotification("Failed to save system prompt", "error");
+  }
+}
+
+// Load system prompt from file via IPC
+async function loadSystemPrompt() {
+  try {
+    const savedPrompt = await ipcRenderer.invoke(IPC_CHANNELS.GET_SYSTEM_PROMPT);
+    if (savedPrompt) {
+      systemPrompt = savedPrompt;
+      showNotification("System prompt loaded", "success");
+    }
+  } catch (error) {
+    console.error("Error loading system prompt:", error);
+  }
+}

@@ -4,6 +4,7 @@ const { isLinux } = require("./config");
 
 let mainWindow;
 let modelListWindow;
+let chatWindow;
 let isWindowVisible = true;
 
 // Create the main application window
@@ -82,6 +83,20 @@ function createModelSelectionWindow() {
   return modelListWindow;
 }
 
+// Toggle split view in the main window (for Command+T)
+function toggleSplitView() {
+  if (!mainWindow) return;
+
+  try {
+    // Send a message to the renderer process to toggle split view
+    mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_SPLIT_VIEW);
+    return true;
+  } catch (error) {
+    console.error("Error in toggleSplitView:", error);
+    return false;
+  }
+}
+
 // Toggle the main window visibility
 function toggleWindowVisibility(forceState) {
   try {
@@ -146,6 +161,14 @@ function toggleWindowVisibility(forceState) {
         mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
       } catch (sendError) {
         console.error("Error sending visibility update:", sendError);
+      }
+
+      // Update hotkeys based on visibility (import hotkeyManager if needed)
+      try {
+        const hotkeyManager = require("./hotkey-manager");
+        hotkeyManager.updateHotkeys(isWindowVisible);
+      } catch (hotkeyError) {
+        console.error("Error updating hotkeys:", hotkeyError);
       }
     }
 
@@ -242,6 +265,7 @@ function getModelListWindow() {
   return modelListWindow;
 }
 
+
 // Get window visibility state
 function getWindowVisibility() {
   return isWindowVisible;
@@ -265,13 +289,14 @@ function getDefaultInstructions(multiPageMode, screenshotsLength, modifierKey) {
     return `Multi-mode: ${screenshotsLength} screenshots. ${modifierKey}+Shift+A to add more, ${modifierKey}+Enter to analyze`;
   }
 
-  return `${modifierKey}+B: Toggle visibility \n ${modifierKey}+H: Take screenshot \n ${modifierKey}+R: Reset \n`;
+  return `${modifierKey}+B: Toggle visibility \n ${modifierKey}+H: Take screenshot \n ${modifierKey}+R: Reset \n ${modifierKey}+T: Toggle split view`;
 }
 
 module.exports = {
   createMainWindow,
   createModelSelectionWindow,
   toggleWindowVisibility,
+  toggleSplitView,
   moveWindow,
   resizeWindow,
   scrollContent,
