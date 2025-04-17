@@ -210,39 +210,8 @@ app.whenReady().then(() => {
   }
 
   hotkeyManager.registerHandlers({
-    TOGGLE_VISIBILITY: () => {
-      try {
-        console.log("Toggle visibility hotkey triggered");
-        // For Linux, ensure we're not calling this rapidly
-        const isVisible = windowManager.toggleWindowVisibility();
-
-        // Wrap in try/catch for Linux stability
-        try {
-          hotkeyManager.updateHotkeys(isVisible);
-        } catch (hotkeyError) {
-          console.error("Error updating hotkeys after visibility toggle:", hotkeyError);
-          // Force re-register on Linux in case of issues
-          if (isLinux) {
-            setTimeout(() => {
-              try {
-                hotkeyManager.updateHotkeys(isVisible);
-              } catch (err) {
-                console.error("Failed to recover hotkeys:", err);
-              }
-            }, 500);
-          }
-        }
-      } catch (error) {
-        console.error("Error in TOGGLE_VISIBILITY handler:", error);
-      }
-    },
-    PROCESS_SCREENSHOTS: () => {
-      if (screenshotManager.getScreenshots().length === 0) {
-        mainWindow.webContents.send(IPC_CHANNELS.WARNING, "No screenshots to process. Take a screenshot first.");
-        return;
-      }
-      processScreenshotsWithAI();
-    },
+    TOGGLE_VISIBILITY: () => windowManager.toggleWindowVisibility(),
+    PROCESS_SCREENSHOTS: () => processScreenshotsWithAI(),
     OPEN_SETTINGS: () => windowManager.createModelSelectionWindow(),
     MOVE_LEFT: () => windowManager.moveWindow("left"),
     MOVE_RIGHT: () => windowManager.moveWindow("right"),
@@ -254,21 +223,17 @@ app.whenReady().then(() => {
     DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
     TAKE_SCREENSHOT: async () => {
       try {
-        windowManager.updateInstruction("Taking screenshot...");
-        const img = await screenshotManager.captureScreenshot(mainWindow);
-        screenshotManager.addScreenshot(img);
-        windowManager.updateInstruction("Processing screenshot with AI...");
-        await processScreenshotsWithAI();
+        // Take a normal screenshot
+        resetProcess();
+        // Hide window during capture
+        global.mainWindowWasVisible = windowManager.getWindowVisibility();
+        if (global.mainWindowWasVisible) {
+          mainWindow.hide();
+        }
+        await screenshotManager.captureAutoScreenshot(mainWindow);
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+H error:`, error);
-        mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error processing command: ${error.message}`);
-        windowManager.updateInstruction(
-          windowManager.getDefaultInstructions(
-            screenshotManager.getMultiPageMode(),
-            screenshotManager.getScreenshots().length,
-            hotkeyManager.getModifierKey(),
-          ),
-        );
+        mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error capturing screenshot: ${error.message}`);
       }
     },
     AREA_SCREENSHOT: () => {
@@ -366,6 +331,7 @@ app.whenReady().then(() => {
       app.quit();
     },
     MODEL_SELECTION: () => windowManager.createModelSelectionWindow(),
+    TOGGLE_SPLIT_VIEW: () => windowManager.toggleSplitView(),
   });
 
   screenshotInstance.on("ok", async (event, buffer, data) => {
