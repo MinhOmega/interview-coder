@@ -1,5 +1,5 @@
 const { ipcMain, app, desktopCapturer, Menu, BrowserWindow, systemPreferences } = require("electron");
-const { IPC_CHANNELS } = require("./constants");
+const { IPC_CHANNELS, AI_PROVIDERS } = require("./constants");
 const { isLinux, isWindows, isMac, modifierKey } = require("./config");
 const ChatHandler = require("./chat-handler");
 const fs = require("fs");
@@ -138,11 +138,42 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
         }
       }
 
-      // Process the message with system prompt if provided
-      const response = await chatHandler.processMessage(messages, windowId, systemPrompt);
+      // Always use streaming for Gemini responses
+      const useStreaming = provider === AI_PROVIDERS.GEMINI;
 
-      // Send response back to the renderer
-      event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
+      // Set up streaming callback to handle chunks of text
+      const streamCallback = (type, chunk, fullText) => {
+        if (type === "start") {
+          // Signal streaming start to the renderer
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START);
+        } else if (type === "chunk") {
+          // Send streaming chunk to the renderer
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, chunk, fullText);
+        } else if (type === "complete") {
+          // Signal streaming completion to the renderer
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, {
+            role: "assistant",
+            content: fullText,
+          });
+        } else if (type === "error") {
+          // Signal error to the renderer
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
+            role: "assistant",
+            content: `Error: ${
+              chunk.message || "Failed to process your message"
+            }. Please check your settings or try again later.`,
+          });
+        }
+      };
+
+      // Process the message with system prompt if provided, with streaming enabled
+      const response = await chatHandler.processMessage(messages, windowId, systemPrompt, useStreaming, streamCallback);
+
+      // For non-streaming responses or Ollama (which doesn't support streaming yet)
+      if (!useStreaming || provider === AI_PROVIDERS.OLLAMA) {
+        // Send response back to the renderer
+        event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
+      }
     } catch (error) {
       console.error("Error processing chat message:", error);
 
