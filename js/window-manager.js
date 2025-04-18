@@ -4,7 +4,6 @@ const { isLinux } = require("./config");
 
 let mainWindow;
 let modelListWindow;
-let chatWindow;
 let isWindowVisible = true;
 
 // Create the main application window
