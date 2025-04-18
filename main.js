@@ -12,6 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
 const log = require("electron-log");
+
 const configManager = require("./js/config-manager");
 const windowManager = require("./js/window-manager");
 const screenshotManager = require("./js/screenshot-manager");

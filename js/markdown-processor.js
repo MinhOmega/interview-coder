@@ -1,14 +1,5 @@
-let unified, remarkGfm, remarkParse, remarkRehype, rehypeRaw, rehypeStringify;
+let unified, remarkParse, remarkRehype, rehypeRaw, rehypeStringify;
 let rehypeSlug, rehypeAutolinkHeadings, rehypePrismPlus, rehypeFormat;
-
-// Using a try-catch for each import to gracefully handle any import failures
-try {
-  // For unified, we're accessing the specific unified function
-  unified = require("unified").unified;
-} catch (error) {
-  console.error("Error importing unified:", error);
-  unified = null;
-}
 
 // Helper function to safely import modules
 function safeImport(moduleName, exportName = 'default') {
@@ -23,7 +14,7 @@ function safeImport(moduleName, exportName = 'default') {
 }
 
 // Import all dependencies safely
-remarkGfm = safeImport("remark-gfm");
+unified = safeImport("unified");
 remarkParse = safeImport("remark-parse");
 remarkRehype = safeImport("remark-rehype");
 rehypeRaw = safeImport("rehype-raw");
@@ -36,7 +27,7 @@ rehypeFormat = safeImport("rehype-format");
 // Create the processor only if all imports were successful
 let processor = null;
 
-if (unified && remarkParse && remarkGfm && remarkRehype && 
+if (unified && remarkParse && remarkRehype && 
     rehypeRaw && rehypeSlug && rehypeAutolinkHeadings && 
     rehypePrismPlus && rehypeFormat && rehypeStringify) {
   
@@ -44,7 +35,6 @@ if (unified && remarkParse && remarkGfm && remarkRehype &&
   
   processor = unified()
     .use(remarkParse)
-    .use(remarkGfm)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw)
     .use(rehypeSlug)
@@ -276,7 +266,6 @@ module.exports = {
   // Also export imported modules for reference if needed
   modules: {
     unified,
-    remarkGfm,
     remarkParse,
     remarkRehype,
     rehypeRaw,
