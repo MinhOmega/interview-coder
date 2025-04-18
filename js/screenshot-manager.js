@@ -6,6 +6,7 @@ const { IPC_CHANNELS } = require("./constants");
 const Screenshots = require("electron-screenshots");
 const { getAppPath, isCommandAvailable } = require("./utils");
 const { isLinux } = require("./config");
+const toastManager = require("./toast-manager");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -75,10 +76,7 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
 
   // Show notification
   if (mainWindow) {
-    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-      body: `${filenamePrefix} saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
-      type: "success",
-    });
+    toastManager.success(`${filenamePrefix} saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
   }
 
   return base64Image;
@@ -186,10 +184,7 @@ async function captureScreenshot(mainWindow) {
     const dimensions = getImageDimensions(imagePath);
 
     // Notify about saved screenshot
-    mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-      body: `Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
-      type: "success",
-    });
+    toastManager.success(`Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
 
     return base64Image;
   } catch (error) {
