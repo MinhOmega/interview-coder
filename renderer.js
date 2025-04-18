@@ -30,9 +30,15 @@ let streamBuffer = "";
 let systemPrompt = "";
 let isSystemPromptVisible = false;
 
+// Message history for the chat
 let messageHistory = [];
+// Make messageHistory available to window for streaming module
+window.messageHistory = messageHistory;
+
 let isSplitView = false;
 let isChatMode = false;
+
+let streamingMessageElement = null;
 
 const onUpdateInstruction = (_, instruction) => {
   const banner = document.getElementById("instruction-banner");
@@ -736,10 +742,10 @@ async function processMarkdown(markdown) {
 }
 
 // Add copy code functionality
-function setupCodeCopyButtons() {
+function setupCodeCopyButtons(container = document) {
   try {
     // Find all copy buttons
-    const copyButtons = document.querySelectorAll(".copy-code-button");
+    const copyButtons = container.querySelectorAll(".copy-code-button");
 
     if (copyButtons.length === 0) {
       // No code blocks found yet
@@ -806,9 +812,12 @@ function setupCodeCopyButtons() {
       button.setAttribute("data-has-listener", "true");
     });
   } catch (err) {
-    console.error("Error setting up code copy buttons:", err);
+    console.error("Error setting up copy buttons:", err);
   }
 }
+
+// Export to window for chat streaming
+window.setupCodeCopyButtons = setupCodeCopyButtons;
 
 // Setup resize handle for split view
 function setupResizeHandle() {
@@ -950,6 +959,177 @@ const onEventDOMContentLoaded = async () => {
   }
 };
 
+// Handle the start of a chat message stream
+const onChatMessageStreamStart = () => {
+  try {
+    console.log("Chat stream started");
+
+    // Show typing indicator
+    const typingIndicator = document.getElementById("split-typing-indicator");
+    if (typingIndicator) {
+      typingIndicator.classList.add("visible");
+    }
+
+    // Create a streaming message element
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (!messagesContainer) return;
+
+    // Check if there's already a streaming message element
+    if (!streamingMessageElement) {
+      streamingMessageElement = document.createElement("div");
+      streamingMessageElement.classList.add("message", "ai-message", "streaming-message");
+      streamingMessageElement.id = "streaming-message";
+      messagesContainer.appendChild(streamingMessageElement);
+    }
+
+    // Clear the stream buffer but keep the element
+    streamBuffer = "";
+
+    // Scroll to bottom to show typing
+    scrollToBottom(messagesContainer);
+  } catch (error) {
+    console.error("Error in chat stream start handler:", error);
+  }
+};
+
+// Handle a chunk of the chat message stream
+const onChatMessageStreamChunk = async (_, chunk, fullText) => {
+  try {
+    // Create the streaming message element if it doesn't exist
+    if (!streamingMessageElement) {
+      const messagesContainer = document.getElementById("split-messages-container");
+      if (!messagesContainer) return;
+
+      streamingMessageElement = document.createElement("div");
+      streamingMessageElement.classList.add("message", "ai-message", "streaming-message");
+      streamingMessageElement.id = "streaming-message";
+      messagesContainer.appendChild(streamingMessageElement);
+
+      // Hide typing indicator since we're now showing actual content
+      const typingIndicator = document.getElementById("split-typing-indicator");
+      if (typingIndicator) {
+        typingIndicator.classList.remove("visible");
+      }
+    }
+
+    // Update the buffer with the new content
+    if (fullText && fullText.length > 0) {
+      // If fullText is provided, use it (complete replacement)
+      streamBuffer = fullText;
+    } else if (chunk) {
+      // Otherwise append the chunk
+      streamBuffer += chunk;
+    }
+
+    // Ensure we have content to display
+    if (!streamBuffer || streamBuffer.trim() === "") {
+      return;
+    }
+
+    // Render the markdown
+    try {
+      const html = await processMarkdown(streamBuffer);
+      if (streamingMessageElement) {
+        streamingMessageElement.innerHTML = html;
+
+        // Setup code copy buttons
+        setupCodeCopyButtons(streamingMessageElement);
+      }
+    } catch (markdownError) {
+      console.error("Error processing markdown:", markdownError);
+      // Fallback to plain text if markdown processing fails
+      if (streamingMessageElement) {
+        streamingMessageElement.textContent = streamBuffer;
+      }
+    }
+
+    // Auto-scroll if user is at the bottom
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (
+      messagesContainer &&
+      messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 50
+    ) {
+      scrollToBottom(messagesContainer);
+    }
+  } catch (error) {
+    console.error("Error processing chat stream chunk:", error);
+  }
+};
+
+// Handle the end of a chat message stream
+const onChatMessageStreamEnd = async (_, response) => {
+  try {
+    console.log("Chat stream ended with response:", response);
+
+    // Hide typing indicator if it's still visible
+    const typingIndicator = document.getElementById("split-typing-indicator");
+    if (typingIndicator) {
+      typingIndicator.classList.remove("visible");
+    }
+
+    // Get content from response or use the accumulated buffer if response is empty
+    const content = response && response.content ? response.content : streamBuffer;
+
+    // Make sure we have some content to display
+    if (!content || content.trim() === "") {
+      console.warn("No content to display at stream end");
+      return;
+    }
+
+    // Update the streaming message with finalized content
+    if (streamingMessageElement) {
+      try {
+        const html = await processMarkdown(content);
+        streamingMessageElement.innerHTML = html;
+        streamingMessageElement.classList.remove("streaming-message");
+        streamingMessageElement.removeAttribute("id");
+
+        // Setup code copy buttons one final time
+        setupCodeCopyButtons(streamingMessageElement);
+      } catch (markdownError) {
+        console.error("Error processing final markdown:", markdownError);
+        // Fallback to plain text
+        streamingMessageElement.textContent = content;
+      }
+
+      // Add to message history - create response object if not provided
+      const messageToAdd = response || { role: "assistant", content: content };
+      messageHistory.push(messageToAdd);
+
+      // Reset stream variables but AFTER we've used them
+      const finishedElement = streamingMessageElement;
+      streamingMessageElement = null;
+      streamBuffer = "";
+
+      // Scroll to bottom one final time
+      const messagesContainer = document.getElementById("split-messages-container");
+      if (messagesContainer) {
+        scrollToBottom(messagesContainer);
+      }
+    } else {
+      console.warn("No streaming message element found at stream end");
+
+      // As a fallback, create a new message if we don't have an element
+      if (content) {
+        await addAIMessage(content);
+
+        // Add to message history
+        const messageToAdd = response || { role: "assistant", content: content };
+        messageHistory.push(messageToAdd);
+      }
+    }
+  } catch (error) {
+    console.error("Error finalizing chat stream:", error);
+
+    // Try to recover by adding the content as a regular message
+    if (streamBuffer) {
+      await addAIMessage(streamBuffer);
+      messageHistory.push({ role: "assistant", content: streamBuffer });
+    }
+  }
+};
+
+// Add these event listeners along with the other ones
 ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, onUpdateInstruction);
 ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, onHideInstruction);
 ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, onUpdateVisibility);
@@ -966,6 +1146,9 @@ ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, onScreenSharingDetected);
 ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, onScrollContent);
 ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, toggleSplitView);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, onChatMessageResponse);
+ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START, onChatMessageStreamStart);
+ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk);
+ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, onChatMessageStreamEnd);
 
 document.addEventListener("contextmenu", onEventContextMenu);
 

@@ -303,7 +303,7 @@ async function processChatMessage(window, messageHistory, systemPrompt) {
       const result = await geminiAI.generateContent({
         contents: geminiMessages,
         generationConfig: {
-          maxOutputTokens: 4000,
+          maxOutputTokens: 8192,
         },
       });
 
