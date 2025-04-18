@@ -17,50 +17,27 @@ const processor = unified()
   .use(rehypeStringify);
 
 let isWindowVisible = true;
+let streamBuffer = "";
 
-ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, (_, instruction) => {
+let systemPrompt = "";
+let isSystemPromptVisible = false;
+
+let messageHistory = [];
+let isSplitView = false;
+let isChatMode = false;
+
+const onUpdateInstruction = (_, instruction) => {
   const banner = document.getElementById("instruction-banner");
   banner.innerHTML = instruction.replace(/\n/g, "<br>");
   banner.style.display = "block";
-});
+};
 
-// Initialize context menu for element inspection
-document.addEventListener("contextmenu", (e) => {
-  ipcRenderer.send(IPC_CHANNELS.SHOW_CONTEXT_MENU);
-});
-
-// Register keyboard shortcut for DevTools (Cmd/Ctrl+Shift+I)
-document.addEventListener("keydown", (e) => {
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
-    ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
-    e.preventDefault();
-  }
-
-  // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
-    ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
-    e.preventDefault();
-  }
-
-  // Linux-specific fallback for toggling visibility
-  if (isLinux) {
-    // Handle both Ctrl+B and Alt+B as fallbacks for Linux
-    const isCtrlB = e.ctrlKey && e.key.toLowerCase() === "b";
-    const isAltB = e.altKey && e.key.toLowerCase() === "b";
-
-    if (isCtrlB || isAltB) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }
-});
-
-ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, () => {
+const onHideInstruction = () => {
   const banner = document.getElementById("instruction-banner");
   banner.style.display = "none";
-});
+};
 
-ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (_, isVisible) => {
+const onUpdateVisibility = (_, isVisible) => {
   isWindowVisible = isVisible;
   document.body.classList.toggle("invisible-mode", !isWindowVisible);
 
@@ -77,25 +54,17 @@ ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (_, isVisible) => {
       el.style.pointerEvents = "";
     }
   });
-});
+};
 
-ipcRenderer.on(IPC_CHANNELS.NOTIFICATION, (_, data) => {
+const onNotification = (_, data) => {
   toastManager.showToast({
     message: data.body,
     type: data.type || "success",
     duration: data.duration,
   });
-});
+};
 
-ipcRenderer.on(IPC_CHANNELS.WARNING, (_, message) => {
-  toastManager.warning(message);
-});
-
-ipcRenderer.on(IPC_CHANNELS.ERROR, (_, message) => {
-  toastManager.error(message);
-});
-
-ipcRenderer.on(IPC_CHANNELS.LOADING, (_, isLoading) => {
+const onLoading = (_, isLoading) => {
   try {
     // Get the containers
     const loadingContent = document.getElementById("loading-content");
@@ -118,33 +87,9 @@ ipcRenderer.on(IPC_CHANNELS.LOADING, (_, isLoading) => {
   } catch (error) {
     console.error("Error in LOADING handler:", error);
   }
-});
+};
 
-// Add a function to clean up the DOM properly
-function cleanupResultContent() {
-  try {
-    // Get the wrapper
-    const wrapper = document.getElementById("result-content-wrapper");
-    if (!wrapper) return;
-
-    // Remove all children completely
-    while (wrapper.firstChild) {
-      wrapper.removeChild(wrapper.firstChild);
-    }
-
-    // Create a fresh content element
-    const newContent = document.createElement("div");
-    newContent.id = "result-content";
-    wrapper.appendChild(newContent);
-
-    // Force a repaint
-    wrapper.offsetHeight;
-  } catch (error) {
-    console.error("Error in cleanupResultContent:", error);
-  }
-}
-
-ipcRenderer.on(IPC_CHANNELS.ANALYSIS_RESULT, async (_, markdown) => {
+const onAnalysisResult = async (_, markdown) => {
   try {
     // Clean up the DOM first
     cleanupResultContent();
@@ -167,10 +112,9 @@ ipcRenderer.on(IPC_CHANNELS.ANALYSIS_RESULT, async (_, markdown) => {
     console.error("Error in ANALYSIS_RESULT handler:", error);
     toastManager.error("Error rendering content: " + error.message);
   }
-});
+};
 
-// Setup for streaming results
-ipcRenderer.on(IPC_CHANNELS.STREAM_START, () => {
+const onStreamStart = () => {
   try {
     // Clear the buffer
     streamBuffer = "";
@@ -180,12 +124,9 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_START, () => {
   } catch (error) {
     console.error("Error in STREAM_START handler:", error);
   }
-});
+};
 
-// Track current markdown accumulation state for improved streaming
-let streamBuffer = "";
-
-ipcRenderer.on(IPC_CHANNELS.STREAM_CHUNK, async (_, chunk) => {
+const onStreamChunk = async (_, chunk) => {
   try {
     // Add chunk to buffer
     streamBuffer += chunk;
@@ -213,9 +154,9 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_CHUNK, async (_, chunk) => {
       "result-content",
     ).innerHTML += `<p class="error-message">Error rendering chunk: ${error.message}</p>`;
   }
-});
+};
 
-ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, async (_, fullText) => {
+const onStreamUpdate = async (_, fullText) => {
   try {
     // Update the stream buffer
     streamBuffer = fullText;
@@ -249,9 +190,9 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, async (_, fullText) => {
       <pre>${fullText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
     `;
   }
-});
+};
 
-ipcRenderer.on(IPC_CHANNELS.STREAM_END, () => {
+const onStreamEnd = () => {
   try {
     // Streaming is complete, reset buffer
     streamBuffer = "";
@@ -273,34 +214,15 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_END, () => {
   } catch (error) {
     console.error("Error in STREAM_END handler:", error);
   }
-});
+};
 
-ipcRenderer.on(IPC_CHANNELS.CLEAR_RESULT, () => {
-  try {
-    // Clean up the DOM completely
-    cleanupResultContent();
-  } catch (error) {
-    console.error("Error in CLEAR_RESULT handler:", error);
-  }
-});
-
-// Update AI provider/model badge display
-ipcRenderer.on(IPC_CHANNELS.MODEL_CHANGED, () => {
-  updateModelBadge();
-});
-
-// Handle screen sharing detection
-ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, () => {
-  // Make the window nearly invisible
+const onScreenSharingDetected = () => {
   isWindowVisible = false;
   document.body.classList.add("invisible-mode");
-
-  // Show temporary notification
   toastManager.warning("Screen sharing detected - window hidden. Press " + modifierKey + "+B to show.");
-});
+};
 
-// Handle content scrolling from keyboard shortcuts
-ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, (_, scrollAmount) => {
+const onScrollContent = (_, scrollAmount) => {
   const resultContentWrapper = document.getElementById("result-content-wrapper");
   if (resultContentWrapper) {
     resultContentWrapper.scrollBy({
@@ -308,7 +230,252 @@ ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, (_, scrollAmount) => {
       behavior: "smooth",
     });
   }
-});
+};
+
+// Toggle split view functionality
+function toggleSplitView() {
+  if (isChatMode) return; // Don't allow toggling split view in chat-only mode
+
+  isSplitView = !isSplitView;
+
+  const standardView = document.getElementById("standard-view");
+  const splitView = document.getElementById("split-view");
+
+  if (isSplitView) {
+    // Show split view
+    standardView.style.display = "none";
+    splitView.style.display = "flex";
+
+    // Clone content from main view to left pane if needed
+    const leftContent = document.getElementById("left-result-content");
+    const mainContent = document.getElementById("result-content");
+    if (leftContent && mainContent && leftContent.innerHTML === "") {
+      leftContent.innerHTML = mainContent.innerHTML;
+    }
+
+    // Setup resize handle
+    setupResizeHandle();
+
+    // Focus split chat input
+    document.getElementById("split-chat-input").focus();
+  } else {
+    // Show standard view
+    standardView.style.display = "block";
+    splitView.style.display = "none";
+  }
+
+  // Notify about toggle
+  toastManager.success("Split view " + (isSplitView ? "enabled" : "disabled"));
+}
+
+// Add a function to clean up the DOM properly
+function cleanupResultContent() {
+  try {
+    // Get the wrapper
+    const wrapper = document.getElementById("result-content-wrapper");
+    if (!wrapper) return;
+
+    // Remove all children completely
+    while (wrapper.firstChild) {
+      wrapper.removeChild(wrapper.firstChild);
+    }
+
+    // Create a fresh content element
+    const newContent = document.createElement("div");
+    newContent.id = "result-content";
+    wrapper.appendChild(newContent);
+
+    // Force a repaint
+    wrapper.offsetHeight;
+  } catch (error) {
+    console.error("Error in cleanupResultContent:", error);
+  }
+}
+
+const onChatMessageResponse = async (_, response) => {
+  // Hide typing indicator before showing the AI message
+  const typingIndicator = document.getElementById("split-typing-indicator");
+  typingIndicator.classList.remove("visible");
+
+  // Add AI message to UI using the markdown processor
+  await addAIMessage(response.content);
+
+  // Add to message history
+  messageHistory.push(response);
+
+  // Scroll to bottom
+  scrollToBottom(document.getElementById("split-messages-container"));
+};
+
+// Function to send message
+function sendMessage(inputElement) {
+  const message = inputElement.value.trim();
+  if (!message) return;
+
+  // Add user message to UI
+  addMessage(message, "user");
+
+  // Add to message history
+  messageHistory.push({ role: "user", content: message });
+
+  // Clear input and reset height
+  inputElement.value = "";
+  inputElement.style.height = "auto";
+
+  // Scroll to bottom
+  const messagesContainer = document.getElementById("split-messages-container");
+  scrollToBottom(messagesContainer);
+
+  // Create message array with system prompt if available
+  const messageArray = [...messageHistory];
+  if (systemPrompt) {
+    messageArray.unshift({ role: "system", content: systemPrompt });
+  }
+
+  // Send to main process with system prompt information
+  ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, messageArray, systemPrompt);
+}
+
+// Add a user message to the UI
+async function addMessage(text, sender) {
+  const messagesContainer = document.getElementById("split-messages-container");
+
+  const messageDiv = document.createElement("div");
+  messageDiv.classList.add("message", sender === "user" ? "user-message" : "ai-message");
+
+  // Process markdown for both user and AI messages
+  try {
+    const html = await processMarkdown(text);
+    messageDiv.innerHTML = html;
+
+    // Setup code copy buttons if needed
+    setupCodeCopyButtons(messageDiv);
+  } catch (error) {
+    console.error("Error processing markdown:", error);
+    // Fallback to basic formatting if markdown processing fails
+    const formattedText = text.replace(/\n/g, "<br>");
+    messageDiv.innerHTML = formattedText;
+  }
+
+  messagesContainer.appendChild(messageDiv);
+
+  // If this is a user message, show the typing indicator right after it
+  if (sender === "user") {
+    // Ensure the typing indicator is in the correct position
+    const typingIndicator = document.getElementById("split-typing-indicator");
+    messagesContainer.appendChild(typingIndicator);
+    typingIndicator.classList.add("visible");
+  }
+
+  scrollToBottom(messagesContainer);
+}
+
+// Add an AI message with proper markdown processing
+async function addAIMessage(text) {
+  const messagesContainer = document.getElementById("split-messages-container");
+
+  const messageDiv = document.createElement("div");
+  messageDiv.classList.add("message", "ai-message");
+
+  // Use the advanced markdown processor
+  try {
+    const html = await processMarkdown(text);
+    messageDiv.innerHTML = html;
+
+    // Setup code copy buttons if needed
+    setupCodeCopyButtons(messageDiv);
+  } catch (error) {
+    console.error("Error processing markdown:", error);
+    messageDiv.textContent = text;
+  }
+
+  messagesContainer.appendChild(messageDiv);
+  scrollToBottom(messagesContainer);
+}
+
+// Scroll to the bottom of the messages container
+function scrollToBottom(container) {
+  if (container) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+// Toggle system prompt visibility
+function toggleSystemPrompt() {
+  const systemPromptContainer = document.getElementById("system-prompt-container");
+  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
+  const chatInput = document.getElementById("split-chat-input");
+
+  isSystemPromptVisible = !isSystemPromptVisible;
+
+  if (isSystemPromptVisible) {
+    // Show system prompt
+    systemPromptContainer.style.display = "flex";
+    systemPromptTextarea.value = systemPrompt || "";
+    systemPromptTextarea.focus();
+
+    // Hide input container temporarily
+    chatInput.parentElement.style.display = "none";
+  } else {
+    // Hide system prompt
+    systemPromptContainer.style.display = "none";
+
+    // Show input container
+    chatInput.parentElement.style.display = "flex";
+    chatInput.focus();
+  }
+}
+
+// Update system prompt
+function updateSystemPrompt() {
+  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
+  systemPrompt = systemPromptTextarea.value.trim();
+
+  // Save the prompt
+  saveSystemPrompt(systemPrompt);
+
+  // Hide system prompt UI
+  toggleSystemPrompt();
+}
+
+// Cancel system prompt update
+function cancelSystemPrompt() {
+  // Hide system prompt UI without saving
+  toggleSystemPrompt();
+}
+
+// Clear system prompt
+function clearSystemPrompt() {
+  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
+  systemPromptTextarea.value = "";
+  systemPromptTextarea.focus();
+
+  // Show notification
+  toastManager.warning("System prompt cleared");
+}
+
+// Save system prompt to file via IPC
+function saveSystemPrompt(prompt) {
+  try {
+    ipcRenderer.send(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, prompt);
+  } catch (error) {
+    console.error("Error saving system prompt:", error);
+    toastManager.error("Failed to save system prompt");
+  }
+}
+
+// Load system prompt from file via IPC
+async function loadSystemPrompt() {
+  try {
+    const savedPrompt = await ipcRenderer.invoke(IPC_CHANNELS.GET_SYSTEM_PROMPT);
+    if (savedPrompt) {
+      systemPrompt = savedPrompt;
+      toastManager.success("System prompt loaded");
+    }
+  } catch (error) {
+    console.error("Error loading system prompt:", error);
+  }
+}
 
 // Update the model badge with current settings
 async function updateModelBadge() {
@@ -611,94 +778,6 @@ async function updateModelBadge() {
   }
 }
 
-// Initialize
-updateModelBadge();
-
-// Listen for postMessage from model-selector window
-window.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "model-settings-updated") {
-    // Simply refresh the model badge from current settings
-    updateModelBadge();
-  }
-});
-
-// Update shortcut labels based on platform
-document.querySelectorAll(".shortcut").forEach((el) => {
-  const text = el.textContent;
-  el.textContent = text.replace("⌘", isMac ? "⌘" : "Ctrl");
-});
-
-let messageHistory = [];
-let isSplitView = false;
-let isChatMode = false;
-
-document.addEventListener("keydown", (e) => {
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "T") {
-    e.preventDefault();
-    toggleSplitView();
-  }
-});
-
-ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, () => {
-  toggleSplitView();
-});
-
-ipcRenderer.on(IPC_CHANNELS.SET_CHAT_MODE, (_, enabled) => {
-  isChatMode = enabled;
-  if (isChatMode) {
-    isSplitView = true;
-
-    // Update display
-    document.getElementById("standard-view").style.display = "none";
-    document.getElementById("split-view").style.display = "flex";
-
-    // Make sure the chat interface in split view is visible
-    document.getElementById("right-chat-interface").style.display = "flex";
-
-    // Focus split chat input
-    document.getElementById("split-chat-input").focus();
-
-    // Initialize settings
-    checkSettings();
-  }
-});
-
-// Toggle split view functionality
-function toggleSplitView() {
-  if (isChatMode) return; // Don't allow toggling split view in chat-only mode
-
-  isSplitView = !isSplitView;
-
-  const standardView = document.getElementById("standard-view");
-  const splitView = document.getElementById("split-view");
-
-  if (isSplitView) {
-    // Show split view
-    standardView.style.display = "none";
-    splitView.style.display = "flex";
-
-    // Clone content from main view to left pane if needed
-    const leftContent = document.getElementById("left-result-content");
-    const mainContent = document.getElementById("result-content");
-    if (leftContent && mainContent && leftContent.innerHTML === "") {
-      leftContent.innerHTML = mainContent.innerHTML;
-    }
-
-    // Setup resize handle
-    setupResizeHandle();
-
-    // Focus split chat input
-    document.getElementById("split-chat-input").focus();
-  } else {
-    // Show standard view
-    standardView.style.display = "block";
-    splitView.style.display = "none";
-  }
-
-  // Notify about toggle
-  toastManager.success("Split view " + (isSplitView ? "enabled" : "disabled"));
-}
-
 // Setup resize handle for split view
 function setupResizeHandle() {
   const handle = document.getElementById("resize-handle");
@@ -737,8 +816,51 @@ function setupResizeHandle() {
   });
 }
 
-// Button event listeners
-document.addEventListener("DOMContentLoaded", async () => {
+const onEventContextMenu = () => {
+  ipcRenderer.send(IPC_CHANNELS.SHOW_CONTEXT_MENU);
+};
+
+const onEventKeyDown = (e) => {
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
+    ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
+    e.preventDefault();
+  }
+
+  // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
+    ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
+    e.preventDefault();
+  }
+
+  // Linux-specific fallback for toggling visibility
+  if (isLinux) {
+    // Handle both Ctrl+B and Alt+B as fallbacks for Linux
+    const isCtrlB = e.ctrlKey && e.key.toLowerCase() === "b";
+    const isAltB = e.altKey && e.key.toLowerCase() === "b";
+
+    if (isCtrlB || isAltB) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "T") {
+    e.preventDefault();
+    toggleSplitView();
+  }
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "p") {
+    e.preventDefault();
+    toggleSystemPrompt();
+  }
+};
+
+const onEventMessage = (event) => {
+  if (event.data && event.data.type === "model-settings-updated") {
+    // Simply refresh the model badge from current settings
+    updateModelBadge();
+  }
+};
+
+const onEventDOMContentLoaded = async () => {
   const splitSendBtn = document.getElementById("split-send-btn");
   const splitChatInput = document.getElementById("split-chat-input");
   const toggleSystemPromptBtn = document.getElementById("toggle-system-prompt-btn");
@@ -787,14 +909,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     clearSystemPromptBtn.addEventListener("click", clearSystemPrompt);
   }
 
-  // Add keyboard shortcut for system prompt (Cmd/Ctrl+P)
-  document.addEventListener("keydown", (e) => {
-    if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "p") {
-      e.preventDefault();
-      toggleSystemPrompt();
-    }
-  });
-
   // Load saved system prompt if available
   await loadSystemPrompt();
 
@@ -802,213 +916,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (toggleSystemPromptBtn) {
     toggleSystemPromptBtn.addEventListener("click", toggleSystemPrompt);
   }
+};
+
+ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, onUpdateInstruction);
+ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, onHideInstruction);
+ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, onUpdateVisibility);
+ipcRenderer.on(IPC_CHANNELS.NOTIFICATION, onNotification);
+ipcRenderer.on(IPC_CHANNELS.LOADING, onLoading);
+ipcRenderer.on(IPC_CHANNELS.ANALYSIS_RESULT, onAnalysisResult);
+ipcRenderer.on(IPC_CHANNELS.STREAM_START, onStreamStart);
+ipcRenderer.on(IPC_CHANNELS.STREAM_CHUNK, onStreamChunk);
+ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, onStreamUpdate);
+ipcRenderer.on(IPC_CHANNELS.STREAM_END, onStreamEnd);
+ipcRenderer.on(IPC_CHANNELS.CLEAR_RESULT, cleanupResultContent);
+ipcRenderer.on(IPC_CHANNELS.MODEL_CHANGED, updateModelBadge);
+ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, onScreenSharingDetected);
+ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, onScrollContent);
+ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, toggleSplitView);
+ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, onChatMessageResponse);
+
+document.addEventListener("contextmenu", onEventContextMenu);
+
+document.addEventListener("keydown", onEventKeyDown);
+
+window.addEventListener("message", onEventMessage);
+document.querySelectorAll(".shortcut").forEach((el) => {
+  const text = el.textContent;
+  el.textContent = text.replace("⌘", isMac ? "⌘" : "Ctrl");
 });
+document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 
-// Check if settings are configured
-function checkSettings() {
-  ipcRenderer
-    .invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS)
-    .then((settings) => {
-      console.log("Current settings:", settings);
-      if (!settings || !settings.aiProvider || settings.aiProvider === AI_PROVIDERS.DEFAULT) {
-        // Add a message that settings need to be configured
-        addMessage(
-          `It looks like you haven't configured your AI settings yet. Please click the Settings button to configure an AI provider.`,
-          "ai",
-        );
-      }
-    })
-    .catch((err) => {
-      console.error("Error checking settings:", err);
-    });
-}
-
-// Add global variables for system prompt
-let systemPrompt = "";
-let isSystemPromptVisible = false;
-
-// Function to send message
-function sendMessage(inputElement) {
-  const message = inputElement.value.trim();
-  if (!message) return;
-
-  // Add user message to UI
-  addMessage(message, "user");
-
-  // Add to message history
-  messageHistory.push({ role: "user", content: message });
-
-  // Clear input and reset height
-  inputElement.value = "";
-  inputElement.style.height = "auto";
-
-  // Scroll to bottom
-  const messagesContainer = document.getElementById("split-messages-container");
-  scrollToBottom(messagesContainer);
-
-  // Create message array with system prompt if available
-  const messageArray = [...messageHistory];
-  if (systemPrompt) {
-    messageArray.unshift({ role: "system", content: systemPrompt });
-  }
-
-  // Send to main process with system prompt information
-  ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, messageArray, systemPrompt);
-}
-
-// Receive response from AI
-ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, async (_, response) => {
-  // Hide typing indicator before showing the AI message
-  const typingIndicator = document.getElementById("split-typing-indicator");
-  typingIndicator.classList.remove("visible");
-
-  // Add AI message to UI using the markdown processor
-  await addAIMessage(response.content);
-
-  // Add to message history
-  messageHistory.push(response);
-
-  // Scroll to bottom
-  scrollToBottom(document.getElementById("split-messages-container"));
-});
-
-// Add a user message to the UI
-async function addMessage(text, sender) {
-  const messagesContainer = document.getElementById("split-messages-container");
-
-  const messageDiv = document.createElement("div");
-  messageDiv.classList.add("message", sender === "user" ? "user-message" : "ai-message");
-
-  // Process markdown for both user and AI messages
-  try {
-    const html = await processMarkdown(text);
-    messageDiv.innerHTML = html;
-
-    // Setup code copy buttons if needed
-    setupCodeCopyButtons(messageDiv);
-  } catch (error) {
-    console.error("Error processing markdown:", error);
-    // Fallback to basic formatting if markdown processing fails
-    const formattedText = text.replace(/\n/g, "<br>");
-    messageDiv.innerHTML = formattedText;
-  }
-
-  messagesContainer.appendChild(messageDiv);
-
-  // If this is a user message, show the typing indicator right after it
-  if (sender === "user") {
-    // Ensure the typing indicator is in the correct position
-    const typingIndicator = document.getElementById("split-typing-indicator");
-    messagesContainer.appendChild(typingIndicator);
-    typingIndicator.classList.add("visible");
-  }
-
-  scrollToBottom(messagesContainer);
-}
-
-// Add an AI message with proper markdown processing
-async function addAIMessage(text) {
-  const messagesContainer = document.getElementById("split-messages-container");
-
-  const messageDiv = document.createElement("div");
-  messageDiv.classList.add("message", "ai-message");
-
-  // Use the advanced markdown processor
-  try {
-    const html = await processMarkdown(text);
-    messageDiv.innerHTML = html;
-
-    // Setup code copy buttons if needed
-    setupCodeCopyButtons(messageDiv);
-  } catch (error) {
-    console.error("Error processing markdown:", error);
-    messageDiv.textContent = text;
-  }
-
-  messagesContainer.appendChild(messageDiv);
-  scrollToBottom(messagesContainer);
-}
-
-// Scroll to the bottom of the messages container
-function scrollToBottom(container) {
-  if (container) {
-    container.scrollTop = container.scrollHeight;
-  }
-}
-
-// Toggle system prompt visibility
-function toggleSystemPrompt() {
-  const systemPromptContainer = document.getElementById("system-prompt-container");
-  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
-  const chatInput = document.getElementById("split-chat-input");
-
-  isSystemPromptVisible = !isSystemPromptVisible;
-
-  if (isSystemPromptVisible) {
-    // Show system prompt
-    systemPromptContainer.style.display = "flex";
-    systemPromptTextarea.value = systemPrompt || "";
-    systemPromptTextarea.focus();
-
-    // Hide input container temporarily
-    chatInput.parentElement.style.display = "none";
-  } else {
-    // Hide system prompt
-    systemPromptContainer.style.display = "none";
-
-    // Show input container
-    chatInput.parentElement.style.display = "flex";
-    chatInput.focus();
-  }
-}
-
-// Update system prompt
-function updateSystemPrompt() {
-  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
-  systemPrompt = systemPromptTextarea.value.trim();
-
-  // Save the prompt
-  saveSystemPrompt(systemPrompt);
-
-  // Hide system prompt UI
-  toggleSystemPrompt();
-}
-
-// Cancel system prompt update
-function cancelSystemPrompt() {
-  // Hide system prompt UI without saving
-  toggleSystemPrompt();
-}
-
-// Clear system prompt
-function clearSystemPrompt() {
-  const systemPromptTextarea = document.getElementById("system-prompt-textarea");
-  systemPromptTextarea.value = "";
-  systemPromptTextarea.focus();
-
-  // Show notification
-  toastManager.warning("System prompt cleared");
-}
-
-// Save system prompt to file via IPC
-function saveSystemPrompt(prompt) {
-  try {
-    ipcRenderer.send(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, prompt);
-  } catch (error) {
-    console.error("Error saving system prompt:", error);
-    toastManager.error("Failed to save system prompt");
-  }
-}
-
-// Load system prompt from file via IPC
-async function loadSystemPrompt() {
-  try {
-    const savedPrompt = await ipcRenderer.invoke(IPC_CHANNELS.GET_SYSTEM_PROMPT);
-    if (savedPrompt) {
-      systemPrompt = savedPrompt;
-      toastManager.success("System prompt loaded");
-    }
-  } catch (error) {
-    console.error("Error loading system prompt:", error);
-  }
-}
+updateModelBadge();
