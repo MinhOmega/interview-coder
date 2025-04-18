@@ -80,7 +80,7 @@ const SHORTCUTS = {
     handler: null,
   },
   TOGGLE_DEVTOOLS: {
-    key: `${modifierKey}+D`,
+    key: `${modifierKey}+Shift+I`,
     handler: null,
   },
 };
@@ -214,7 +214,7 @@ function getPlatformShortcuts() {
     areaScreenshot: `${modifierKey}+D`,
     reset: `${modifierKey}+R`,
     toggleSplitView: `${modifierKey}+T`,
-    toggleDevtools: `${modifierKey}+D`,
+    toggleDevtools: `${modifierKey}+Shift+I`,
   };
 }
 
