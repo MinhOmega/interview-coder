@@ -127,15 +127,16 @@ The application will generate all AI responses in your selected language, with s
 ### macOS
 | Shortcut           | Action                      |
 | ------------------ | --------------------------- |
+| `⌘ + B`            | Toggle window visibility    |
 | `⌘ + H`            | Capture window screenshot   |
 | `⌘ + D`            | Capture selected area       |
 | `⌘ + A`            | Add screenshot (multi-page) |
 | `⌘ + Enter`        | Process screenshots         |
 | `⌘ + R`            | Reset current process       |
 | `⌘ + M`            | Open model selector         |
+| `⌘ + T`            | Toggle split view           |
 | `⌘ + ,`            | Open settings               |
 | `⌘ + Q`            | Quit application            |
-| `⌘ + B`            | Toggle window visibility    |
 | `⌘ + Shift + ↑↓←→` | Move window                 |
 | `Shift + ↑↓`       | Scroll up/down              |
 | `⌘ + Shift + =`    | Increase window size        |
@@ -144,19 +145,22 @@ The application will generate all AI responses in your selected language, with s
 ### Windows/Linux
 | Shortcut              | Action                      |
 | --------------------- | --------------------------- |
+| `Ctrl + B`            | Toggle window visibility    |
 | `Ctrl + H`            | Capture window screenshot   |
 | `Ctrl + D`            | Capture selected area       |
 | `Ctrl + A`            | Add screenshot (multi-page) |
 | `Ctrl + Enter`        | Process screenshots         |
 | `Ctrl + R`            | Reset current process       |
 | `Ctrl + M`            | Open model selector         |
+| `Ctrl + T`            | Toggle split view           |
 | `Ctrl + ,`            | Open settings               |
 | `Ctrl + Q`            | Quit application            |
-| `Ctrl + B`            | Toggle window visibility    |
 | `Ctrl + Shift + ↑↓←→` | Move window                 |
 | `Shift + ↑↓`          | Scroll up/down              |
 | `Ctrl + Shift + =`    | Increase window size        |
 | `Ctrl + Shift + -`    | Decrease window size        |
+
+> **Note for Linux users:** Alternative key bindings may be used automatically if the primary shortcuts cannot be registered.
 
 ## 🤖 Supported AI Models
 
