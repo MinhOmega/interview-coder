@@ -11,7 +11,7 @@ const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
-const { isLinux, isMac } = require("./js/config");
+const { isLinux, isMac, isWindows } = require("./js/config");
 const toastManager = require("./js/toast-manager");
 
 // Set up hot reload for development
@@ -149,6 +149,10 @@ app.whenReady().then(() => {
         const isRegistered = hotkeyManager.validateHotkeys();
         if (!isRegistered) {
           console.warn("Hotkeys may not be properly registered on Linux. Using fallback mechanisms.");
+          
+          // Show alternative shortcuts notification for Linux users
+          const altKeys = hotkeyManager.getLinuxAlternativeKeys();
+          toastManager.info(`For Linux users: Try using ${altKeys.toggleVisibility.alternative} to toggle visibility if ${altKeys.toggleVisibility.primary} doesn't work.`);
         }
       } catch (error) {
         console.error("Error validating hotkeys on Linux:", error);
@@ -413,7 +417,54 @@ app.whenReady().then(() => {
     }
   });
   eventHandler.setupScreenCaptureDetection(mainWindow, windowManager);
-  hotkeyManager.updateHotkeys(true);
+  
+  try {
+    // Try to register hotkeys but don't crash if it fails
+    const hotkeySuccess = hotkeyManager.updateHotkeys(true);
+    
+    if (!hotkeySuccess) {
+      console.log("No hotkeys registered successfully, but application will continue running");
+      // Show toast notification to user about hotkey issues
+      setTimeout(() => {
+        toastManager.error("Keyboard shortcuts are unavailable on your system. The app will still function through mouse interaction.");
+        
+        if (isWindows) {
+          // For Windows, show fallback UI instructions
+          setTimeout(() => {
+            toastManager.info("Use the system tray icon or app buttons to control the application instead of keyboard shortcuts.");
+          }, 2000);
+        } else if (isLinux) {
+          // For Linux, suggest installing additional packages
+          setTimeout(() => {
+            toastManager.info("On Linux, you may need to install X11 development packages to enable keyboard shortcuts.");
+          }, 2000);
+        }
+      }, 2000);
+    } else {
+      // Shortcuts registered successfully but some might have failed
+      // Show platform-specific alternative shortcuts
+      if (isWindows) {
+        const altKeys = hotkeyManager.getWindowsAlternativeKeys();
+        setTimeout(() => {
+          toastManager.info(`Try using these alternative shortcuts on Windows:`);
+          
+          // Display the most important shortcuts
+          setTimeout(() => {
+            toastManager.info(`${altKeys.toggleVisibility.alternative}: Toggle visibility, ${altKeys.takeScreenshot.alternative}: Take screenshot`);
+          }, 1000);
+          
+          // Display the secondary shortcuts
+          setTimeout(() => {
+            toastManager.info(`${altKeys.quit.alternative}: Quit, ${altKeys.modelSelection.alternative}: Model selection`);
+          }, 3000);
+        }, 3000);
+      }
+    }
+  } catch (hotkeyError) {
+    console.error("Error registering hotkeys:", hotkeyError);
+    // Don't crash, just continue without hotkeys
+    toastManager.error("An error occurred while setting up keyboard shortcuts. The app will still function through mouse interaction.");
+  }
 
   setTimeout(() => {
     windowManager.updateInstruction(
@@ -440,6 +491,12 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     windowManager.createMainWindow();
-    hotkeyManager.updateHotkeys(true);
+    
+    try {
+      hotkeyManager.updateHotkeys(true);
+    } catch (error) {
+      console.error("Error updating hotkeys on activate:", error);
+      // Continue without hotkeys if they fail
+    }
   }
 });
