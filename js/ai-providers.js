@@ -1,6 +1,6 @@
 const axios = require("axios");
 const { OpenAI } = require("openai");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const EventEmitter = require("events");
 const { AI_PROVIDERS } = require("./constants");
 const { getSettingsFilePath, saveApiKey } = require("./config-manager");
@@ -446,27 +446,79 @@ async function generateWithGemini(messages, model, streaming = false) {
 
     for (const message of messages) {
       if (message.type === "text") {
-        contentParts.push({ text: message.text });
-      } else if (message.type === "image_url") {
-        const imageUrl = message.image_url.url;
-        // Extract base64 data from data URL - Gemini requires just the base64 data without the prefix
-        const base64Data = imageUrl.split(",")[1];
-        if (!base64Data) {
-          console.error("Invalid base64 data in image:", imageUrl.substring(0, 50) + "...");
-          continue; // Skip this image
+        // Only add text messages with actual content
+        if (message.text && message.text.trim() !== "") {
+          contentParts.push({ text: message.text });
         }
-        contentParts.push({
-          inlineData: {
-            data: base64Data,
-            mimeType: "image/png",
-          },
-        });
+      } else if (message.type === "image_url") {
+        try {
+          let base64Data = null;
+          let mimeType = "image/jpeg";
+
+          // Handle different image URL formats
+          if (typeof message.image_url === "object" && message.image_url.url) {
+            // Format: { type: "image_url", image_url: { url: "data:image/..." } }
+            const imageUrl = message.image_url.url;
+
+            // Extract MIME type if available
+            const mimeMatch = imageUrl.match(/^data:([^;]+);base64,/);
+            if (mimeMatch) {
+              mimeType = mimeMatch[1];
+            }
+
+            // Extract base64 data
+            base64Data = imageUrl.split(";base64,").pop();
+          } else if (typeof message.image_url === "string") {
+            // Format: { type: "image_url", image_url: "data:image/..." }
+            const imageUrl = message.image_url;
+
+            // Extract MIME type if available
+            const mimeMatch = imageUrl.match(/^data:([^;]+);base64,/);
+            if (mimeMatch) {
+              mimeType = mimeMatch[1];
+            }
+
+            // Extract base64 data
+            base64Data = imageUrl.split(";base64,").pop();
+          }
+
+          // Validate base64 data
+          if (!base64Data) {
+            console.error("Invalid or missing base64 data in image URL");
+            continue; // Skip this image
+          }
+
+          // Add to content parts
+          contentParts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType,
+            },
+          });
+        } catch (error) {
+          console.error("Error processing image data for Gemini:", error);
+          // Continue without this image
+        }
       }
     }
 
+    // Ensure we have at least one content part
+    if (contentParts.length === 0) {
+      // If no valid content, add a default text message
+      contentParts.push({ text: "Please provide a valid question or input." });
+    }
+
+    // Filter out any invalid parts (final validation before API call)
+    const filteredContentParts = contentParts.filter((part) => {
+      // Keep image parts
+      if (part.inlineData) return true;
+      // Only keep text parts with actual content
+      return part.text && part.text.trim() !== "";
+    });
+
     // Create the content message format required by Gemini
     const geminiContent = {
-      parts: contentParts,
+      parts: filteredContentParts,
       role: "user",
     };
 
@@ -478,11 +530,31 @@ async function generateWithGemini(messages, model, streaming = false) {
       maxOutputTokens: 8192,
     };
 
+    const safetySettings = [
+      {
+        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+      },
+    ];
+
     // If streaming is requested, use the streaming API
     if (streaming) {
       const streamingResponse = await geminiModel.generateContentStream({
         contents: [geminiContent],
         generationConfig: genConfig,
+        safetySettings,
       });
 
       // Set up stream handling
@@ -521,6 +593,7 @@ async function generateWithGemini(messages, model, streaming = false) {
       const response = await geminiModel.generateContent({
         contents: [geminiContent],
         generationConfig: genConfig,
+        safetySettings,
       });
 
       return response.response.text();
