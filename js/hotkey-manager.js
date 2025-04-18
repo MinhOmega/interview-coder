@@ -125,11 +125,6 @@ function registerHandlers(handlers) {
 // Function to manage hotkey registration based on visibility
 function updateHotkeys(isVisible) {
   try {
-    // Log platform information for debugging
-    console.log(`Updating hotkeys for platform: ${process.platform}`);
-    console.log(`Modifier key for this platform: ${modifierKey}`);
-    console.log(`isLinux: ${isLinux}, isWindows: ${isWindows}`);
-
     // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
 

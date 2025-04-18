@@ -726,7 +726,6 @@ function initialize() {
   if (progressBarFill) {
     // Make sure styles get applied correctly
     progressBarFill.style.height = "100%";
-    progressBarFill.style.backgroundColor = "var(--accent-color)";
     progressBarFill.style.width = "0%";
     progressBarFill.style.transition = "width 0.3s ease";
   }
