@@ -750,6 +750,8 @@ code.inline-code {
   color: white;
   margin-left: auto;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
 }
 
 .user-message code {
@@ -1200,5 +1202,26 @@ textarea {
 
   .markdown-cell {
     min-width: 80px;
+  }
+}
+
+/* Streaming message styles */
+.streaming-message {
+  position: relative;
+  animation: pulse-border 2s infinite;
+  border-left: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+@keyframes pulse-border {
+  0% {
+    border-left-color: rgba(59, 130, 246, 0.5);
+  }
+
+  50% {
+    border-left-color: rgba(59, 130, 246, 1);
+  }
+
+  100% {
+    border-left-color: rgba(59, 130, 246, 0.5);
   }
 }
