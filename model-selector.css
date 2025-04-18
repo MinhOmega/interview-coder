@@ -929,3 +929,302 @@ button:disabled {
   padding-top: 0;
   padding-bottom: 0;
 }
+
+/* Add styles for model library and progress bar */
+.tabs {
+  display: flex;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab-btn {
+  padding: 8px 15px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-color-secondary);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+  color: var(--accent-color);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.library-container {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.library-table-container {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.library-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.library-table th {
+  position: sticky;
+  top: 0;
+  background: var(--background-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.library-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color-secondary);
+}
+
+.library-table tr:last-child td {
+  border-bottom: none;
+}
+
+.library-table tr:hover {
+  background-color: var(--highlight-color);
+}
+
+.library-table .pull-btn {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.library-table .pull-btn:hover {
+  background-color: var(--accent-hover-color);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.progress-container {
+  margin-top: 15px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.progress-bar {
+  height: 10px;
+  background-color: var(--border-color);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--accent-color);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-details {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+}
+
+#library-search-input {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 100%;
+}
+
+.modal-content {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Model library dropdown and info card styles */
+.model-library-container {
+  margin-bottom: 20px;
+}
+
+.select-container {
+  position: relative;
+}
+
+.model-library-select {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-card);
+  font-size: 14px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.select-container::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--text-secondary);
+  pointer-events: none;
+}
+
+.model-library-select:focus {
+  outline: none;
+  border-color: var(--border-focused);
+  box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+}
+
+.model-details {
+  margin-top: 15px;
+}
+
+.model-info-card {
+  padding: 15px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-hover);
+}
+
+.model-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.model-name {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.model-size-badge {
+  background-color: rgba(67, 97, 238, 0.1);
+  color: var(--bg-button-primary);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.model-params {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.model-command {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.model-command code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+}
+
+.model-requirements {
+  font-size: 12px;
+  color: var(--text-warning);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Progress bar styles - ensure correct styling */
+#progress-bar-fill {
+  height: 100%;
+  background-color: var(--bg-button-primary);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .model-info-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .model-size-badge {
+    align-self: flex-start;
+  }
+}
+
+.vision-badge {
+  display: inline-block;
+  background-color: rgba(255, 99, 132, 0.1);
+  color: #ff6384;
+  padding: 3px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Styling for optgroups */
+optgroup {
+  font-weight: 600;
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+option {
+  padding: 8px;
+  font-weight: normal;
+}
+
+/* Custom scrollbar for select */
+select::-webkit-scrollbar {
+  width: 8px;
+}
+
+select::-webkit-scrollbar-track {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+select::-webkit-scrollbar-thumb {
+  background-color: var(--border-medium);
+  border-radius: 4px;
+}
+
+select::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
