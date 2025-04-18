@@ -12,6 +12,7 @@ const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac } = require("./js/config");
+const toastManager = require("./js/toast-manager");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -58,7 +59,7 @@ async function processScreenshotsWithAI() {
   const screenshots = screenshotManager.getScreenshots();
 
   if (screenshots.length === 0) {
-    mainWindow.webContents.send(IPC_CHANNELS.WARNING, "No screenshots to process. Take a screenshot first.");
+    toastManager.warning("No screenshots to process. Take a screenshot first.");
     return;
   }
 
@@ -76,7 +77,7 @@ async function processScreenshotsWithAI() {
     );
   } catch (error) {
     console.error("Error processing screenshots:", error);
-    mainWindow.webContents.send(IPC_CHANNELS.ERROR, "Failed to process screenshots: " + error.message);
+    toastManager.error("Failed to process screenshots: " + error.message);
     windowManager.updateInstruction(
       windowManager.getDefaultInstructions(
         screenshotManager.getMultiPageMode(),
@@ -262,10 +263,7 @@ app.whenReady().then(() => {
                 screenshotManager.addScreenshot(base64Image);
 
                 // Show notification
-                mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-                  body: `Fullscreen screenshot saved to ${result.path} (${result.dimensions.width}x${result.dimensions.height})`,
-                  type: "success",
-                });
+                toastManager.success(`Fullscreen screenshot saved to ${result.path} (${result.dimensions.width}x${result.dimensions.height})`);
 
                 // Process the screenshot with AI
                 windowManager.updateInstruction("Processing screenshot with AI...");
@@ -402,10 +400,7 @@ app.whenReady().then(() => {
       screenshotManager.addScreenshot(base64Image);
 
       // Show notification
-      mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-        body: `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
-        type: "success",
-      });
+      sendSuccessNotification(mainWindow, `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
 
       // Process the screenshot with AI
       await processScreenshotsWithAI();

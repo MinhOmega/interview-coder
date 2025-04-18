@@ -7,6 +7,7 @@ const rehypeRaw = require("rehype-raw").default;
 const rehypeStringify = require("rehype-stringify").default;
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
+const toastManager = require("./js/toast-manager");
 
 const processor = unified()
   .use(remarkParse)
@@ -79,15 +80,19 @@ ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (_, isVisible) => {
 });
 
 ipcRenderer.on(IPC_CHANNELS.NOTIFICATION, (_, data) => {
-  showNotification(data.body, data.type || "success");
+  toastManager.showToast({
+    message: data.body,
+    type: data.type || "success",
+    duration: data.duration,
+  });
 });
 
 ipcRenderer.on(IPC_CHANNELS.WARNING, (_, message) => {
-  showNotification(message, "warning");
+  toastManager.warning(message);
 });
 
 ipcRenderer.on(IPC_CHANNELS.ERROR, (_, message) => {
-  showNotification(message, "error");
+  toastManager.error(message);
 });
 
 ipcRenderer.on(IPC_CHANNELS.LOADING, (_, isLoading) => {
@@ -160,7 +165,7 @@ ipcRenderer.on(IPC_CHANNELS.ANALYSIS_RESULT, async (_, markdown) => {
     window.scrollTo(0, 0);
   } catch (error) {
     console.error("Error in ANALYSIS_RESULT handler:", error);
-    showNotification("Error rendering content: " + error.message, "error");
+    toastManager.error("Error rendering content: " + error.message);
   }
 });
 
@@ -291,7 +296,7 @@ ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, () => {
   document.body.classList.add("invisible-mode");
 
   // Show temporary notification
-  showNotification("Screen sharing detected - window hidden. Press " + modifierKey + "+B to show.", "warning");
+  toastManager.warning("Screen sharing detected - window hidden. Press " + modifierKey + "+B to show.");
 });
 
 // Handle content scrolling from keyboard shortcuts
@@ -565,35 +570,45 @@ function setupCodeCopyButtons() {
   }
 }
 
-// Show notification
-function showNotification(message, type = "success") {
-  const container = document.getElementById("notification-container");
-  const notification = document.createElement("div");
-  notification.textContent = message;
-  notification.className = `notification ${type}`;
+// Update the model badge with current settings
+async function updateModelBadge() {
+  try {
+    let settings;
 
-  container.appendChild(notification);
+    try {
+      settings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
+    } catch (error) {
+      console.error("Error getting model settings from main process:", error);
+      // Set default badge text to indicate error
+      const badge = document.getElementById("model-badge");
+      badge.textContent = `Press ${modifierKey}+M to set model`;
+      return;
+    }
 
-  const notifications = container.getElementsByClassName("notification");
-  const offset = (notifications.length - 1) * 20;
+    const badge = document.getElementById("model-badge");
 
-  notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
+    let providerName = "";
+    switch (settings.aiProvider) {
+      case AI_PROVIDERS.OPENAI:
+        providerName = "OpenAI";
+        break;
+      case AI_PROVIDERS.OLLAMA:
+        providerName = "Ollama";
+        break;
+      case AI_PROVIDERS.GEMINI:
+        providerName = "Gemini";
+        break;
+    }
 
-  void notification.offsetWidth;
-  notification.classList.add("visible");
-  notification.style.transform = `translateX(0) translateY(-${offset}px)`;
-
-  setTimeout(() => {
-    notification.classList.remove("visible");
-    notification.style.transform = `translateX(50px) translateY(-${offset}px)`;
-
-    setTimeout(() => {
-      notification.remove();
-      Array.from(notifications).forEach((n, i) => {
-        n.style.transform = `translateX(0) translateY(-${i * 20}px)`;
-      });
-    }, 300);
-  }, 15000);
+    const modelName = settings.currentModel;
+    badge.textContent =
+      providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
+  } catch (error) {
+    console.error("Error updating model badge:", error);
+    // Ensure badge always shows something useful even on complete failure
+    const badge = document.getElementById("model-badge");
+    badge.textContent = "AI: Default Model";
+  }
 }
 
 // Initialize
@@ -681,7 +696,7 @@ function toggleSplitView() {
   }
 
   // Notify about toggle
-  showNotification("Split view " + (isSplitView ? "enabled" : "disabled"), "success");
+  toastManager.success("Split view " + (isSplitView ? "enabled" : "disabled"));
 }
 
 // Setup resize handle for split view
@@ -972,7 +987,7 @@ function clearSystemPrompt() {
   systemPromptTextarea.focus();
 
   // Show notification
-  showNotification("System prompt cleared", "warning");
+  toastManager.warning("System prompt cleared");
 }
 
 // Save system prompt to file via IPC
@@ -981,7 +996,7 @@ function saveSystemPrompt(prompt) {
     ipcRenderer.send(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, prompt);
   } catch (error) {
     console.error("Error saving system prompt:", error);
-    showNotification("Failed to save system prompt", "error");
+    toastManager.error("Failed to save system prompt");
   }
 }
 
@@ -991,7 +1006,7 @@ async function loadSystemPrompt() {
     const savedPrompt = await ipcRenderer.invoke(IPC_CHANNELS.GET_SYSTEM_PROMPT);
     if (savedPrompt) {
       systemPrompt = savedPrompt;
-      showNotification("System prompt loaded", "success");
+      toastManager.success("System prompt loaded");
     }
   } catch (error) {
     console.error("Error loading system prompt:", error);
