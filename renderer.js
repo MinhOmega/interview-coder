@@ -1,29 +1,10 @@
 const { ipcRenderer } = require("electron");
-const unified = require("unified").unified;
-const remarkGfm = require("remark-gfm").default;
-const remarkParse = require("remark-parse").default;
-const remarkRehype = require("remark-rehype").default;
-const rehypeRaw = require("rehype-raw").default;
-const rehypeStringify = require("rehype-stringify").default;
-const rehypeSlug = require("rehype-slug").default;
-const rehypeAutolinkHeadings = require("rehype-autolink-headings").default;
-const rehypePrismPlus = require("rehype-prism-plus").default;
-const rehypeFormat = require("rehype-format").default;
+const { processMarkdown } = require("./js/markdown-processor");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkGfm)
-  .use(remarkRehype, { allowDangerousHtml: true })
-  .use(rehypeRaw)
-  .use(rehypeSlug)
-  .use(rehypeAutolinkHeadings)
-  .use(rehypePrismPlus)
-  .use(rehypeFormat)
-  .use(rehypeStringify);
-
+// Variables for tracking state
 let isWindowVisible = true;
 let streamBuffer = "";
 
@@ -538,209 +519,6 @@ async function updateModelBadge() {
   }
 }
 
-function markdownProcess(markdown) {
-  // First safely handle HTML elements while preserving HTML tags like <sup>
-  const safeMarkdown = markdown
-    // Code blocks with language - escape HTML inside code blocks
-    .replace(/```(\w+)\n([\s\S]*?)```/g, (_, lang, code) => {
-      return "```" + lang + "\n" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "\n```";
-    })
-    // Code blocks without language - escape HTML inside code blocks
-    .replace(/```\n([\s\S]*?)```/g, (_, code) => {
-      return "```\n" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "\n```";
-    })
-    // Inline code blocks - escape HTML within them
-    .replace(/`([^`]+)`/g, (_, code) => {
-      return "`" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "`";
-    });
-
-  // Create a temp div to handle HTML strings safely
-  const tempDiv = document.createElement("div");
-
-  // Process the markdown with HTML preserved
-  let processedContent = safeMarkdown
-    // Code blocks with language
-    .replace(/```(\w+)\n([\s\S]*?)```/g, (_, lang, code) => {
-      return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
-    })
-    // Code blocks without language
-    .replace(/```\n([\s\S]*?)```/g, (_, code) => {
-      return `<pre><code>${code.trim()}</code></pre>`;
-    })
-    // Inline code blocks
-    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-    // Headers
-    .replace(/^### (.*$)/gm, "<h3>$1</h3>")
-    .replace(/^## (.*$)/gm, "<h2>$1</h2>")
-    .replace(/^# (.*$)/gm, "<h1>$1</h1>")
-    // Bold and italic
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    // Lists
-    .replace(/^\* (.+)/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>)\n/g, "<ul>$1</ul>")
-    // Links
-    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
-    // Tables - table header row
-    .replace(/\|(.+)\|\s*\n\|(\s*:?-+:?\s*\|)+\s*\n/gm, (match, headerRow) => {
-      const headers = headerRow
-        .split("|")
-        .map((header) => header.trim())
-        .filter(Boolean);
-      let headerHTML = '<div class="table-wrapper"><table class="markdown-table"><thead class="markdown-thead"><tr>';
-
-      headers.forEach((header) => {
-        headerHTML += `<th class="markdown-cell">${header}</th>`;
-      });
-
-      headerHTML += "</tr></thead><tbody>";
-      return headerHTML;
-    })
-    // Tables - table rows
-    .replace(/\|(.+)\|\s*\n/gm, (match, rowContent) => {
-      // Skip if it's a separator row with dashes
-      if (rowContent.match(/^\s*:?-+:?\s*\|/)) {
-        return "";
-      }
-
-      const cells = rowContent
-        .split("|")
-        .map((cell) => cell.trim())
-        .filter(Boolean);
-      let rowHTML = "<tr>";
-
-      cells.forEach((cell) => {
-        rowHTML += `<td class="markdown-cell">${cell}</td>`;
-      });
-
-      rowHTML += "</tr>";
-      return rowHTML;
-    })
-    // Close table tags
-    .replace(/<\/tr>\s*(?!<tr>|<\/tbody>)/g, "</tr></tbody></table></div>")
-    // Paragraphs
-    .replace(/\n\n/g, "</p><p>");
-
-  tempDiv.innerHTML = processedContent;
-
-  // Fix any broken HTML structure
-  if (!processedContent.startsWith("<p>")) {
-    processedContent = "<p>" + processedContent;
-  }
-  if (!processedContent.endsWith("</p>")) {
-    processedContent = processedContent + "</p>";
-  }
-
-  return processedContent;
-}
-
-async function processMarkdown(markdown) {
-  try {
-    // Check if we have any content to process
-    if (!markdown || markdown.trim() === "") {
-      return "";
-    }
-
-    let html = "";
-    if (processor) {
-      try {
-        // Process the markdown with unified processor
-        const file = await processor.process(markdown);
-        html = String(file);
-
-        // Ensure inline code blocks are properly styled
-        const tempWrapper = document.createElement("div");
-        tempWrapper.innerHTML = html;
-
-        // Add class to inline code elements if not already present
-        tempWrapper.querySelectorAll("code:not([class])").forEach((codeEl) => {
-          // Skip if inside a pre element (block code)
-          if (codeEl.parentElement.tagName !== "PRE") {
-            codeEl.classList.add("inline-code");
-          }
-        });
-
-        // Add table styling for better display
-        tempWrapper.querySelectorAll("table").forEach((tableEl) => {
-          tableEl.classList.add("markdown-table");
-
-          // Add wrapper for responsive tables
-          const tableWrapper = document.createElement("div");
-          tableWrapper.classList.add("table-wrapper");
-          tableEl.parentNode.insertBefore(tableWrapper, tableEl);
-          tableWrapper.appendChild(tableEl);
-        });
-
-        // Style table headers
-        tempWrapper.querySelectorAll("thead").forEach((theadEl) => {
-          theadEl.classList.add("markdown-thead");
-        });
-
-        // Style table cells
-        tempWrapper.querySelectorAll("td, th").forEach((cellEl) => {
-          cellEl.classList.add("markdown-cell");
-        });
-
-        html = tempWrapper.innerHTML;
-      } catch (err) {
-        console.error("Error using unified processor:", err);
-        // Fall back to our custom markdown processor
-        // html = markdownProcess(markdown);
-      }
-    } else {
-      // Use our custom markdown processor if unified isn't available
-      // html = markdownProcess(markdown);
-    }
-
-    // Add copy buttons to code blocks and language tags
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML = html;
-
-    // Find all pre > code elements and wrap them with copy button and language tag
-    wrapper.querySelectorAll("pre > code").forEach((codeBlock) => {
-      const pre = codeBlock.parentNode;
-
-      // Skip if already processed
-      if (pre.parentNode && pre.parentNode.classList.contains("code-block-container")) {
-        return;
-      }
-
-      const container = document.createElement("div");
-      container.className = "code-block-container";
-
-      // Create copy button
-      const copyButton = document.createElement("button");
-      copyButton.className = "copy-code-button";
-      copyButton.textContent = "Copy";
-
-      // Extract language from class
-      let language = "";
-      if (codeBlock.className) {
-        const langMatch = codeBlock.className.match(/language-(\w+)/);
-        if (langMatch && langMatch[1]) {
-          language = langMatch[1];
-
-          // Create language tag
-          const langTag = document.createElement("div");
-          langTag.className = "code-language-tag";
-          langTag.textContent = language;
-          container.appendChild(langTag);
-        }
-      }
-
-      // Move the pre element into the container
-      pre.parentNode.insertBefore(container, pre);
-      container.appendChild(copyButton);
-      container.appendChild(pre);
-    });
-
-    return wrapper.innerHTML;
-  } catch (err) {
-    console.error("Error in markdown processing:", err);
-    return `<p class="error-message">Error processing markdown: ${err.message}</p>`;
-  }
-}
-
 // Add copy code functionality
 function setupCodeCopyButtons(container = document) {
   try {
@@ -862,35 +640,68 @@ const onEventContextMenu = () => {
 };
 
 const onEventKeyDown = (e) => {
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
-    ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
-    e.preventDefault();
-  }
-
-  // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
-    ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
-    e.preventDefault();
-  }
-
-  // Linux-specific fallback for toggling visibility
-  if (isLinux) {
-    // Handle both Ctrl+B and Alt+B as fallbacks for Linux
-    const isCtrlB = e.ctrlKey && e.key.toLowerCase() === "b";
-    const isAltB = e.altKey && e.key.toLowerCase() === "b";
-
-    if (isCtrlB || isAltB) {
+  try {
+    // Unified DevTools hotkey that works on all platforms
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "d") {
+      console.log("DevTools hotkey pressed");
+      ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
       e.preventDefault();
-      e.stopPropagation();
+      return;
     }
-  }
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "T") {
-    e.preventDefault();
-    toggleSplitView();
-  }
-  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "p") {
-    e.preventDefault();
-    toggleSystemPrompt();
+
+    // Original DevTools hotkey (Cmd/Ctrl+Shift+I)
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
+      console.log("DevTools alternative hotkey pressed");
+      ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
+      e.preventDefault();
+      return;
+    }
+
+    // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
+      console.log("Reload hotkey pressed");
+      ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
+      e.preventDefault();
+      return;
+    }
+
+    // Linux-specific fallback for toggling visibility
+    if (isLinux) {
+      // Handle both Ctrl+B and Alt+B as fallbacks for Linux
+      const isCtrlB = e.ctrlKey && e.key.toLowerCase() === "b";
+      const isAltB = e.altKey && e.key.toLowerCase() === "b";
+
+      if (isCtrlB || isAltB) {
+        console.log("Linux visibility toggle hotkey pressed");
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "T") {
+      console.log("Split view toggle hotkey pressed");
+      e.preventDefault();
+      toggleSplitView();
+      return;
+    }
+
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "p") {
+      console.log("System prompt toggle hotkey pressed");
+      e.preventDefault();
+      toggleSystemPrompt();
+      return;
+    }
+  } catch (error) {
+    console.error("Error handling keyboard shortcut:", error);
+    logError(`Keyboard shortcut error: ${error.message}`, {
+      key: e.key,
+      ctrl: e.ctrlKey,
+      alt: e.altKey,
+      meta: e.metaKey,
+      shift: e.shiftKey,
+      platform: navigator.platform,
+    });
   }
 };
 
@@ -933,6 +744,7 @@ const onEventDOMContentLoaded = async () => {
   const updateSystemPromptBtn = document.getElementById("update-system-prompt");
   const cancelSystemPromptBtn = document.getElementById("cancel-system-prompt");
   const clearSystemPromptBtn = document.getElementById("clear-system-prompt");
+  const devToolsBtn = document.getElementById("btn-devtools");
 
   if (systemPromptBtn) {
     systemPromptBtn.addEventListener("click", toggleSystemPrompt);
@@ -948,6 +760,19 @@ const onEventDOMContentLoaded = async () => {
 
   if (clearSystemPromptBtn) {
     clearSystemPromptBtn.addEventListener("click", clearSystemPrompt);
+  }
+
+  // DevTools button functionality
+  if (devToolsBtn) {
+    devToolsBtn.addEventListener("click", () => {
+      try {
+        console.log("DevTools button clicked");
+        ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
+      } catch (error) {
+        console.error("Error toggling DevTools:", error);
+        logError(`Failed to open DevTools: ${error.message}`);
+      }
+    });
   }
 
   // Load saved system prompt if available
@@ -1162,3 +987,27 @@ document.querySelectorAll(".shortcut").forEach((el) => {
 document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 
 updateModelBadge();
+
+// Add a utility function for logging errors
+function logError(message, extraData = {}) {
+  console.error(`[ERROR] ${message}`, extraData);
+
+  // Display in DevTools console with platform details
+  const platformInfo = {
+    platform: navigator.platform,
+    userAgent: navigator.userAgent,
+    os: {
+      isMac,
+      isLinux,
+      isWindows,
+      platform: process.platform,
+    },
+  };
+
+  console.error("Error Details:", {
+    message,
+    timestamp: new Date().toISOString(),
+    ...extraData,
+    platformInfo,
+  });
+}

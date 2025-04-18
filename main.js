@@ -1,4 +1,13 @@
-const { app, BrowserWindow, ipcMain, nativeImage, desktopCapturer } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeImage,
+  desktopCapturer,
+  systemPreferences,
+  Menu,
+  MenuItem,
+} = require("electron");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
@@ -13,6 +22,7 @@ const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac, isWindows } = require("./js/config");
 const toastManager = require("./js/toast-manager");
+const macOSPermissions = isMac ? require("./js/macos-permissions") : null;
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -32,6 +42,17 @@ if (isDev) {
 // Development mode notification
 if (isDev) {
   console.log("Running in development mode with hot reload");
+} else {
+  console.log("Running in production mode");
+}
+
+// Enable DevTools in production (disable Electron security warnings)
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = true;
+
+// Early setup of command line switches for permissions
+if (isMac) {
+  app.commandLine.appendSwitch("enable-permissions-api");
+  app.commandLine.appendSwitch("enable-features", "ScreenCaptureAPI");
 }
 
 axios.defaults.family = 4;
@@ -92,6 +113,15 @@ async function processScreenshotsWithAI() {
  */
 async function captureFullScreenFallback() {
   try {
+    // On macOS, ensure we have proper permissions first
+    if (isMac) {
+      const status = systemPreferences.getMediaAccessStatus("screen");
+      if (status !== "granted") {
+        await systemPreferences.askForMediaAccess("screen");
+        // The actual permission status might not change immediately, but we've at least asked
+      }
+    }
+
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
     const picturesPath = getAppPath("pictures", "");
     const imagePath = path.join(picturesPath, `fullscreen-${timestamp}.png`);
@@ -131,7 +161,103 @@ async function captureFullScreenFallback() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // For macOS, ensure screen capture permissions are requested at startup
+  if (isMac && macOSPermissions) {
+    try {
+      console.log("Initializing macOS permissions...");
+      const permissionsStatus = await macOSPermissions.initializePermissions();
+      console.log("macOS permissions initialized:", permissionsStatus);
+
+      // Force permission request in production as a fallback
+      if (!isDev && !permissionsStatus.screenCapturePermission) {
+        console.log("Initial permission check failed, forcing permission request...");
+        await macOSPermissions.forcePermissionRequest();
+      }
+    } catch (error) {
+      console.error("Error initializing macOS permissions:", error);
+    }
+  }
+
+  // Create application menu with DevTools access
+  const template = [
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ]
+      : []),
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools", accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        ...(isMac
+          ? [{ type: "separator" }, { role: "front" }, { type: "separator" }, { role: "window" }]
+          : [{ role: "close" }]),
+      ],
+    },
+    {
+      label: "Debug",
+      submenu: [
+        {
+          label: "Toggle DevTools",
+          accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I",
+          click: () => {
+            const mainWindow = windowManager.getMainWindow();
+            if (mainWindow) {
+              if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
+              } else {
+                mainWindow.webContents.openDevTools();
+              }
+            }
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+
   const mainWindow = windowManager.createMainWindow();
 
   // Initialize AI clients from saved config
@@ -226,6 +352,20 @@ app.whenReady().then(() => {
     SCROLL_DOWN: () => windowManager.scrollContent("down"),
     INCREASE_WINDOW_SIZE: () => windowManager.resizeWindow("increase"),
     DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
+    TOGGLE_DEVTOOLS: () => {
+      try {
+        const mainWindow = windowManager.getMainWindow();
+        if (mainWindow) {
+          if (mainWindow.webContents.isDevToolsOpened()) {
+            mainWindow.webContents.closeDevTools();
+          } else {
+            mainWindow.webContents.openDevTools();
+          }
+        }
+      } catch (error) {
+        console.error("Error toggling DevTools:", error);
+      }
+    },
     TAKE_SCREENSHOT: async () => {
       try {
         windowManager.updateInstruction("Taking screenshot...");
@@ -484,6 +624,19 @@ app.whenReady().then(() => {
 
   ipcMain.on(IPC_CHANNELS.SCREENSHOT_READY_FOR_PROCESSING, async () => {
     await processScreenshotsWithAI();
+  });
+
+  // Register right-click context menu with DevTools
+  mainWindow.webContents.on("context-menu", (_, params) => {
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Inspect Element",
+        click: () => {
+          mainWindow.webContents.inspectElement(params.x, params.y);
+        },
+      },
+    ]);
+    contextMenu.popup();
   });
 });
 
