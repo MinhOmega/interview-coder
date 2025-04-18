@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
 const { nativeImage, desktopCapturer } = require("electron");
-const { IPC_CHANNELS } = require("./constants");
 const Screenshots = require("electron-screenshots");
 const { getAppPath, isCommandAvailable } = require("./utils");
 const { isLinux } = require("./config");
@@ -76,6 +75,7 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
 
   // Show notification
   if (mainWindow) {
+    // Use the toastManager to send the IPC message
     toastManager.success(`${filenamePrefix} saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
   }
 
@@ -128,7 +128,6 @@ async function captureScreenshot(mainWindow) {
 
     const wasVisible = await autoHideWindow(mainWindow);
 
-    let success = false;
     let base64Image = "";
 
     // If on Linux, first check if ImageMagick is installed
@@ -183,7 +182,7 @@ async function captureScreenshot(mainWindow) {
 
     const dimensions = getImageDimensions(imagePath);
 
-    // Notify about saved screenshot
+    // Notify about saved screenshot - uses IPC to send to renderer
     toastManager.success(`Screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
 
     return base64Image;
