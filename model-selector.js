@@ -704,40 +704,40 @@ function initialize() {
 
 // Initialize modal event listeners
 function initializeModals() {
-  const apiKeyModal = document.getElementById('api-key-modal');
-  const saveApiKeyBtn = document.getElementById('save-api-key');
-  const cancelApiKeyBtn = document.getElementById('cancel-api-key');
-  const closeModalBtn = document.querySelector('.close-modal');
-  
+  const apiKeyModal = document.getElementById("api-key-modal");
+  const saveApiKeyBtn = document.getElementById("save-api-key");
+  const cancelApiKeyBtn = document.getElementById("cancel-api-key");
+  const closeModalBtn = document.querySelector(".close-modal");
+
   // Save API key button
-  saveApiKeyBtn.addEventListener('click', () => {
+  saveApiKeyBtn.addEventListener("click", () => {
     modalManager.saveApiKeyFromModal();
   });
-  
+
   // Cancel and close buttons
-  cancelApiKeyBtn.addEventListener('click', () => {
+  cancelApiKeyBtn.addEventListener("click", () => {
     modalManager.closeApiKeyModal();
   });
-  
+
   if (closeModalBtn) {
-    closeModalBtn.addEventListener('click', () => {
+    closeModalBtn.addEventListener("click", () => {
       modalManager.closeApiKeyModal();
     });
   }
-  
+
   // Close modal when clicking outside
-  window.addEventListener('click', (e) => {
+  window.addEventListener("click", (e) => {
     if (e.target === apiKeyModal) {
       modalManager.closeApiKeyModal();
     }
   });
-  
+
   // Add keyboard shortcuts for modal
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && apiKeyModal.style.display === 'block') {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && apiKeyModal.style.display === "block") {
       modalManager.closeApiKeyModal();
     }
-    if (e.key === 'Enter' && apiKeyModal.style.display === 'block') {
+    if (e.key === "Enter" && apiKeyModal.style.display === "block") {
       saveApiKeyBtn.click();
     }
   });

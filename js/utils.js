@@ -12,10 +12,10 @@ const path = require("path");
 const getAppPath = (pathName, defaultPath = "") => {
   try {
     // Check if app is available and properly initialized
-    if (app && typeof app.getPath === 'function') {
+    if (app && typeof app.getPath === "function") {
       return app.getPath(pathName);
     }
-    
+
     // Return default path if provided
     return defaultPath;
   } catch (error) {
@@ -159,8 +159,8 @@ function adjustUIForScreenSize() {
  */
 const isCommandAvailable = (command) => {
   try {
-    const { execSync } = require('child_process');
-    execSync(`which ${command}`, { stdio: 'ignore' });
+    const { execSync } = require("child_process");
+    execSync(`which ${command}`, { stdio: "ignore" });
     return true;
   } catch (error) {
     return false;

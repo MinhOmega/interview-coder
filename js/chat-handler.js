@@ -1,7 +1,7 @@
 const axios = require("axios");
 const { AI_PROVIDERS } = require("./constants");
 const { getUserDataPath } = require("./utils");
-const fs = require('fs');
+const fs = require("fs");
 
 /**
  * Handles chat functionality with AI models
@@ -55,7 +55,7 @@ class ChatHandler {
       if (systemPrompt) {
         this.systemPrompts.set(windowId, systemPrompt);
       }
-      
+
       // Get cached system prompt for this window or load from file if not in memory
       let currentSystemPrompt = this.systemPrompts.get(windowId);
       if (!currentSystemPrompt) {
@@ -64,21 +64,21 @@ class ChatHandler {
           this.systemPrompts.set(windowId, currentSystemPrompt);
         }
       }
-      
+
       // Get the current AI provider and model from config
       const provider = this.configManager.getAiProvider();
       const currentModel = this.configManager.getCurrentModel();
 
       console.log(`Processing message with ${provider} using model ${currentModel}`);
-      
+
       // Create a copy of messages with system prompt if available
       let messagesWithSystem = [...messages];
       if (currentSystemPrompt) {
         // Insert system prompt at beginning if not already there
-        if (messagesWithSystem.length === 0 || messagesWithSystem[0].role !== 'system') {
-          messagesWithSystem.unshift({ 
-            role: 'system', 
-            content: currentSystemPrompt 
+        if (messagesWithSystem.length === 0 || messagesWithSystem[0].role !== "system") {
+          messagesWithSystem.unshift({
+            role: "system",
+            content: currentSystemPrompt,
           });
         }
       }
@@ -150,14 +150,14 @@ class ChatHandler {
    */
   loadSystemPrompt() {
     try {
-      const systemPromptFile = getUserDataPath('systemPrompt.txt');
+      const systemPromptFile = getUserDataPath("systemPrompt.txt");
       if (fs.existsSync(systemPromptFile)) {
-        return fs.readFileSync(systemPromptFile, 'utf8');
+        return fs.readFileSync(systemPromptFile, "utf8");
       }
     } catch (error) {
-      console.error('Error loading system prompt:', error);
+      console.error("Error loading system prompt:", error);
     }
-    return '';
+    return "";
   }
 
   /**
