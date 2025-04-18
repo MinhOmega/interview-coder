@@ -5,6 +5,10 @@ const remarkParse = require("remark-parse").default;
 const remarkRehype = require("remark-rehype").default;
 const rehypeRaw = require("rehype-raw").default;
 const rehypeStringify = require("rehype-stringify").default;
+const rehypeSlug = require("rehype-slug").default;
+const rehypeAutolinkHeadings = require("rehype-autolink-headings").default;
+const rehypePrismPlus = require("rehype-prism-plus").default;
+const rehypeFormat = require("rehype-format").default;
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
@@ -14,6 +18,10 @@ const processor = unified()
   .use(remarkGfm)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRaw)
+  .use(rehypeSlug)
+  .use(rehypeAutolinkHeadings)
+  .use(rehypePrismPlus)
+  .use(rehypeFormat)
   .use(rehypeStringify);
 
 let isWindowVisible = true;
@@ -240,6 +248,12 @@ function toggleSplitView() {
 
   const standardView = document.getElementById("standard-view");
   const splitView = document.getElementById("split-view");
+
+  // Hide instruction banner when toggling split view
+  const instructionBanner = document.getElementById("instruction-banner");
+  if (instructionBanner) {
+    instructionBanner.style.display = "none";
+  }
 
   if (isSplitView) {
     // Show split view
@@ -561,6 +575,43 @@ function markdownProcess(markdown) {
     .replace(/(<li>.*<\/li>)\n/g, "<ul>$1</ul>")
     // Links
     .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
+    // Tables - table header row
+    .replace(/\|(.+)\|\s*\n\|(\s*:?-+:?\s*\|)+\s*\n/gm, (match, headerRow) => {
+      const headers = headerRow
+        .split("|")
+        .map((header) => header.trim())
+        .filter(Boolean);
+      let headerHTML = '<div class="table-wrapper"><table class="markdown-table"><thead class="markdown-thead"><tr>';
+
+      headers.forEach((header) => {
+        headerHTML += `<th class="markdown-cell">${header}</th>`;
+      });
+
+      headerHTML += "</tr></thead><tbody>";
+      return headerHTML;
+    })
+    // Tables - table rows
+    .replace(/\|(.+)\|\s*\n/gm, (match, rowContent) => {
+      // Skip if it's a separator row with dashes
+      if (rowContent.match(/^\s*:?-+:?\s*\|/)) {
+        return "";
+      }
+
+      const cells = rowContent
+        .split("|")
+        .map((cell) => cell.trim())
+        .filter(Boolean);
+      let rowHTML = "<tr>";
+
+      cells.forEach((cell) => {
+        rowHTML += `<td class="markdown-cell">${cell}</td>`;
+      });
+
+      rowHTML += "</tr>";
+      return rowHTML;
+    })
+    // Close table tags
+    .replace(/<\/tr>\s*(?!<tr>|<\/tbody>)/g, "</tr></tbody></table></div>")
     // Paragraphs
     .replace(/\n\n/g, "</p><p>");
 
@@ -587,6 +638,7 @@ async function processMarkdown(markdown) {
     let html = "";
     if (processor) {
       try {
+        // Process the markdown with unified processor
         const file = await processor.process(markdown);
         html = String(file);
 
@@ -602,15 +654,36 @@ async function processMarkdown(markdown) {
           }
         });
 
+        // Add table styling for better display
+        tempWrapper.querySelectorAll("table").forEach((tableEl) => {
+          tableEl.classList.add("markdown-table");
+
+          // Add wrapper for responsive tables
+          const tableWrapper = document.createElement("div");
+          tableWrapper.classList.add("table-wrapper");
+          tableEl.parentNode.insertBefore(tableWrapper, tableEl);
+          tableWrapper.appendChild(tableEl);
+        });
+
+        // Style table headers
+        tempWrapper.querySelectorAll("thead").forEach((theadEl) => {
+          theadEl.classList.add("markdown-thead");
+        });
+
+        // Style table cells
+        tempWrapper.querySelectorAll("td, th").forEach((cellEl) => {
+          cellEl.classList.add("markdown-cell");
+        });
+
         html = tempWrapper.innerHTML;
       } catch (err) {
         console.error("Error using unified processor:", err);
         // Fall back to our custom markdown processor
-        html = markdownProcess(markdown);
+        // html = markdownProcess(markdown);
       }
     } else {
       // Use our custom markdown processor if unified isn't available
-      html = markdownProcess(markdown);
+      // html = markdownProcess(markdown);
     }
 
     // Add copy buttons to code blocks and language tags
@@ -734,47 +807,6 @@ function setupCodeCopyButtons() {
     });
   } catch (err) {
     console.error("Error setting up code copy buttons:", err);
-  }
-}
-
-// Update the model badge with current settings
-async function updateModelBadge() {
-  try {
-    let settings;
-
-    try {
-      settings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
-    } catch (error) {
-      console.error("Error getting model settings from main process:", error);
-      // Set default badge text to indicate error
-      const badge = document.getElementById("model-badge");
-      badge.textContent = `Press ${modifierKey}+M to set model`;
-      return;
-    }
-
-    const badge = document.getElementById("model-badge");
-
-    let providerName = "";
-    switch (settings.aiProvider) {
-      case AI_PROVIDERS.OPENAI:
-        providerName = "OpenAI";
-        break;
-      case AI_PROVIDERS.OLLAMA:
-        providerName = "Ollama";
-        break;
-      case AI_PROVIDERS.GEMINI:
-        providerName = "Gemini";
-        break;
-    }
-
-    const modelName = settings.currentModel;
-    badge.textContent =
-      providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
-  } catch (error) {
-    console.error("Error updating model badge:", error);
-    // Ensure badge always shows something useful even on complete failure
-    const badge = document.getElementById("model-badge");
-    badge.textContent = "AI: Default Model";
   }
 }
 
