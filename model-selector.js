@@ -194,26 +194,6 @@ cancelPullBtn.addEventListener("click", () => {
   pullModelModal.style.display = "none";
 });
 
-// Tab handling
-function setupTabs() {
-  const tabButtons = document.querySelectorAll(".tab-btn");
-  
-  tabButtons.forEach(button => {
-    button.addEventListener("click", () => {
-      // Get the tab to show
-      const tabId = button.getAttribute("data-tab");
-      
-      // Deactivate all tabs and buttons
-      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-      document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
-      
-      // Activate the selected tab and button
-      button.classList.add("active");
-      document.getElementById(tabId).classList.add("active");
-    });
-  });
-}
-
 // Confirm pull button
 confirmPullBtn.addEventListener("click", async () => {
   const modelSelect = document.getElementById("model-library-select");
@@ -718,9 +698,6 @@ function initialize() {
   // Initialize modals
   initializeModals();
   
-  // Setup tabs
-  setupTabs();
-
   // Set up keyboard shortcuts
   setupKeyboardShortcuts();
 

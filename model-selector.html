@@ -230,12 +230,21 @@
       
       <p class="mb-2">Select a model to pull from the Ollama Model Library:</p>
       
+      <div id="system-specs" class="system-specs mb-2">
+        <!-- System specs will be populated here -->
+      </div>
+      
       <div class="model-library-container">
         <div class="select-container mb-2">
           <select id="model-library-select" class="model-library-select">
             <option value="" disabled selected>Select a model to pull</option>
             <!-- Options will be dynamically populated -->
           </select>
+        </div>
+        
+        <div class="compatibility-legend">
+          <div class="legend-item"><span class="legend-icon compatible">✅</span> Compatible with your system</div>
+          <div class="legend-item"><span class="legend-icon incompatible">⚠️</span> May not be compatible</div>
         </div>
         
         <div id="model-details" class="model-details">

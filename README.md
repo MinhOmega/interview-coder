@@ -15,7 +15,7 @@
 ![Platform - Windows, macOS, Linux](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 ![Electron Version](https://img.shields.io/badge/electron-v35.1.2-blue)
-![Version](https://img.shields.io/badge/version-v1.5.1-green)
+![Version](https://img.shields.io/badge/version-v1.5.2-green)
 
 </div>
 

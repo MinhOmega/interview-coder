@@ -930,37 +930,6 @@ button:disabled {
   padding-bottom: 0;
 }
 
-/* Add styles for model library and progress bar */
-.tabs {
-  display: flex;
-  margin-bottom: 15px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.tab-btn {
-  padding: 8px 15px;
-  cursor: pointer;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-color-secondary);
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.tab-btn.active {
-  color: var(--accent-color);
-  border-bottom: 2px solid var(--accent-color);
-}
-
-.tab-content {
-  display: none;
-}
-
-.tab-content.active {
-  display: block;
-}
-
 .library-container {
   max-height: 300px;
   overflow-y: auto;
@@ -1054,20 +1023,6 @@ button:disabled {
   color: var(--text-color-secondary);
 }
 
-#library-search-input {
-  padding: 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  width: 100%;
-}
-
-.modal-content {
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-/* Model library dropdown and info card styles */
 .model-library-container {
   margin-bottom: 20px;
 }
@@ -1227,4 +1182,129 @@ select::-webkit-scrollbar-thumb {
 
 select::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-secondary);
+}
+
+/* System specs and compatibility styles */
+.system-specs {
+  padding: 8px 12px;
+  background-color: rgba(67, 97, 238, 0.1);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bg-button-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.system-specs::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234361ee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='16' height='16' rx='2' ry='2'%3E%3C/rect%3E%3Crect x='9' y='9' width='6' height='6'%3E%3C/rect%3E%3Cline x1='9' y1='1' x2='9' y2='4'%3E%3C/line%3E%3Cline x1='15' y1='1' x2='15' y2='4'%3E%3C/line%3E%3Cline x1='9' y1='20' x2='9' y2='23'%3E%3C/line%3E%3Cline x1='15' y1='20' x2='15' y2='23'%3E%3C/line%3E%3Cline x1='20' y1='9' x2='23' y2='9'%3E%3C/line%3E%3Cline x1='20' y1='14' x2='23' y2='14'%3E%3C/line%3E%3Cline x1='1' y1='9' x2='4' y2='9'%3E%3C/line%3E%3Cline x1='1' y1='14' x2='4' y2='14'%3E%3C/line%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  display: inline-block;
+}
+
+.compatibility-legend {
+  display: flex;
+  gap: 15px;
+  margin: 10px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.legend-icon.compatible {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--bg-button-success);
+}
+
+.legend-icon.incompatible {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: var(--bg-button-warning);
+}
+
+.compatible-model {
+  border-color: var(--border-success) !important;
+  border-left: 3px solid var(--border-success) !important;
+}
+
+.incompatible-model {
+  border-color: var(--border-warning) !important;
+  border-left: 3px solid var(--border-warning) !important;
+}
+
+.compatibility-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-right: 5px;
+  font-size: 12px;
+}
+
+.compatibility-icon.compatible {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--bg-button-success);
+}
+
+.compatibility-icon.incompatible {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: var(--bg-button-warning);
+}
+
+.compatibility-message {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.compatibility-message.compatible {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--text-success);
+}
+
+.compatibility-message.incompatible {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: var(--text-warning);
+}
+
+.warning-pull {
+  background-color: var(--bg-button-warning) !important;
+}
+
+.warning-pull:hover:not(:disabled) {
+  background-color: var(--bg-button-warning-hover) !important;
+}
+
+option.incompatible-model {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: var(--text-warning);
+}
+
+@media (max-width: 768px) {
+  .compatibility-legend {
+    flex-direction: column;
+    gap: 5px;
+  }
 }

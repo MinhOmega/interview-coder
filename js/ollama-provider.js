@@ -226,31 +226,59 @@ async function testOllamaConnection() {
 
 // Library of models for Ollama
 const MODEL_LIBRARY = [
-  { name: "gemma3:1b", params: "1B", size: "815MB", ram: "4GB", family: "Gemma 3" },
-  { name: "gemma3", params: "4B", size: "3.3GB", ram: "8GB", family: "Gemma 3" },
-  { name: "gemma3:12b", params: "12B", size: "8.1GB", ram: "16GB", family: "Gemma 3" },
-  { name: "gemma3:27b", params: "27B", size: "17GB", ram: "32GB", family: "Gemma 3" },
-  { name: "qwq", params: "32B", size: "20GB", ram: "32GB", family: "QwQ" },
-  { name: "deepseek-r1", params: "7B", size: "4.7GB", ram: "8GB", family: "DeepSeek-R1", vision: true },
-  { name: "deepseek-r1:671b", params: "671B", size: "404GB", ram: "512GB", family: "DeepSeek-R1" },
-  { name: "llama3.3", params: "70B", size: "43GB", ram: "64GB", family: "Llama 3.3" },
-  { name: "llama3.2", params: "3B", size: "2.0GB", ram: "8GB", family: "Llama 3.2" },
-  { name: "llama3.2:1b", params: "1B", size: "1.3GB", ram: "4GB", family: "Llama 3.2" },
-  { name: "llama3.2-vision", params: "11B", size: "7.9GB", ram: "16GB", family: "Llama 3.2", vision: true },
-  { name: "llama3.2-vision:90b", params: "90B", size: "55GB", ram: "96GB", family: "Llama 3.2", vision: true },
-  { name: "llama3.1", params: "8B", size: "4.7GB", ram: "8GB", family: "Llama 3.1" },
-  { name: "llama3.1:405b", params: "405B", size: "231GB", ram: "256GB", family: "Llama 3.1" },
-  { name: "phi4", params: "14B", size: "9.1GB", ram: "16GB", family: "Phi 4" },
-  { name: "phi4-mini", params: "3.8B", size: "2.5GB", ram: "8GB", family: "Phi 4 Mini" },
-  { name: "mistral", params: "7B", size: "4.1GB", ram: "8GB", family: "Mistral" },
-  { name: "moondream", params: "1.4B", size: "829MB", ram: "4GB", family: "Moondream 2", vision: true },
-  { name: "neural-chat", params: "7B", size: "4.1GB", ram: "8GB", family: "Neural Chat" },
-  { name: "starling-lm", params: "7B", size: "4.1GB", ram: "8GB", family: "Starling" },
-  { name: "codellama", params: "7B", size: "3.8GB", ram: "8GB", family: "Code Llama" },
-  { name: "llama2-uncensored", params: "7B", size: "3.8GB", ram: "8GB", family: "Llama 2 Uncensored" },
-  { name: "llava", params: "7B", size: "4.5GB", ram: "8GB", family: "LLaVA", vision: true },
-  { name: "granite3.2", params: "8B", size: "4.9GB", ram: "8GB", family: "Granite 3.2" },
+  { name: "gemma3:1b", params: "1B", size: "815MB", ram: "4GB", cpuCores: 2, family: "Gemma 3" },
+  { name: "gemma3", params: "4B", size: "3.3GB", ram: "8GB", cpuCores: 4, family: "Gemma 3" },
+  { name: "gemma3:12b", params: "12B", size: "8.1GB", ram: "16GB", cpuCores: 6, family: "Gemma 3" },
+  { name: "gemma3:27b", params: "27B", size: "17GB", ram: "32GB", cpuCores: 8, family: "Gemma 3" },
+  { name: "qwq", params: "32B", size: "20GB", ram: "32GB", cpuCores: 8, family: "QwQ" },
+  { name: "deepseek-r1", params: "7B", size: "4.7GB", ram: "8GB", cpuCores: 4, family: "DeepSeek-R1", vision: true },
+  { name: "deepseek-r1:671b", params: "671B", size: "404GB", ram: "512GB", cpuCores: 32, family: "DeepSeek-R1" },
+  { name: "llama3.3", params: "70B", size: "43GB", ram: "64GB", cpuCores: 16, family: "Llama 3.3" },
+  { name: "llama3.2", params: "3B", size: "2.0GB", ram: "8GB", cpuCores: 4, family: "Llama 3.2" },
+  { name: "llama3.2:1b", params: "1B", size: "1.3GB", ram: "4GB", cpuCores: 2, family: "Llama 3.2" },
+  { name: "llama3.2-vision", params: "11B", size: "7.9GB", ram: "16GB", cpuCores: 6, family: "Llama 3.2", vision: true },
+  { name: "llama3.2-vision:90b", params: "90B", size: "55GB", ram: "96GB", cpuCores: 24, family: "Llama 3.2", vision: true },
+  { name: "llama3.1", params: "8B", size: "4.7GB", ram: "8GB", cpuCores: 4, family: "Llama 3.1" },
+  { name: "llama3.1:405b", params: "405B", size: "231GB", ram: "256GB", cpuCores: 32, family: "Llama 3.1" },
+  { name: "phi4", params: "14B", size: "9.1GB", ram: "16GB", cpuCores: 6, family: "Phi 4" },
+  { name: "phi4-mini", params: "3.8B", size: "2.5GB", ram: "8GB", cpuCores: 4, family: "Phi 4 Mini" },
+  { name: "mistral", params: "7B", size: "4.1GB", ram: "8GB", cpuCores: 4, family: "Mistral" },
+  { name: "moondream", params: "1.4B", size: "829MB", ram: "4GB", cpuCores: 2, family: "Moondream 2", vision: true },
+  { name: "neural-chat", params: "7B", size: "4.1GB", ram: "8GB", cpuCores: 4, family: "Neural Chat" },
+  { name: "starling-lm", params: "7B", size: "4.1GB", ram: "8GB", cpuCores: 4, family: "Starling" },
+  { name: "codellama", params: "7B", size: "3.8GB", ram: "8GB", cpuCores: 4, family: "Code Llama" },
+  { name: "llama2-uncensored", params: "7B", size: "3.8GB", ram: "8GB", cpuCores: 4, family: "Llama 2 Uncensored" },
+  { name: "llava", params: "7B", size: "4.5GB", ram: "8GB", cpuCores: 4, family: "LLaVA", vision: true },
+  { name: "granite3.2", params: "8B", size: "4.9GB", ram: "8GB", cpuCores: 4, family: "Granite 3.2" },
 ];
+
+// Get system specifications
+function getSystemSpecs() {
+  try {
+    // Using Node.js OS module
+    const os = require('os');
+    
+    // Get total memory in GB
+    const totalRamGB = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+    
+    // Get CPU cores count
+    const cpuCores = os.cpus().length;
+    
+    return { 
+      ram: totalRamGB, 
+      cores: cpuCores,
+      platform: os.platform(),
+      arch: os.arch()
+    };
+  } catch (error) {
+    console.error("Error getting system specs:", error);
+    // Return reasonable defaults if we can't get the actual specs
+    return { ram: 8, cores: 4, platform: 'unknown', arch: 'unknown' };
+  }
+}
+
+// Cache system specs
+const SYSTEM_SPECS = getSystemSpecs();
 
 // Load model library into dropdown select
 function loadModelLibrary() {
@@ -289,14 +317,30 @@ function loadModelLibrary() {
     optgroup.label = family;
     
     modelsByFamily[family].forEach(model => {
+      // Check if model is compatible with system
+      const ramRequiredGB = parseInt(model.ram.replace(/[^\d]/g, ''));
+      const isCompatible = checkModelCompatibility(model);
+      
       const option = document.createElement("option");
       option.value = model.name;
-      option.textContent = `${model.name} (${model.params}, ${model.size})`;
+      
+      // Add compatibility marker to option text
+      const compatibilityMarker = isCompatible ? "✅" : "⚠️";
+      option.textContent = `${compatibilityMarker} ${model.name} (${model.params}, ${model.size})`;
+      
+      // Store model data in dataset attributes
       option.dataset.params = model.params;
       option.dataset.size = model.size;
       option.dataset.ram = model.ram;
+      option.dataset.cpuCores = model.cpuCores;
       option.dataset.family = model.family;
       option.dataset.vision = model.vision ? "true" : "false";
+      option.dataset.compatible = isCompatible ? "true" : "false";
+      
+      // Style options based on compatibility
+      if (!isCompatible) {
+        option.classList.add("incompatible-model");
+      }
       
       optgroup.appendChild(option);
     });
@@ -311,6 +355,24 @@ function loadModelLibrary() {
     // Enable pull button when a model is selected
     confirmPullBtn.disabled = !librarySelect.value;
   });
+  
+  // Show system specs in the status area
+  const systemSpecsDiv = document.getElementById("system-specs");
+  if (systemSpecsDiv) {
+    systemSpecsDiv.textContent = `Your System: ${SYSTEM_SPECS.ram}GB RAM, ${SYSTEM_SPECS.cores} CPU Cores`;
+  }
+}
+
+// Check if model is compatible with user's system
+function checkModelCompatibility(model) {
+  // Parse the RAM requirement (strip non-digit characters and convert to number)
+  const ramRequiredGB = parseInt(model.ram.replace(/[^\d]/g, ''));
+  
+  // Check RAM and CPU requirements
+  const hasEnoughRam = SYSTEM_SPECS.ram >= ramRequiredGB;
+  const hasEnoughCores = SYSTEM_SPECS.cores >= model.cpuCores;
+  
+  return hasEnoughRam && hasEnoughCores;
 }
 
 // Update model details when a model is selected
@@ -321,24 +383,57 @@ function updateModelDetails(modelName) {
   const model = MODEL_LIBRARY.find(m => m.name === modelName);
   if (!model) return;
   
+  // Check compatibility
+  const isCompatible = checkModelCompatibility(model);
+  
   // Update the info card
+  const modelInfoCard = document.querySelector(".model-info-card");
   const modelNameElement = document.querySelector(".model-name");
   const modelSizeBadge = document.querySelector(".model-size-badge");
   const modelParams = document.querySelector(".model-params");
   const modelCommand = document.querySelector(".model-command code");
   const modelRequirements = document.querySelector(".model-requirements");
   
+  // Remove previous compatibility classes
+  modelInfoCard.classList.remove("compatible-model", "incompatible-model");
+  
+  // Add appropriate compatibility class
+  modelInfoCard.classList.add(isCompatible ? "compatible-model" : "incompatible-model");
+  
+  // Base model info
   modelNameElement.textContent = `${model.family} (${model.name})`;
   modelSizeBadge.textContent = model.size;
   modelParams.textContent = `Parameters: ${model.params}`;
   modelCommand.textContent = `ollama run ${model.name}`;
   
-  // Set requirements based on RAM
-  modelRequirements.textContent = `System Requirements: Minimum ${model.ram} RAM`;
+  // Set requirements and compatibility status
+  const compatibilityIcon = isCompatible ? 
+    `<span class="compatibility-icon compatible">✅</span>` : 
+    `<span class="compatibility-icon incompatible">⚠️</span>`;
+  
+  modelRequirements.innerHTML = `
+    ${compatibilityIcon} System Requirements: ${model.ram} RAM, ${model.cpuCores} CPU Cores
+    ${isCompatible ? 
+      '<div class="compatibility-message compatible">Compatible with your system</div>' : 
+      `<div class="compatibility-message incompatible">Your system (${SYSTEM_SPECS.ram}GB RAM, ${SYSTEM_SPECS.cores} Cores) may not meet requirements</div>`
+    }
+  `;
   
   // Add vision badge if applicable
   if (model.vision) {
     modelNameElement.innerHTML = `${model.family} (${model.name}) <span class="vision-badge">Vision</span>`;
+  }
+  
+  // Update the confirm button based on compatibility
+  const confirmPullBtn = document.getElementById("confirm-pull");
+  if (confirmPullBtn) {
+    if (!isCompatible) {
+      confirmPullBtn.classList.add("warning-pull");
+      confirmPullBtn.title = "This model may not run well on your system";
+    } else {
+      confirmPullBtn.classList.remove("warning-pull");
+      confirmPullBtn.title = "";
+    }
   }
 }
 
