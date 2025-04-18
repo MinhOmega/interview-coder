@@ -66,11 +66,21 @@ function showToast({ message, type = "success", duration, callback, close = true
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
       const mainWindow = windows[0];
-      mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-        body: message,
-        type: type,
-        duration: duration || DURATIONS[type],
-      });
+      try {
+        // Check if window and webContents still exist
+        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+          mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+            body: message,
+            type: type,
+            duration: duration || DURATIONS[type],
+          });
+        } else {
+          console.log(`[${type.toUpperCase()}]: ${message} (Window not available)`);
+        }
+      } catch (error) {
+        console.error("Error sending toast notification:", error);
+        console.log(`[${type.toUpperCase()}]: ${message}`);
+      }
     } else {
       console.log(`[${type.toUpperCase()}]: ${message}`);
     }
