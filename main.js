@@ -7,6 +7,7 @@ const {
   systemPreferences,
   Menu,
   MenuItem,
+  dialog,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -24,6 +25,7 @@ const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac, isWindows } = require("./js/config");
 const toastManager = require("./js/toast-manager");
+const updateManager = require("./js/update-manager");
 const macOSPermissions = isMac ? require("./js/macos-permissions") : null;
 
 // Set up hot reload for development
@@ -265,6 +267,29 @@ app.whenReady().then(async () => {
         },
       ],
     },
+    {
+      label: "Help",
+      submenu: [
+        {
+          label: "Check for Updates",
+          click: () => {
+            updateManager.checkForUpdates();
+          },
+        },
+        { type: "separator" },
+        {
+          label: "About",
+          click: () => {
+            dialog.showMessageBox({
+              title: "About Interview Coder",
+              message: `Interview Coder v${app.getVersion()}`,
+              detail: "A tool for capturing and analyzing screenshots using AI.",
+              buttons: ["OK"],
+            });
+          },
+        },
+      ],
+    },
   ];
 
   const menu = Menu.buildFromTemplate(template);
@@ -278,6 +303,9 @@ app.whenReady().then(async () => {
   if (initStatus.openai) {
     openai = aiProviders.getOpenAI();
   }
+
+  // Initialize the auto-updater with the main window
+  updateManager.setupAutoUpdater(mainWindow);
 
   // Linux-specific initialization
   if (isLinux) {

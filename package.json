@@ -1,6 +1,6 @@
 {
   "name": "interview-coders",
-  "version": "1.5.2",
+  "version": "1.5.3-beta.1",
   "main": "main.js",
   "description": "Interview Coder is an Electron application that captures and analyzes screenshots using AI (OpenAI, Google Gemini, or Ollama). It features global keyboard shortcuts, multi-page mode for complex questions, real-time streaming responses, and supports both cloud and local AI models. The app provides a customizable UI with transparent, always-on-top windows and markdown-rendered responses, making it ideal for processing coding questions, generating code, or providing detailed answers from screenshots.",
   "author": {
@@ -60,7 +60,8 @@
       },
       "strictVerify": false,
       "notarize": false,
-      "type": "development"
+      "type": "development",
+      "publish": ["github"]
     },
     "dmg": {
       "icon": "build/logo.icns",
@@ -83,7 +84,7 @@
       },
       "title": "Install Interview Coder",
       "sign": false,
-      "writeUpdateInfo": false,
+      "writeUpdateInfo": true,
       "artifactName": "${productName}-${arch}.${ext}"
     },
     "win": {
@@ -92,7 +93,16 @@
         "nsis",
         "portable"
       ],
-      "artifactName": "${productName}.${ext}"
+      "artifactName": "${productName}.${ext}",
+      "publish": ["github"]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "linux": {
       "icon": "build/logo.png",
@@ -102,7 +112,8 @@
         "rpm"
       ],
       "category": "Development",
-      "artifactName": "${productName}.${ext}"
+      "artifactName": "${productName}.${ext}",
+      "publish": ["github"]
     },
     "asar": true,
     "compression": "maximum",
@@ -143,6 +154,7 @@
     "axios": "^1.8.4",
     "electron-log": "^5.2.4",
     "electron-screenshots": "^0.5.27",
+    "electron-updater": "^6.6.2",
     "openai": "^4.90.0",
     "rehype-autolink-headings": "^5.0.1",
     "rehype-format": "^3.1.0",
