@@ -1,0 +1,84 @@
+name: Build and Pre-release
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      retention_days: 1
+
+  prerelease:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get package version and generate pre-release version
+        id: package-version
+        run: |
+          # Extract the base version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
+          # Get current branch name
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+
+          # Get short SHA of the commit
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
+          # Generate pre-release suffix based on branch
+          if [ "$BRANCH_NAME" = "main" ]; then
+            PRE_SUFFIX="beta"
+          else
+            # Convert branch name to kebab-case for the tag
+            BRANCH_KEBAB=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+            PRE_SUFFIX="alpha.$BRANCH_KEBAB"
+          fi
+
+          # Generate the full pre-release version
+          PRE_VERSION="$BASE_VERSION-$PRE_SUFFIX.$SHORT_SHA"
+
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
+          echo "PRE_VERSION=$PRE_VERSION" >> $GITHUB_OUTPUT
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Pre-release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.package-version.outputs.PRE_VERSION }}
+          name: Pre-release v${{ steps.package-version.outputs.PRE_VERSION }}
+          draft: false
+          prerelease: true
+          body: |
+            Pre-release build from branch: ${{ steps.package-version.outputs.BRANCH_NAME }}
+            Base version: ${{ steps.package-version.outputs.BASE_VERSION }}
+
+            This is an automated pre-release build for testing purposes.
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.exe
+            artifacts/**/*.zip
+            artifacts/**/*.yml
+            artifacts/**/*.yaml
+            artifacts/**/latest*.yml
+            artifacts/**/latest*.yaml

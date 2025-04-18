@@ -3,6 +3,7 @@ const { processMarkdown } = require("./js/markdown-processor");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
+const updateUI = require("./js/update-ui");
 const log = require("electron-log");
 
 // Variables for tracking state
@@ -742,15 +743,11 @@ const onEventDOMContentLoaded = async () => {
   }
 
   // System prompt button functionality
-  const systemPromptBtn = document.getElementById("btn-system-prompt");
   const updateSystemPromptBtn = document.getElementById("update-system-prompt");
   const cancelSystemPromptBtn = document.getElementById("cancel-system-prompt");
   const clearSystemPromptBtn = document.getElementById("clear-system-prompt");
   const devToolsBtn = document.getElementById("btn-devtools");
-
-  if (systemPromptBtn) {
-    systemPromptBtn.addEventListener("click", toggleSystemPrompt);
-  }
+  const checkUpdatesBtn = document.getElementById("btn-check-updates");
 
   if (updateSystemPromptBtn) {
     updateSystemPromptBtn.addEventListener("click", updateSystemPrompt);
@@ -762,6 +759,38 @@ const onEventDOMContentLoaded = async () => {
 
   if (clearSystemPromptBtn) {
     clearSystemPromptBtn.addEventListener("click", clearSystemPrompt);
+  }
+
+  // Check for updates button
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener("click", () => {
+      try {
+        log.info("Check for updates button clicked");
+        
+        // Try automatic check first, then fall back to manual if needed
+        updateUI.checkForUpdates();
+        
+        // Add a fallback timer to try manual check if automatic fails
+        setTimeout(() => {
+          // Only do this if we don't already have update info
+          const updateBadge = document.getElementById("update-badge");
+          if (updateBadge && updateBadge.classList.contains("hidden")) {
+            try {
+              log.info("Trying manual update check as fallback...");
+              const checkForUpdatesManual = updateUI.checkForUpdatesManual || (() => {
+                ipcRenderer.invoke('check-for-updates-manual');
+              });
+              checkForUpdatesManual();
+            } catch (manualError) {
+              log.error("Error in manual update check:", manualError);
+            }
+          }
+        }, 5000);
+      } catch (error) {
+        log.error("Error checking for updates:", error);
+        logError(`Failed to check for updates: ${error.message}`);
+      }
+    });
   }
 
   // DevTools button functionality
@@ -784,6 +813,13 @@ const onEventDOMContentLoaded = async () => {
   if (toggleSystemPromptBtn) {
     toggleSystemPromptBtn.addEventListener("click", toggleSystemPrompt);
   }
+
+  // Setup UI components
+  setupResizeHandle();
+  setupCodeCopyButtons();
+
+  // Initialize update UI
+  updateUI.createUpdateUI();
 };
 
 // Handle the start of a chat message stream

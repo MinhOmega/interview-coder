@@ -12,75 +12,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-      fail-fast: false
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-
-      # Install system dependencies for Linux
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxkbfile-dev libsecret-1-dev libudev-dev libxtst-dev
-        shell: bash
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          # Rebuild native modules if needed
-          npm rebuild
-        shell: bash
-
-      - name: Setup macOS certificates
-        if: matrix.os == 'macos-latest'
-        run: echo "Add your certificate setup steps here if needed"
-        shell: bash
-
-      - name: Build application
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npm run build:mac
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            npm run build:linux
-          else
-            npm run build:win
-          fi
-        shell: bash
-
-      - name: List dist directory
-        run: ls -la dist/
-        shell: bash
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.os }}-build
-          path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
-            dist/*.zip
-          retention-days: 1
-          if-no-files-found: warn
+    uses: ./.github/workflows/build.yml
+    with:
+      retention_days: 1
 
   release:
     needs: build
@@ -117,3 +51,7 @@ jobs:
             artifacts/**/*.rpm
             artifacts/**/*.exe
             artifacts/**/*.zip
+            artifacts/**/*.yml
+            artifacts/**/*.yaml
+            artifacts/**/latest*.yml
+            artifacts/**/latest*.yaml

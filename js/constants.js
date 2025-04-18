@@ -42,6 +42,13 @@ const IPC_CHANNELS = {
   TOGGLE_SPLIT_VIEW: "toggle-split-view",
   UPDATE_SYSTEM_PROMPT: "update-system-prompt",
   GET_SYSTEM_PROMPT: "get-system-prompt",
+  // Auto Update channels
+  UPDATE_STATUS: "update-status",
+  CHECK_FOR_UPDATES: "check-for-updates",
+  CHECK_FOR_UPDATES_MANUAL: "check-for-updates-manual",
+  DOWNLOAD_UPDATE: "download-update",
+  INSTALL_UPDATE: "install-update",
+  GET_UPDATE_STATUS: "get-update-status",
 };
 
 module.exports = {
