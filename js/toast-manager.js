@@ -6,16 +6,22 @@ const isMainProcess = process && process.type === "browser";
 try {
   Toastify = require("toastify-js");
 } catch (error) {
+  console.log("Trying alternative ways to load Toastify:", error.message);
+  
   if (typeof window !== "undefined" && window.Toastify) {
+    console.log("Using Toastify from window object");
     Toastify = window.Toastify;
   } else {
-    console.error("Toastify could not be loaded:", error);
-
+    console.error("Toastify could not be loaded - using fallback implementation");
+    
     Toastify = function (options) {
-      console.log(`TOAST [${options.className}]: ${options.text}`);
+      console.log(`TOAST [${options.className || 'default'}]: ${options.text}`);
       return {
         showToast: function () {
-          console.log("Toast would show now");
+          console.log("Toast would show now (fallback)");
+          if (typeof document !== "undefined") {
+            console.warn("Toast notification:", options.text);
+          }
         },
       };
     };
@@ -63,22 +69,31 @@ const COLORS = {
 function showToast({ message, type = "success", duration, callback, close = true }) {
   if (isMainProcess) {
     const { BrowserWindow } = require("electron");
-    const windows = BrowserWindow.getAllWindows();
-    if (windows.length > 0) {
-      const mainWindow = windows[0];
-      mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-        body: message,
-        type: type,
-        duration: duration || DURATIONS[type],
-      });
-    } else {
+    try {
+      const windows = BrowserWindow.getAllWindows();
+      if (windows.length > 0) {
+        const mainWindow = windows[0];
+        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+          mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+            body: message,
+            type: type,
+            duration: duration || DURATIONS[type],
+          });
+        } else {
+          console.log(`[${type.toUpperCase()}]: ${message} (Window not available)`);
+        }
+      } else {
+        console.log(`[${type.toUpperCase()}]: ${message} (No windows found)`);
+      }
+    } catch (error) {
+      console.error("Error sending toast from main process:", error);
       console.log(`[${type.toUpperCase()}]: ${message}`);
     }
     return null;
   }
 
   if (typeof document === "undefined") {
-    console.log(`[${type.toUpperCase()}]: ${message}`);
+    console.log(`[${type.toUpperCase()}]: ${message} (No document available)`);
     return null;
   }
 
@@ -96,11 +111,24 @@ function showToast({ message, type = "success", duration, callback, close = true
   config.className = `toast-notification ${type}`;
 
   try {
-    const toast = Toastify(config);
-    toast.showToast();
-    return toast;
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => {
+        try {
+          const toast = Toastify(config);
+          toast.showToast();
+        } catch (err) {
+          console.error("Failed to show toast after DOM ready:", err);
+        }
+      });
+      return null;
+    } else {
+      const toast = Toastify(config);
+      toast.showToast();
+      return toast;
+    }
   } catch (error) {
-    console.error("Error showing toast notification:", error, error.stack);
+    console.error("Error showing toast notification:", error);
+    if (error.stack) console.error("Stack:", error.stack);
 
     console.log(`[${type.toUpperCase()}]: ${message}`);
     return null;

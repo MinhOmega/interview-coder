@@ -16,6 +16,9 @@ function createMainWindow() {
   const windowWidth = 1000;
   const windowHeight = 800;
 
+  // Check if in development mode
+  const isDev = process.env.NODE_ENV === "development" || !require('electron').app.isPackaged;
+
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -24,13 +27,16 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      devTools: true, // Always enable DevTools in both dev and production
+      additionalArguments: ["--allow-file-access-from-files"], // Add additional arguments for better compatibility
+      webSecurity: !isDev, // Disable web security in dev for easier debugging
     },
     frame: false,
     transparent: true,
     backgroundColor: "#00000000", // Transparent background
     alwaysOnTop: true,
     paintWhenInitiallyHidden: true,
-    contentProtection: true,
+    contentProtection: false, // Disable content protection to ensure DevTools work properly
     movable: true, // Ensure window is movable
     roundedCorners: true,
     titleBarStyle: "hidden", // Hide title bar completely
@@ -44,7 +50,44 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile("index.html");
-  mainWindow.setContentProtection(true);
+  
+  // Ensure DevTools works in all environments
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // Allow DevTools to be opened with both standard shortcuts
+    const isMac = process.platform === 'darwin';
+    const isDevToolsShortcut1 = 
+      (isMac && input.meta && input.alt && input.key.toLowerCase() === 'i') ||
+      (!isMac && input.control && input.shift && input.key.toLowerCase() === 'i');
+    
+    const isDevToolsShortcut2 = 
+      (isMac && input.meta && input.control && input.key.toLowerCase() === 'i') ||
+      (!isMac && input.control && input.alt && input.key.toLowerCase() === 'i');
+      
+    if (isDevToolsShortcut1 || isDevToolsShortcut2) {
+      // Force DevTools to open regardless of environment
+      setTimeout(() => {
+        if (!mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.openDevTools();
+        }
+      }, 100);
+      event.preventDefault();
+    }
+  });
+  
+  // Allow F12 to also open DevTools (common convention)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12') {
+      setTimeout(() => {
+        if (!mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.openDevTools();
+        } else {
+          mainWindow.webContents.closeDevTools();
+        }
+      }, 100);
+      event.preventDefault();
+    }
+  });
+  
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
 

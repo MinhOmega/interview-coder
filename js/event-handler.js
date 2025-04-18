@@ -50,10 +50,52 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
 
   ipcMain.on(IPC_CHANNELS.TOGGLE_DEVTOOLS, () => {
     if (mainWindow) {
-      if (mainWindow.webContents.isDevToolsOpened()) {
-        mainWindow.webContents.closeDevTools();
-      } else {
-        mainWindow.webContents.openDevTools();
+      try {
+        console.log(`Toggling DevTools on platform: ${process.platform}`);
+        
+        // Check if DevTools are already open
+        const isDevToolsOpen = mainWindow.webContents.isDevToolsOpened();
+        console.log(`DevTools are currently ${isDevToolsOpen ? 'open' : 'closed'}`);
+        
+        if (isDevToolsOpen) {
+          mainWindow.webContents.closeDevTools();
+          console.log('DevTools closed successfully');
+        } else {
+          // Platform-specific DevTools settings
+          let options = {};
+          
+          // For macOS, open devtools in detached mode by default
+          if (process.platform === 'darwin') {
+            options = { mode: 'detach' };
+          }
+          
+          mainWindow.webContents.openDevTools(options);
+          console.log('DevTools opened successfully with options:', options);
+        }
+      } catch (error) {
+        console.error(`Error toggling DevTools on ${process.platform}:`, error);
+        
+        // Provide more detailed error info to help debugging
+        const errorInfo = {
+          message: error.message,
+          stack: error.stack,
+          platform: process.platform,
+          electronVersion: process.versions.electron,
+          nodeVersion: process.versions.node,
+          chromeVersion: process.versions.chrome
+        };
+        
+        console.error('DevTools error details:', errorInfo);
+        
+        // Try an alternative approach for problematic platforms
+        try {
+          if (!mainWindow.webContents.isDevToolsOpened()) {
+            console.log('Trying alternative method to open DevTools...');
+            mainWindow.webContents.openDevTools();
+          }
+        } catch (altError) {
+          console.error('Alternative DevTools method also failed:', altError);
+        }
       }
     }
   });
