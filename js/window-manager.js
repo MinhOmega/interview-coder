@@ -265,7 +265,6 @@ function getModelListWindow() {
   return modelListWindow;
 }
 
-
 // Get window visibility state
 function getWindowVisibility() {
   return isWindowVisible;

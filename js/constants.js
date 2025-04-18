@@ -11,8 +11,6 @@ const IPC_CHANNELS = {
   UPDATE_VISIBILITY: "update-visibility",
   TOGGLE_VISIBILITY: "toggle-visibility",
   NOTIFICATION: "notification",
-  WARNING: "warning",
-  ERROR: "error",
   LOADING: "loading",
   ANALYSIS_RESULT: "analysis-result",
   STREAM_START: "stream-start",
@@ -39,7 +37,6 @@ const IPC_CHANNELS = {
   SEND_CHAT_MESSAGE: "send-chat-message",
   CHAT_MESSAGE_RESPONSE: "chat-message-response",
   TOGGLE_SPLIT_VIEW: "toggle-split-view",
-  SET_CHAT_MODE: "set-chat-mode",
   UPDATE_SYSTEM_PROMPT: "update-system-prompt",
   GET_SYSTEM_PROMPT: "get-system-prompt",
 };
