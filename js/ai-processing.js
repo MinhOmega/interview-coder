@@ -4,8 +4,8 @@ const configManager = require("./config-manager");
 const aiProviders = require("./ai-providers");
 const windowManager = require("./window-manager");
 const { getUserDataPath } = require("./utils");
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const toastManager = require("./toast-manager");
 
 const basePrompt = `I need you to analyze this problem carefully and provide the best possible solution with excellent performance and readability.
 
@@ -208,7 +208,7 @@ async function processScreenshots(
         });
 
         streamingResult.emitter.on("error", (error) => {
-          mainWindow.webContents.send(IPC_CHANNELS.ERROR, error.message);
+          toastManager.error(`${error.message}`);
           mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
           mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
         });
@@ -236,14 +236,14 @@ async function processScreenshots(
     }
 
     mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
-    mainWindow.webContents.send(IPC_CHANNELS.ERROR, err.message);
     mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+    toastManager.error(`${err.message}`);
   }
 }
 
 /**
  * Processes a chat message with the AI
- * 
+ *
  * @param {BrowserWindow} window - The window sending the message
  * @param {Array} messageHistory - The message history including user and AI messages
  * @param {string} systemPrompt - Optional system prompt to include
@@ -253,100 +253,98 @@ async function processChatMessage(window, messageHistory, systemPrompt) {
     // Get current AI settings
     const settings = configManager.getCurrentSettings();
     const { aiProvider, currentModel } = settings;
-    
+
     if (!aiProvider || aiProvider === AI_PROVIDERS.DEFAULT) {
-      window.webContents.send(IPC_CHANNELS.ERROR, "Please configure an AI provider in settings first.");
+      toastManager.error("Please configure an AI provider in settings first.");
       return;
     }
-    
+
     let messages = [];
-    
+
     // Add system prompt if provided
     if (systemPrompt) {
       messages.push({ role: "system", content: systemPrompt });
     }
-    
+
     // Add message history
-    messageHistory.forEach(msg => {
+    messageHistory.forEach((msg) => {
       messages.push({ role: msg.role, content: msg.content });
     });
-    
+
     let response;
 
     if (aiProvider === AI_PROVIDERS.OPENAI) {
       // Get OpenAI client
       const openai = aiProviders.getOpenAI();
-      
+
       if (!openai) {
         throw new Error("OpenAI client is not initialized. Please go to Settings and enter your API key.");
       }
-      
+
       const result = await openai.chat.completions.create({
         model: currentModel,
         messages: messages,
         max_tokens: 4000,
       });
-      
+
       response = { role: "assistant", content: result.choices[0].message.content };
-    } 
-    else if (aiProvider === AI_PROVIDERS.GEMINI) {
+    } else if (aiProvider === AI_PROVIDERS.GEMINI) {
       // Get Gemini client
       const geminiAI = aiProviders.getGeminiAI();
-      
+
       if (!geminiAI) {
         throw new Error("Gemini AI client is not initialized. Please go to Settings and enter your API key.");
       }
-      
-      const geminiMessages = messages.map(msg => {
+
+      const geminiMessages = messages.map((msg) => {
         return { role: msg.role === "user" ? "user" : "model", parts: [{ text: msg.content }] };
       });
-      
+
       const result = await geminiAI.generateContent({
         contents: geminiMessages,
         generationConfig: {
           maxOutputTokens: 4000,
         },
       });
-      
+
       response = { role: "assistant", content: result.response.text() };
-    }
-    else if (aiProvider === AI_PROVIDERS.OLLAMA) {
+    } else if (aiProvider === AI_PROVIDERS.OLLAMA) {
       // Use Ollama client
       const result = await aiProviders.generateWithOllama(
-        messages.map(msg => msg.content),
-        currentModel
+        messages.map((msg) => msg.content),
+        currentModel,
       );
-      
+
       response = { role: "assistant", content: result };
     }
-    
+
     // Send response back to renderer
     window.webContents.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
-    
   } catch (error) {
     console.error("Error in processChatMessage:", error);
-    window.webContents.send(IPC_CHANNELS.ERROR, error.message);
+    toastManager.error(`${error.message}`);
     // Send a fallback error response
-    window.webContents.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, { 
-      role: "assistant", 
-      content: "I'm sorry, I encountered an error while processing your message. Please try again or check your AI provider settings." 
+    window.webContents.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
+      role: "assistant",
+      content:
+        "I'm sorry, I encountered an error while processing your message. Please try again or check your AI provider settings.",
     });
   }
 }
 
 /**
  * Gets the system prompt from file if it exists
- * 
+ *
  * @returns {string} The system prompt or empty string if not found
  */
 function getSystemPrompt() {
   try {
-    const systemPromptFile = getUserDataPath('systemPrompt.txt');
+    const systemPromptFile = getUserDataPath("systemPrompt.txt");
     if (fs.existsSync(systemPromptFile)) {
-      return fs.readFileSync(systemPromptFile, 'utf8');
+      return fs.readFileSync(systemPromptFile, "utf8");
     }
   } catch (error) {
-    console.error('Error loading system prompt:', error);
+    console.error("Error loading system prompt:", error);
   }
   return "";
 }
@@ -355,5 +353,5 @@ module.exports = {
   createPrompt,
   processScreenshots,
   processChatMessage,
-  getSystemPrompt
+  getSystemPrompt,
 };

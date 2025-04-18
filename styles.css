@@ -522,52 +522,6 @@ code {
   margin-top: 5px;
 }
 
-#notification-container {
-  position: fixed;
-  bottom: 10%;
-  right: 20px;
-  z-index: 100000;
-  max-width: 400px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-end;
-}
-
-.notification {
-  padding: 14px 20px;
-  color: white;
-  border-radius: 8px;
-  font-size: 14px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  max-width: 400px;
-  word-break: break-word;
-  pointer-events: auto;
-  opacity: 0;
-  transform: translateX(50px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.notification.success {
-  background-color: var(--bg-notification-success);
-  border: 1px solid rgba(120, 180, 120, 0.3);
-}
-
-.notification.warning {
-  background-color: var(--bg-notification-warning);
-  border: 1px solid rgba(180, 130, 20, 0.3);
-}
-
-.notification.error {
-  background-color: var(--bg-notification-error);
-  border: 1px solid rgba(180, 70, 70, 0.3);
-}
-
-.notification.visible {
-  opacity: 1;
-  transform: translateX(0);
-}
-
 body.invisible-mode {
   opacity: 0;
   pointer-events: none;

@@ -12,6 +12,7 @@ const eventHandler = require("./js/event-handler");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac } = require("./js/config");
+const toastManager = require("./js/toast-manager");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -58,7 +59,7 @@ async function processScreenshotsWithAI() {
   const screenshots = screenshotManager.getScreenshots();
 
   if (screenshots.length === 0) {
-    mainWindow.webContents.send(IPC_CHANNELS.WARNING, "No screenshots to process. Take a screenshot first.");
+    toastManager.warning("No screenshots to process. Take a screenshot first.");
     return;
   }
 
@@ -76,7 +77,7 @@ async function processScreenshotsWithAI() {
     );
   } catch (error) {
     console.error("Error processing screenshots:", error);
-    mainWindow.webContents.send(IPC_CHANNELS.ERROR, "Failed to process screenshots: " + error.message);
+    toastManager.error("Failed to process screenshots: " + error.message);
     windowManager.updateInstruction(
       windowManager.getDefaultInstructions(
         screenshotManager.getMultiPageMode(),
@@ -223,17 +224,21 @@ app.whenReady().then(() => {
     DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
     TAKE_SCREENSHOT: async () => {
       try {
-        // Take a normal screenshot
-        resetProcess();
-        // Hide window during capture
-        global.mainWindowWasVisible = windowManager.getWindowVisibility();
-        if (global.mainWindowWasVisible) {
-          mainWindow.hide();
-        }
-        await screenshotManager.captureAutoScreenshot(mainWindow);
+        windowManager.updateInstruction("Taking screenshot...");
+        const img = await screenshotManager.captureScreenshot(mainWindow);
+        screenshotManager.addScreenshot(img);
+        windowManager.updateInstruction("Processing screenshot with AI...");
+        await processScreenshotsWithAI();
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+H error:`, error);
-        mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error capturing screenshot: ${error.message}`);
+        toastManager.error(`Error processing command: ${error.message}`);
+        windowManager.updateInstruction(
+          windowManager.getDefaultInstructions(
+            screenshotManager.getMultiPageMode(),
+            screenshotManager.getScreenshots().length,
+            hotkeyManager.getModifierKey(),
+          ),
+        );
       }
     },
     AREA_SCREENSHOT: () => {
@@ -241,10 +246,6 @@ app.whenReady().then(() => {
         if (isLinux) {
           // Check if ImageMagick's import command is available
           if (!isCommandAvailable("import")) {
-            mainWindow.webContents.send(
-              IPC_CHANNELS.WARNING,
-              "Area screenshot requires ImageMagick. Please install it with: sudo apt-get install imagemagick",
-            );
             windowManager.updateInstruction(
               "Area screenshot requires ImageMagick. Please install with: sudo apt-get install imagemagick",
             );
@@ -254,25 +255,18 @@ app.whenReady().then(() => {
               try {
                 windowManager.updateInstruction("Taking full screen screenshot as fallback...");
                 const result = await captureFullScreenFallback();
-
-                // Convert to base64 string format expected by the app
                 const base64Image = `data:image/png;base64,${result.buffer.toString("base64")}`;
-
-                // Add screenshot to the manager
                 screenshotManager.addScreenshot(base64Image);
-
-                // Show notification
-                mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-                  body: `Fullscreen screenshot saved to ${result.path} (${result.dimensions.width}x${result.dimensions.height})`,
-                  type: "success",
-                });
+                toastManager.success(
+                  `Fullscreen screenshot saved to ${result.path} (${result.dimensions.width}x${result.dimensions.height})`,
+                );
 
                 // Process the screenshot with AI
                 windowManager.updateInstruction("Processing screenshot with AI...");
                 await processScreenshotsWithAI();
               } catch (fallbackError) {
                 console.error("Fallback screenshot failed:", fallbackError);
-                mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Fallback screenshot failed: ${fallbackError.message}`);
+                toastManager.error(`Fallback screenshot failed: ${fallbackError.message}`);
                 windowManager.updateInstruction(
                   windowManager.getDefaultInstructions(
                     screenshotManager.getMultiPageMode(),
@@ -293,7 +287,7 @@ app.whenReady().then(() => {
         global.mainWindowWasVisible = wasVisible;
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
-        mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error starting area capture: ${error.message}`);
+        toastManager.error(`Error starting area capture: ${error.message}`);
         windowManager.updateInstruction(
           windowManager.getDefaultInstructions(
             screenshotManager.getMultiPageMode(),
@@ -323,7 +317,7 @@ app.whenReady().then(() => {
         );
       } catch (error) {
         console.error(`${hotkeyManager.getModifierKey()}+A error:`, error);
-        mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Error processing command: ${error.message}`);
+        toastManager.error(`Error processing command: ${error.message}`);
       }
     },
     RESET: () => resetProcess(),
@@ -349,7 +343,7 @@ app.whenReady().then(() => {
 
       if (!buffer) {
         console.error("Screenshot buffer is invalid:", { event, buffer, data });
-        mainWindow.webContents.send(IPC_CHANNELS.ERROR, "Failed to process screenshot: Invalid screenshot data");
+        toastManager.error("Failed to process screenshot: Invalid screenshot data");
         windowManager.updateInstruction(
           windowManager.getDefaultInstructions(
             screenshotManager.getMultiPageMode(),
@@ -402,16 +396,13 @@ app.whenReady().then(() => {
       screenshotManager.addScreenshot(base64Image);
 
       // Show notification
-      mainWindow.webContents.send(IPC_CHANNELS.NOTIFICATION, {
-        body: `Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`,
-        type: "success",
-      });
+      toastManager.success(`Area screenshot saved to ${imagePath} (${dimensions.width}x${dimensions.height})`);
 
       // Process the screenshot with AI
       await processScreenshotsWithAI();
     } catch (error) {
       console.error("Error handling screenshot:", error);
-      mainWindow.webContents.send(IPC_CHANNELS.ERROR, `Failed to process screenshot: ${error.message}`);
+      toastManager.error(`Failed to process screenshot: ${error.message}`);
       mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
     }
   });
@@ -450,8 +441,7 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    const mainWindow = windowManager.createMainWindow();
-    // Register hotkeys again
+    windowManager.createMainWindow();
     hotkeyManager.updateHotkeys(true);
   }
 });

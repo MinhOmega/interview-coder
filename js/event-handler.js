@@ -4,6 +4,7 @@ const { isLinux, isWindows, isMac, modifierKey } = require("./config");
 const ChatHandler = require("./chat-handler");
 const fs = require("fs");
 const { getUserDataPath } = require("./utils");
+const toastManager = require("./toast-manager");
 
 let chatHandler;
 
@@ -167,29 +168,25 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
       return "";
     }
   });
-  
+
   ipcMain.on(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, (event, prompt) => {
     try {
-      const systemPromptFile = getUserDataPath('systemPrompt.txt');
-      fs.writeFileSync(systemPromptFile, prompt, 'utf8');
-      
+      const systemPromptFile = getUserDataPath("systemPrompt.txt");
+      fs.writeFileSync(systemPromptFile, prompt, "utf8");
+
       // Update in all chat handlers
       if (chatHandler) {
         // Update system prompt for all windows
         const windows = BrowserWindow.getAllWindows();
-        windows.forEach(window => {
+        windows.forEach((window) => {
           const windowId = window.id;
           chatHandler.systemPrompts.set(windowId, prompt);
         });
       }
-      
-      event.sender.send(IPC_CHANNELS.NOTIFICATION, {
-        body: "System prompt updated successfully",
-        type: "success"
-      });
+      toastManager.success("System prompt updated successfully");
     } catch (error) {
       console.error("Error updating system prompt:", error);
-      event.sender.send(IPC_CHANNELS.ERROR, "Failed to update system prompt: " + error.message);
+      toastManager.error(`Failed to update system prompt: ${error.message}`);
     }
   });
 
