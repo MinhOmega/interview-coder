@@ -79,6 +79,10 @@ const SHORTCUTS = {
     key: `${modifierKey}+T`,
     handler: null,
   },
+  TOGGLE_DEVTOOLS: {
+    key: `${modifierKey}+Shift+I`,
+    handler: null,
+  },
 };
 
 // Register shortcut handlers
@@ -210,6 +214,7 @@ function getPlatformShortcuts() {
     areaScreenshot: `${modifierKey}+D`,
     reset: `${modifierKey}+R`,
     toggleSplitView: `${modifierKey}+T`,
+    toggleDevtools: `${modifierKey}+Shift+I`,
   };
 }
 

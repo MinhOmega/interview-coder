@@ -1,6 +1,8 @@
 const { BrowserWindow, screen } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 const { isLinux } = require("./config");
+const path = require("path");
+const log = require("electron-log");
 
 let mainWindow;
 let modelListWindow;
@@ -16,6 +18,9 @@ function createMainWindow() {
   const windowWidth = 1000;
   const windowHeight = 800;
 
+  // Check if in development mode
+  const isDev = process.env.NODE_ENV === "development" || !require("electron").app.isPackaged;
+
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -24,13 +29,16 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      devTools: true, // Always enable DevTools in both dev and production
+      additionalArguments: ["--allow-file-access-from-files"], // Add additional arguments for better compatibility
+      webSecurity: !isDev, // Disable web security in dev for easier debugging
     },
     frame: false,
     transparent: true,
     backgroundColor: "#00000000", // Transparent background
     alwaysOnTop: true,
     paintWhenInitiallyHidden: true,
-    contentProtection: true,
+    contentProtection: false, // Disable content protection to ensure DevTools work properly
     movable: true, // Ensure window is movable
     roundedCorners: true,
     titleBarStyle: "hidden", // Hide title bar completely
@@ -44,7 +52,44 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile("index.html");
-  mainWindow.setContentProtection(true);
+
+  // Ensure DevTools works in all environments
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    // Allow DevTools to be opened with both standard shortcuts
+    const isMac = process.platform === "darwin";
+    const isDevToolsShortcut1 =
+      (isMac && input.meta && input.alt && input.key.toLowerCase() === "i") ||
+      (!isMac && input.control && input.shift && input.key.toLowerCase() === "i");
+
+    const isDevToolsShortcut2 =
+      (isMac && input.meta && input.control && input.key.toLowerCase() === "i") ||
+      (!isMac && input.control && input.alt && input.key.toLowerCase() === "i");
+
+    if (isDevToolsShortcut1 || isDevToolsShortcut2) {
+      // Force DevTools to open regardless of environment
+      setTimeout(() => {
+        if (!mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.openDevTools();
+        }
+      }, 100);
+      event.preventDefault();
+    }
+  });
+
+  // Allow F12 to also open DevTools (common convention)
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") {
+      setTimeout(() => {
+        if (!mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.openDevTools();
+        } else {
+          mainWindow.webContents.closeDevTools();
+        }
+      }, 100);
+      event.preventDefault();
+    }
+  });
+
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
 
@@ -75,7 +120,7 @@ function createModelSelectionWindow() {
     modelListWindow = null;
     // Notify main window to refresh model badge
     if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send("model-changed");
+      mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);
     }
   });
 
@@ -91,7 +136,7 @@ function toggleSplitView() {
     mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_SPLIT_VIEW);
     return true;
   } catch (error) {
-    console.error("Error in toggleSplitView:", error);
+    log.error("Error in toggleSplitView:", error);
     return false;
   }
 }
@@ -101,7 +146,7 @@ function toggleWindowVisibility(forceState) {
   try {
     isWindowVisible = typeof forceState === "boolean" ? forceState : !isWindowVisible;
 
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (isWindowVisible) {
         // Show the window
         try {
@@ -113,9 +158,11 @@ function toggleWindowVisibility(forceState) {
             // For Linux, we use a different approach
             setTimeout(() => {
               try {
-                mainWindow.setAlwaysOnTop(true);
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.setAlwaysOnTop(true);
+                }
               } catch (err) {
-                console.error("Linux setAlwaysOnTop error:", err);
+                log.error("Linux setAlwaysOnTop error:", err);
               }
             }, 100);
           }
@@ -126,11 +173,11 @@ function toggleWindowVisibility(forceState) {
               modelListWindow.show();
               modelListWindow.setOpacity(1);
             } catch (err) {
-              console.error("Error showing model list window:", err);
+              log.error("Error showing model list window:", err);
             }
           }
         } catch (showError) {
-          console.error("Error showing window:", showError);
+          log.error("Error showing window:", showError);
         }
       } else {
         // Hide the window
@@ -147,19 +194,21 @@ function toggleWindowVisibility(forceState) {
               modelListWindow.hide();
               modelListWindow.setOpacity(0);
             } catch (err) {
-              console.error("Error hiding model list window:", err);
+              log.error("Error hiding model list window:", err);
             }
           }
         } catch (hideError) {
-          console.error("Error hiding window:", hideError);
+          log.error("Error hiding window:", hideError);
         }
       }
 
       // Notify renderer about visibility change
       try {
-        mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
+        if (mainWindow.webContents) {
+          mainWindow.webContents.send(IPC_CHANNELS.UPDATE_VISIBILITY, isWindowVisible);
+        }
       } catch (sendError) {
-        console.error("Error sending visibility update:", sendError);
+        log.error("Error sending visibility update:", sendError);
       }
 
       // Update hotkeys based on visibility (import hotkeyManager if needed)
@@ -167,13 +216,13 @@ function toggleWindowVisibility(forceState) {
         const hotkeyManager = require("./hotkey-manager");
         hotkeyManager.updateHotkeys(isWindowVisible);
       } catch (hotkeyError) {
-        console.error("Error updating hotkeys:", hotkeyError);
+        log.error("Error updating hotkeys:", hotkeyError);
       }
     }
 
     return isWindowVisible;
   } catch (error) {
-    console.error("Error in toggleWindowVisibility:", error);
+    log.error("Error in toggleWindowVisibility:", error);
     // Default to visible in case of error
     return true;
   }
@@ -249,9 +298,14 @@ function resizeWindow(direction) {
 
 // Function to scroll content in the result area
 function scrollContent(direction) {
-  if (!mainWindow) return;
-  const scrollAmount = direction === "up" ? -300 : 300;
-  mainWindow.webContents.send(IPC_CHANNELS.SCROLL_CONTENT, scrollAmount);
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return;
+  
+  try {
+    const scrollAmount = direction === "up" ? -300 : 300;
+    mainWindow.webContents.send(IPC_CHANNELS.SCROLL_CONTENT, scrollAmount);
+  } catch (error) {
+    log.error("Error in scrollContent:", error);
+  }
 }
 
 // Get the main window
@@ -271,13 +325,18 @@ function getWindowVisibility() {
 
 // Update the instruction in the main window
 function updateInstruction(instruction) {
-  if (!mainWindow) return;
-  if (!instruction || instruction.trim() === "") {
-    // If instruction is empty, hide the instruction banner
-    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
-  } else {
-    // Show the instruction with the provided text
-    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_INSTRUCTION, instruction);
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return;
+  
+  try {
+    if (!instruction || instruction.trim() === "") {
+      // If instruction is empty, hide the instruction banner
+      mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+    } else {
+      // Show the instruction with the provided text
+      mainWindow.webContents.send(IPC_CHANNELS.UPDATE_INSTRUCTION, instruction);
+    }
+  } catch (error) {
+    log.error("Error in updateInstruction:", error);
   }
 }
 

@@ -1,12 +1,13 @@
 {
   "name": "interview-coders",
-  "version": "1.4.0",
+  "version": "1.5.1",
   "main": "main.js",
   "description": "Interview Coder is an Electron application that captures and analyzes screenshots using AI (OpenAI, Google Gemini, or Ollama). It features global keyboard shortcuts, multi-page mode for complex questions, real-time streaming responses, and supports both cloud and local AI models. The app provides a customizable UI with transparent, always-on-top windows and markdown-rendered responses, making it ideal for processing coding questions, generating code, or providing detailed answers from screenshots.",
   "author": {
     "name": "Minh Vo",
     "email": "vnqminh0502@gmail.com"
   },
+  "type": "commonjs",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
@@ -14,18 +15,29 @@
     "build": "electron-builder build --mac --win --linux",
     "build:mac": "electron-builder build --mac",
     "build:win": "electron-builder build --win",
-    "build:linux": "electron-builder build --linux"
+    "build:linux": "electron-builder build --linux",
+    "clean": "rimraf dist dist-electron",
+    "lint": "eslint ."
   },
   "build": {
     "appId": "com.interviewcoders.app",
     "productName": "Interview Coder",
+    "extraMetadata": {
+      "type": "commonjs"
+    },
+    "files": [
+      "**/*",
+      "!**/*.ts",
+      "!*.map",
+      "!*.md",
+      "!*.code-workspace",
+      "!node_modules/.cache/**/*"
+    ],
     "mac": {
       "icon": "build/logo.icns",
       "category": "public.app-category.developer-tools",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
       "signIgnore": [
         "node_modules"
       ],
@@ -37,36 +49,50 @@
             "arm64"
           ]
         }
-      ]
+      ],
+      "darkModeSupport": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "This app requires camera access to capture screenshots.",
+        "NSMicrophoneUsageDescription": "This app requires microphone access.",
+        "NSScreenCaptureUsageDescription": "This app requires screen recording access to capture screenshots for analysis."
+      },
+      "strictVerify": false,
+      "notarize": false,
+      "type": "development"
     },
     "dmg": {
       "icon": "build/logo.icns",
       "iconSize": 128,
       "contents": [
         {
-          "x": 270,
-          "y": 220,
-          "type": "file"
+          "x": 130,
+          "y": 220
         },
         {
-          "x": 270,
-          "y": 400,
+          "x": 410,
+          "y": 220,
           "type": "link",
           "path": "/Applications"
         }
       ],
       "window": {
-        "width": 540,
-        "height": 400
+        "width": 800,
+        "height": 600
       },
-      "title": "Install Interview Coder"
+      "title": "Install Interview Coder",
+      "sign": false,
+      "writeUpdateInfo": false,
+      "artifactName": "${productName}-${arch}.${ext}"
     },
     "win": {
       "icon": "build/logo.ico",
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "artifactName": "${productName}.${ext}"
     },
     "linux": {
       "icon": "build/logo.png",
@@ -75,32 +101,79 @@
         "deb",
         "rpm"
       ],
-      "category": "Development"
-    }
+      "category": "Development",
+      "artifactName": "${productName}.${ext}"
+    },
+    "asar": true,
+    "compression": "maximum",
+    "generateUpdatesFilesForAllChannels": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "minhomega",
+        "repo": "interview-coder",
+        "private": false,
+        "releaseType": "release"
+      }
+    ],
+    "afterSign": "scripts/notarize.js",
+    "extraResources": [
+      {
+        "from": "node_modules/toastify-js/src",
+        "to": "toastify-js",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
+  "keywords": [
+    "interview",
+    "coding",
+    "interview prep",
+    "technical interview",
+    "tool",
+    "AI",
+    "screenshot analysis"
+  ],
+  "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "@mdx-js/mdx": "^3.1.0",
     "axios": "^1.8.4",
+    "electron-log": "^5.2.4",
     "electron-screenshots": "^0.5.27",
     "openai": "^4.90.0",
-    "rehype-autolink-headings": "^7.1.0",
-    "rehype-format": "^5.0.1",
+    "rehype-autolink-headings": "^5.0.1",
+    "rehype-format": "^3.1.0",
     "rehype-prism-plus": "^2.0.1",
-    "rehype-raw": "^7.0.0",
-    "rehype-slug": "^6.0.0",
-    "rehype-stringify": "^10.0.1",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2",
+    "rehype-raw": "^5.1.0",
+    "rehype-slug": "^4.0.1",
+    "rehype-stringify": "^8.0.0",
+    "remark-parse": "^0.0.0",
+    "remark-rehype": "^9.0.0",
     "screenshot-desktop": "^1.15.0",
     "toastify-js": "^1.12.0",
-    "unified": "^11.0.5"
+    "unified": "^9.2.2"
   },
   "devDependencies": {
     "chokidar": "^4.0.3",
     "electron": "^35.1.2",
     "electron-builder": "^26.0.12",
-    "electron-reload": "^2.0.0-alpha.1"
+    "electron-reload": "^2.0.0-alpha.1",
+    "eslint": "^8.57.1",
+    "rimraf": "^6.0.1"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }

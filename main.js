@@ -1,7 +1,18 @@
-const { app, BrowserWindow, ipcMain, nativeImage, desktopCapturer } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeImage,
+  desktopCapturer,
+  systemPreferences,
+  Menu,
+  MenuItem,
+} = require("electron");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
+const log = require("electron-log");
+
 const configManager = require("./js/config-manager");
 const windowManager = require("./js/window-manager");
 const screenshotManager = require("./js/screenshot-manager");
@@ -13,9 +24,29 @@ const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac, isWindows } = require("./js/config");
 const toastManager = require("./js/toast-manager");
+const macOSPermissions = isMac ? require("./js/macos-permissions") : null;
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+
+// Configure electron-log
+log.transports.file.level = "info";
+log.transports.console.level = isDev ? "debug" : "info";
+log.transports.file.maxSize = 10 * 1024 * 1024; // 10MB
+log.transports.file.format = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
+
+// Use the non-deprecated errorHandler instead of catchErrors
+log.errorHandler.startCatching({
+  showDialog: false,
+  onError(error) {
+    log.error("Uncaught error:", error);
+  },
+});
+
+// Replace console with electron-log
+Object.assign(console, log.functions);
+console.log("Starting application with electron-log integration");
+
 if (isDev) {
   try {
     require("electron-reload")(__dirname, {
@@ -23,15 +54,17 @@ if (isDev) {
       hardResetMethod: "exit",
       ignored: [/node_modules/, /[\/\\]\./, /\.git/, /\.map$/, /package-lock\.json$/],
     });
-    console.log("Hot reload enabled for development");
+    log.info("Hot reload enabled for development");
   } catch (err) {
-    console.error("Failed to initialize hot reload:", err);
+    log.error("Failed to initialize hot reload:", err);
   }
 }
 
 // Development mode notification
 if (isDev) {
-  console.log("Running in development mode with hot reload");
+  log.info("Running in development mode with hot reload");
+} else {
+  log.info("Running in production mode");
 }
 
 axios.defaults.family = 4;
@@ -74,7 +107,7 @@ async function processScreenshotsWithAI() {
       true,
     );
   } catch (error) {
-    console.error("Error processing screenshots:", error);
+    log.error("Error processing screenshots:", error);
     toastManager.error("Failed to process screenshots: " + error.message);
     windowManager.updateInstruction(
       windowManager.getDefaultInstructions(
@@ -92,6 +125,15 @@ async function processScreenshotsWithAI() {
  */
 async function captureFullScreenFallback() {
   try {
+    // On macOS, ensure we have proper permissions first
+    if (isMac) {
+      const status = systemPreferences.getMediaAccessStatus("screen");
+      if (status !== "granted") {
+        await systemPreferences.askForMediaAccess("screen");
+        // The actual permission status might not change immediately, but we've at least asked
+      }
+    }
+
     const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
     const picturesPath = getAppPath("pictures", "");
     const imagePath = path.join(picturesPath, `fullscreen-${timestamp}.png`);
@@ -126,17 +168,113 @@ async function captureFullScreenFallback() {
       },
     };
   } catch (error) {
-    console.error("Error capturing fallback screenshot:", error);
+    log.error("Error capturing fallback screenshot:", error);
     throw error;
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // For macOS, ensure screen capture permissions are requested at startup
+  if (isMac && macOSPermissions) {
+    try {
+      log.info("Initializing macOS permissions...");
+      const permissionsStatus = await macOSPermissions.initializePermissions();
+      log.info("macOS permissions initialized:", permissionsStatus);
+
+      // Force permission request in production as a fallback
+      if (!isDev && !permissionsStatus.screenCapturePermission) {
+        log.info("Initial permission check failed, forcing permission request...");
+        await macOSPermissions.forcePermissionRequest();
+      }
+    } catch (error) {
+      log.error("Error initializing macOS permissions:", error);
+    }
+  }
+
+  // Create application menu with DevTools access
+  const template = [
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ]
+      : []),
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools", accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        ...(isMac
+          ? [{ type: "separator" }, { role: "front" }, { type: "separator" }, { role: "window" }]
+          : [{ role: "close" }]),
+      ],
+    },
+    {
+      label: "Debug",
+      submenu: [
+        {
+          label: "Toggle DevTools",
+          accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I",
+          click: () => {
+            const mainWindow = windowManager.getMainWindow();
+            if (mainWindow) {
+              if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
+              } else {
+                mainWindow.webContents.openDevTools();
+              }
+            }
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+
   const mainWindow = windowManager.createMainWindow();
 
   // Initialize AI clients from saved config
   const initStatus = aiProviders.initializeFromConfig();
-  console.log("AI clients initialization status:", initStatus);
+  log.info("AI clients initialization status:", initStatus);
   if (initStatus.openai) {
     openai = aiProviders.getOpenAI();
   }
@@ -148,7 +286,7 @@ app.whenReady().then(() => {
       try {
         const isRegistered = hotkeyManager.validateHotkeys();
         if (!isRegistered) {
-          console.warn("Hotkeys may not be properly registered on Linux. Using fallback mechanisms.");
+          log.warn("Hotkeys may not be properly registered on Linux. Using fallback mechanisms.");
 
           // Show Linux shortcuts info
           const platformShortcuts = hotkeyManager.getPlatformShortcuts();
@@ -157,7 +295,7 @@ app.whenReady().then(() => {
           );
         }
       } catch (error) {
-        console.error("Error validating hotkeys on Linux:", error);
+        log.error("Error validating hotkeys on Linux:", error);
       }
     }, 2000);
   }
@@ -165,7 +303,7 @@ app.whenReady().then(() => {
   // Handle API key initialization from UI
   ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey) => {
     try {
-      console.log(`Initializing ${provider} client with provided API key`);
+      log.info(`Initializing ${provider} client with provided API key`);
       const result = aiProviders.updateAIClients(provider, apiKey);
 
       if (provider === AI_PROVIDERS.OPENAI && result) {
@@ -175,7 +313,7 @@ app.whenReady().then(() => {
 
       return { success: result };
     } catch (error) {
-      console.error(`Error initializing ${provider} client:`, error);
+      log.error(`Error initializing ${provider} client:`, error);
       return { success: false, error: error.message };
     }
   });
@@ -185,7 +323,7 @@ app.whenReady().then(() => {
     try {
       return configManager.saveApiKey(apiKey);
     } catch (error) {
-      console.error("Error saving API key:", error);
+      log.error("Error saving API key:", error);
       return false;
     }
   });
@@ -195,7 +333,7 @@ app.whenReady().then(() => {
     try {
       return configManager.getApiKey();
     } catch (error) {
-      console.error("Error getting API key:", error);
+      log.error("Error getting API key:", error);
       return null;
     }
   });
@@ -210,7 +348,7 @@ app.whenReady().then(() => {
       // Pass windows to the hot reload module for targeted reloading
       devConfig.setupHotReload(mainWindow, windowManager.getModelListWindow());
     } catch (err) {
-      console.error("Error setting up dev hot reload:", err);
+      log.error("Error setting up dev hot reload:", err);
     }
   }
 
@@ -226,6 +364,20 @@ app.whenReady().then(() => {
     SCROLL_DOWN: () => windowManager.scrollContent("down"),
     INCREASE_WINDOW_SIZE: () => windowManager.resizeWindow("increase"),
     DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
+    TOGGLE_DEVTOOLS: () => {
+      try {
+        const mainWindow = windowManager.getMainWindow();
+        if (mainWindow) {
+          if (mainWindow.webContents.isDevToolsOpened()) {
+            mainWindow.webContents.closeDevTools();
+          } else {
+            mainWindow.webContents.openDevTools();
+          }
+        }
+      } catch (error) {
+        log.error("Error toggling DevTools:", error);
+      }
+    },
     TAKE_SCREENSHOT: async () => {
       try {
         windowManager.updateInstruction("Taking screenshot...");
@@ -234,7 +386,7 @@ app.whenReady().then(() => {
         windowManager.updateInstruction("Processing screenshot with AI...");
         await processScreenshotsWithAI();
       } catch (error) {
-        console.error(`${hotkeyManager.getModifierKey()}+H error:`, error);
+        log.error(`${hotkeyManager.getModifierKey()}+H error:`, error);
         toastManager.error(`Error processing command: ${error.message}`);
         windowManager.updateInstruction(
           windowManager.getDefaultInstructions(
@@ -269,7 +421,7 @@ app.whenReady().then(() => {
                 windowManager.updateInstruction("Processing screenshot with AI...");
                 await processScreenshotsWithAI();
               } catch (fallbackError) {
-                console.error("Fallback screenshot failed:", fallbackError);
+                log.error("Fallback screenshot failed:", fallbackError);
                 toastManager.error(`Fallback screenshot failed: ${fallbackError.message}`);
                 windowManager.updateInstruction(
                   windowManager.getDefaultInstructions(
@@ -290,7 +442,7 @@ app.whenReady().then(() => {
 
         global.mainWindowWasVisible = wasVisible;
       } catch (error) {
-        console.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
+        log.error(`${hotkeyManager.getModifierKey()}+D error:`, error);
         toastManager.error(`Error starting area capture: ${error.message}`);
         windowManager.updateInstruction(
           windowManager.getDefaultInstructions(
@@ -320,7 +472,7 @@ app.whenReady().then(() => {
           } screenshots captured. ${hotkeyManager.getModifierKey()}+A to add more, ${hotkeyManager.getModifierKey()}+Enter to analyze`,
         );
       } catch (error) {
-        console.error(`${hotkeyManager.getModifierKey()}+A error:`, error);
+        log.error(`${hotkeyManager.getModifierKey()}+A error:`, error);
         toastManager.error(`Error processing command: ${error.message}`);
       }
     },
@@ -346,7 +498,7 @@ app.whenReady().then(() => {
       }
 
       if (!buffer) {
-        console.error("Screenshot buffer is invalid:", { event, buffer, data });
+        log.error("Screenshot buffer is invalid:", { event, buffer, data });
         toastManager.error("Failed to process screenshot: Invalid screenshot data");
         windowManager.updateInstruction(
           windowManager.getDefaultInstructions(
@@ -405,7 +557,7 @@ app.whenReady().then(() => {
       // Process the screenshot with AI
       await processScreenshotsWithAI();
     } catch (error) {
-      console.error("Error handling screenshot:", error);
+      log.error("Error handling screenshot:", error);
       toastManager.error(`Failed to process screenshot: ${error.message}`);
       mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
     }
@@ -425,7 +577,7 @@ app.whenReady().then(() => {
     const hotkeySuccess = hotkeyManager.updateHotkeys(true);
 
     if (!hotkeySuccess) {
-      console.log("No hotkeys registered successfully, but application will continue running");
+      log.info("No hotkeys registered successfully, but application will continue running");
       // Show toast notification to user about hotkey issues
       setTimeout(() => {
         toastManager.error(
@@ -454,18 +606,22 @@ app.whenReady().then(() => {
       if (isDev) {
         hotkeyManager.getPlatformShortcuts();
         setTimeout(() => {
-          const modifier = hotkeyManager.getModifierKey();
-          const platformName = {
-            linux: "Linux",
-            win32: "Windows",
-            darwin: "macOS",
-          }[process.platform];
-          toastManager.info(`Using ${modifier} as the modifier key on ${platformName}`);
+          try {
+            const modifier = hotkeyManager.getModifierKey();
+            const platformName = {
+              linux: "Linux",
+              win32: "Windows",
+              darwin: "macOS",
+            }[process.platform];
+            toastManager.info(`Using ${modifier} as the modifier key on ${platformName}`);
+          } catch (error) {
+            log.error("Error showing modifier key toast:", error);
+          }
         }, 1000);
       }
     }
   } catch (hotkeyError) {
-    console.error("Error registering hotkeys:", hotkeyError);
+    log.error("Error registering hotkeys:", hotkeyError);
     // Don't crash, just continue without hotkeys
     toastManager.error(
       "An error occurred while setting up keyboard shortcuts. The app will still function through mouse interaction.",
@@ -473,17 +629,34 @@ app.whenReady().then(() => {
   }
 
   setTimeout(() => {
-    windowManager.updateInstruction(
-      windowManager.getDefaultInstructions(
-        screenshotManager.getMultiPageMode(),
-        screenshotManager.getScreenshots().length,
-        hotkeyManager.getModifierKey(),
-      ),
-    );
+    try {
+      windowManager.updateInstruction(
+        windowManager.getDefaultInstructions(
+          screenshotManager.getMultiPageMode(),
+          screenshotManager.getScreenshots().length,
+          hotkeyManager.getModifierKey(),
+        ),
+      );
+    } catch (error) {
+      log.error("Error updating instruction:", error);
+    }
   }, 1000);
 
   ipcMain.on(IPC_CHANNELS.SCREENSHOT_READY_FOR_PROCESSING, async () => {
     await processScreenshotsWithAI();
+  });
+
+  // Register right-click context menu with DevTools
+  mainWindow.webContents.on("context-menu", (_, params) => {
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Inspect Element",
+        click: () => {
+          mainWindow.webContents.inspectElement(params.x, params.y);
+        },
+      },
+    ]);
+    contextMenu.popup();
   });
 });
 
@@ -501,7 +674,7 @@ app.on("activate", () => {
     try {
       hotkeyManager.updateHotkeys(true);
     } catch (error) {
-      console.error("Error updating hotkeys on activate:", error);
+      log.error("Error updating hotkeys on activate:", error);
     }
   }
 });
