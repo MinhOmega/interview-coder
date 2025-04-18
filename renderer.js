@@ -3,6 +3,7 @@ const { processMarkdown } = require("./js/markdown-processor");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
+const log = require("electron-log");
 
 // Variables for tracking state
 let isWindowVisible = true;
@@ -80,7 +81,7 @@ const onLoading = (_, isLoading) => {
       resultContentWrapper.appendChild(newContent);
     }
   } catch (error) {
-    console.error("Error in LOADING handler:", error);
+    log.error("Error in LOADING handler:", error);
   }
 };
 
@@ -104,7 +105,7 @@ const onAnalysisResult = async (_, markdown) => {
     // Scroll to top
     window.scrollTo(0, 0);
   } catch (error) {
-    console.error("Error in ANALYSIS_RESULT handler:", error);
+    log.error("Error in ANALYSIS_RESULT handler:", error);
     toastManager.error("Error rendering content: " + error.message);
   }
 };
@@ -117,7 +118,7 @@ const onStreamStart = () => {
     // Clean up the DOM
     cleanupResultContent();
   } catch (error) {
-    console.error("Error in STREAM_START handler:", error);
+    log.error("Error in STREAM_START handler:", error);
   }
 };
 
@@ -143,7 +144,7 @@ const onStreamChunk = async (_, chunk) => {
       window.scrollTo(0, document.body.scrollHeight);
     }
   } catch (error) {
-    console.error("Error processing stream chunk:", error);
+    log.error("Error processing stream chunk:", error);
     // Display error but continue operation
     document.getElementById(
       "result-content",
@@ -178,7 +179,7 @@ const onStreamUpdate = async (_, fullText) => {
       window.scrollTo(0, document.body.scrollHeight);
     }
   } catch (error) {
-    console.error("Error processing stream update:", error);
+    log.error("Error processing stream update:", error);
     // Provide better error visualization
     document.getElementById("result-content").innerHTML = `
       <p class="error-message">Error rendering content: ${error.message}</p>
@@ -207,7 +208,7 @@ const onStreamEnd = () => {
       resultContent.scrollBy({ top: 1, behavior: "smooth" });
     }
   } catch (error) {
-    console.error("Error in STREAM_END handler:", error);
+    log.error("Error in STREAM_END handler:", error);
   }
 };
 
@@ -289,7 +290,7 @@ function cleanupResultContent() {
     // Force a repaint
     wrapper.offsetHeight;
   } catch (error) {
-    console.error("Error in cleanupResultContent:", error);
+    log.error("Error in cleanupResultContent:", error);
   }
 }
 
@@ -352,7 +353,7 @@ async function addMessage(text, sender) {
     // Setup code copy buttons if needed
     setupCodeCopyButtons(messageDiv);
   } catch (error) {
-    console.error("Error processing markdown:", error);
+    log.error("Error processing markdown:", error);
     // Fallback to basic formatting if markdown processing fails
     const formattedText = text.replace(/\n/g, "<br>");
     messageDiv.innerHTML = formattedText;
@@ -386,7 +387,7 @@ async function addAIMessage(text) {
     // Setup code copy buttons if needed
     setupCodeCopyButtons(messageDiv);
   } catch (error) {
-    console.error("Error processing markdown:", error);
+    log.error("Error processing markdown:", error);
     messageDiv.textContent = text;
   }
 
@@ -460,7 +461,7 @@ function saveSystemPrompt(prompt) {
   try {
     ipcRenderer.send(IPC_CHANNELS.UPDATE_SYSTEM_PROMPT, prompt);
   } catch (error) {
-    console.error("Error saving system prompt:", error);
+    log.error("Error saving system prompt:", error);
     toastManager.error("Failed to save system prompt");
   }
 }
@@ -474,7 +475,7 @@ async function loadSystemPrompt() {
       toastManager.success("System prompt loaded");
     }
   } catch (error) {
-    console.error("Error loading system prompt:", error);
+    log.error("Error loading system prompt:", error);
   }
 }
 
@@ -486,7 +487,7 @@ async function updateModelBadge() {
     try {
       settings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
     } catch (error) {
-      console.error("Error getting model settings from main process:", error);
+      log.error("Error getting model settings from main process:", error);
       // Set default badge text to indicate error
       const badge = document.getElementById("model-badge");
       badge.textContent = `Press ${modifierKey}+M to set model`;
@@ -512,7 +513,7 @@ async function updateModelBadge() {
     badge.textContent =
       providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
   } catch (error) {
-    console.error("Error updating model badge:", error);
+    log.error("Error updating model badge:", error);
     // Ensure badge always shows something useful even on complete failure
     const badge = document.getElementById("model-badge");
     badge.textContent = "AI: Default Model";
@@ -542,7 +543,7 @@ function setupCodeCopyButtons(container = document) {
           // Find the code element within the container
           const pre = this.nextElementSibling;
           if (!pre || !pre.tagName || pre.tagName.toLowerCase() !== "pre") {
-            console.error("No pre element found");
+            log.error("No pre element found");
             return;
           }
 
@@ -569,7 +570,7 @@ function setupCodeCopyButtons(container = document) {
               }, 2000);
             })
             .catch((err) => {
-              console.error("Failed to copy code: ", err);
+              log.error("Failed to copy code: ", err);
               this.textContent = "Error";
 
               setTimeout(() => {
@@ -577,7 +578,7 @@ function setupCodeCopyButtons(container = document) {
               }, 2000);
             });
         } catch (err) {
-          console.error("Error in copy button handler:", err);
+          log.error("Error in copy button handler:", err);
           // Try to recover
           this.textContent = "Error";
           setTimeout(() => {
@@ -590,7 +591,7 @@ function setupCodeCopyButtons(container = document) {
       button.setAttribute("data-has-listener", "true");
     });
   } catch (err) {
-    console.error("Error setting up copy buttons:", err);
+    log.error("Error setting up copy buttons:", err);
   }
 }
 
@@ -643,7 +644,7 @@ const onEventKeyDown = (e) => {
   try {
     // Unified DevTools hotkey that works on all platforms
     if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "d") {
-      console.log("DevTools hotkey pressed");
+      log.info("DevTools hotkey pressed");
       ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
       e.preventDefault();
       return;
@@ -651,7 +652,7 @@ const onEventKeyDown = (e) => {
 
     // Original DevTools hotkey (Cmd/Ctrl+Shift+I)
     if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "I") {
-      console.log("DevTools alternative hotkey pressed");
+      log.info("DevTools alternative hotkey pressed");
       ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
       e.preventDefault();
       return;
@@ -659,8 +660,9 @@ const onEventKeyDown = (e) => {
 
     // Add development-only keyboard shortcut for manual reload (Cmd/Ctrl+Shift+R)
     if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === "R") {
-      console.log("Reload hotkey pressed");
+      log.info("Reload hotkey pressed");
       ipcRenderer.send(IPC_CHANNELS.DEV_RELOAD);
+
       e.preventDefault();
       return;
     }
@@ -672,7 +674,7 @@ const onEventKeyDown = (e) => {
       const isAltB = e.altKey && e.key.toLowerCase() === "b";
 
       if (isCtrlB || isAltB) {
-        console.log("Linux visibility toggle hotkey pressed");
+        log.info("Linux visibility toggle hotkey pressed");
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -680,20 +682,20 @@ const onEventKeyDown = (e) => {
     }
 
     if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "T") {
-      console.log("Split view toggle hotkey pressed");
+      log.info("Split view toggle hotkey pressed");
       e.preventDefault();
       toggleSplitView();
       return;
     }
 
     if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "p") {
-      console.log("System prompt toggle hotkey pressed");
+      log.info("System prompt toggle hotkey pressed");
       e.preventDefault();
       toggleSystemPrompt();
       return;
     }
   } catch (error) {
-    console.error("Error handling keyboard shortcut:", error);
+    log.error("Error handling keyboard shortcut:", error);
     logError(`Keyboard shortcut error: ${error.message}`, {
       key: e.key,
       ctrl: e.ctrlKey,
@@ -766,10 +768,10 @@ const onEventDOMContentLoaded = async () => {
   if (devToolsBtn) {
     devToolsBtn.addEventListener("click", () => {
       try {
-        console.log("DevTools button clicked");
+        log.info("DevTools button clicked");
         ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
       } catch (error) {
-        console.error("Error toggling DevTools:", error);
+        log.error("Error toggling DevTools:", error);
         logError(`Failed to open DevTools: ${error.message}`);
       }
     });
@@ -787,7 +789,7 @@ const onEventDOMContentLoaded = async () => {
 // Handle the start of a chat message stream
 const onChatMessageStreamStart = () => {
   try {
-    console.log("Chat stream started");
+    log.info("Chat stream started");
 
     // Show typing indicator
     const typingIndicator = document.getElementById("split-typing-indicator");
@@ -813,7 +815,7 @@ const onChatMessageStreamStart = () => {
     // Scroll to bottom to show typing
     scrollToBottom(messagesContainer);
   } catch (error) {
-    console.error("Error in chat stream start handler:", error);
+    log.error("Error in chat stream start handler:", error);
   }
 };
 
@@ -861,7 +863,7 @@ const onChatMessageStreamChunk = async (_, chunk, fullText) => {
         setupCodeCopyButtons(streamingMessageElement);
       }
     } catch (markdownError) {
-      console.error("Error processing markdown:", markdownError);
+      log.error("Error processing markdown:", markdownError);
       // Fallback to plain text if markdown processing fails
       if (streamingMessageElement) {
         streamingMessageElement.textContent = streamBuffer;
@@ -877,14 +879,14 @@ const onChatMessageStreamChunk = async (_, chunk, fullText) => {
       scrollToBottom(messagesContainer);
     }
   } catch (error) {
-    console.error("Error processing chat stream chunk:", error);
+    log.error("Error processing chat stream chunk:", error);
   }
 };
 
 // Handle the end of a chat message stream
 const onChatMessageStreamEnd = async (_, response) => {
   try {
-    console.log("Chat stream ended with response:", response);
+    log.info("Chat stream ended with response:", response);
 
     // Hide typing indicator if it's still visible
     const typingIndicator = document.getElementById("split-typing-indicator");
@@ -897,7 +899,7 @@ const onChatMessageStreamEnd = async (_, response) => {
 
     // Make sure we have some content to display
     if (!content || content.trim() === "") {
-      console.warn("No content to display at stream end");
+      log.warn("No content to display at stream end");
       return;
     }
 
@@ -912,7 +914,7 @@ const onChatMessageStreamEnd = async (_, response) => {
         // Setup code copy buttons one final time
         setupCodeCopyButtons(streamingMessageElement);
       } catch (markdownError) {
-        console.error("Error processing final markdown:", markdownError);
+        log.error("Error processing final markdown:", markdownError);
         // Fallback to plain text
         streamingMessageElement.textContent = content;
       }
@@ -932,7 +934,7 @@ const onChatMessageStreamEnd = async (_, response) => {
         scrollToBottom(messagesContainer);
       }
     } else {
-      console.warn("No streaming message element found at stream end");
+      log.warn("No streaming message element found at stream end");
 
       // As a fallback, create a new message if we don't have an element
       if (content) {
@@ -944,7 +946,7 @@ const onChatMessageStreamEnd = async (_, response) => {
       }
     }
   } catch (error) {
-    console.error("Error finalizing chat stream:", error);
+    log.error("Error finalizing chat stream:", error);
 
     // Try to recover by adding the content as a regular message
     if (streamBuffer) {
@@ -954,7 +956,7 @@ const onChatMessageStreamEnd = async (_, response) => {
   }
 };
 
-// Add these event listeners along with the other ones
+// Set up IPC event listeners
 ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, onUpdateInstruction);
 ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, onHideInstruction);
 ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, onUpdateVisibility);
@@ -975,22 +977,20 @@ ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START, onChatMessageStreamStart)
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, onChatMessageStreamEnd);
 
+document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 document.addEventListener("contextmenu", onEventContextMenu);
-
 document.addEventListener("keydown", onEventKeyDown);
-
 window.addEventListener("message", onEventMessage);
 document.querySelectorAll(".shortcut").forEach((el) => {
   const text = el.textContent;
   el.textContent = text.replace("⌘", isMac ? "⌘" : "Ctrl");
 });
-document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 
 updateModelBadge();
 
 // Add a utility function for logging errors
 function logError(message, extraData = {}) {
-  console.error(`[ERROR] ${message}`, extraData);
+  log.error(`[ERROR] ${message}`, extraData);
 
   // Display in DevTools console with platform details
   const platformInfo = {
@@ -1004,7 +1004,7 @@ function logError(message, extraData = {}) {
     },
   };
 
-  console.error("Error Details:", {
+  log.error("Error Details:", {
     message,
     timestamp: new Date().toISOString(),
     ...extraData,

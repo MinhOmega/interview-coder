@@ -8,6 +8,7 @@ const ollamaProvider = require("./js/ollama-provider");
 const utils = require("./js/utils");
 const modalManager = require("./js/modal-manager");
 const configManager = require("./js/config-manager");
+const log = require("electron-log");
 
 const aiProviderRadios = document.querySelectorAll('input[name="aiProvider"]');
 const radioLabels = document.querySelectorAll(".radio-label");
@@ -43,7 +44,7 @@ async function loadCurrentSettings() {
   try {
     currentSettings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
   } catch (error) {
-    console.error("Error getting current settings:", error.message);
+    log.error("Error getting current settings:", error.message);
     // Set default settings if handler is not registered
     currentSettings = configManager.getCurrentSettings();
 

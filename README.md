@@ -15,6 +15,7 @@
 ![Platform - Windows, macOS, Linux](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 ![Electron Version](https://img.shields.io/badge/electron-v35.1.2-blue)
+![Version](https://img.shields.io/badge/version-v1.5.1-green)
 
 </div>
 
@@ -141,6 +142,7 @@ The application will generate all AI responses in your selected language, with s
 | `Shift + ↑↓`       | Scroll up/down              |
 | `⌘ + Shift + =`    | Increase window size        |
 | `⌘ + Shift + -`    | Decrease window size        |
+| `⌘ + Shift + I`    | Toggle DevTools             |
 
 ### Windows/Linux
 | Shortcut              | Action                      |
@@ -159,6 +161,7 @@ The application will generate all AI responses in your selected language, with s
 | `Shift + ↑↓`          | Scroll up/down              |
 | `Ctrl + Shift + =`    | Increase window size        |
 | `Ctrl + Shift + -`    | Decrease window size        |
+| `Ctrl + Shift + I`    | Toggle DevTools             |
 
 > **Note for Linux users:** Alternative key bindings may be used automatically if the primary shortcuts cannot be registered.
 
@@ -180,17 +183,6 @@ The application will generate all AI responses in your selected language, with s
 ## ⚠️ Status
 
 This project is under active development. While core features are functional, you may encounter occasional bugs or incomplete features. Your feedback and contributions are welcome!
-
-## ⚠️ Development Mode Notice
-
-**IMPORTANT:** This application is currently only available in development mode. There are no pre-built packages or installers yet.
-
-To use Interview Coder:
-1. You must clone the repository and run it locally in development mode
-2. Follow the installation instructions above and use `npm run dev` (macOS/Linux) or `npm run dev:windows` (Windows)
-3. Packaged releases will be available in the future when the application reaches a more stable state
-
-The application is not yet ready for production use and is actively being developed. Please report any issues on GitHub.
 
 ## 💭 Personal Note
 
@@ -218,20 +210,32 @@ When running in development mode, the application provides the following feature
 
 - **Automatic reloading** when files are changed
 - **Manual reload** with keyboard shortcut `Ctrl+Shift+R` (or `Cmd+Shift+R` on macOS)
+- **Visual indicator** showing "DEV MODE" in the bottom-right corner with a clickable reload button
 - **Force reload option** in the right-click context menu
 - **Independent window reload** - only reloads the window (main or settings) that's affected by the file changes
+- **IPC communication** for development-specific channels between renderer and main processes
 
 ### Monitored Files
 
 The following files are monitored for changes:
 
 - **Renderer Files**: HTML, CSS, and renderer JavaScript files
-- **Main Process Files**: main.js and all files in the js/ directory
+  - `renderer.js`, `styles.css`, `index.html`
+  - `model-selector.js`, `model-selector.css`, `model-selector.html`
+- **Main Process Files**: `main.js` and all files in the `js/` directory
+  - Excludes `js/dev-config.js` to prevent reload loops
+
+### Development IPC Channels
+
+The application uses a dedicated IPC channel for development:
+
+- `DEV_RELOAD`: Used to trigger a manual reload of all applicable windows
 
 ### Debugging
 
 To open the DevTools for debugging:
 - Use keyboard shortcut `Ctrl+Shift+I` (or `Cmd+Shift+I` on macOS)
+- Alternative shortcut: `Ctrl+D` (or `Cmd+D` on macOS)
 - Or right-click and select "Inspect Element" from the context menu
 
 <div align="center">
