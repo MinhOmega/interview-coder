@@ -1,13 +1,13 @@
 const { globalShortcut } = require("electron");
-const { isLinux, modifierKey } = require("./config");
+const { isLinux, isWindows, modifierKey } = require("./config");
 
 let lastToggleTime = 0;
 const TOGGLE_DEBOUNCE_MS = 300;
 
+// Define shortcuts using only the platform-specific modifier key
 const SHORTCUTS = {
   TOGGLE_VISIBILITY: {
     key: `${modifierKey}+B`,
-    altKey: isLinux ? "Alt+B" : null,
     handler: null,
     alwaysActive: true,
   },
@@ -85,12 +85,12 @@ const SHORTCUTS = {
 function registerHandlers(handlers) {
   Object.keys(handlers).forEach((key) => {
     if (SHORTCUTS[key]) {
-      // If on Linux, we wrap the toggle visibility handler to add debouncing
-      if (isLinux && key === "TOGGLE_VISIBILITY") {
+      // Platform-specific debouncing for toggle visibility
+      if ((isLinux || isWindows) && key === "TOGGLE_VISIBILITY") {
         const originalHandler = handlers[key];
         SHORTCUTS[key].handler = () => {
           const now = Date.now();
-          // Prevent rapid firing of toggle on Linux which can cause hangs
+          // Prevent rapid firing of toggle which can cause hangs
           if (now - lastToggleTime < TOGGLE_DEBOUNCE_MS) {
             console.log("Toggle debounced - ignoring rapid keypress");
             return;
@@ -121,32 +121,51 @@ function registerHandlers(handlers) {
 // Function to manage hotkey registration based on visibility
 function updateHotkeys(isVisible) {
   try {
+    // Log platform information for debugging
+    console.log(`Updating hotkeys for platform: ${process.platform}`);
+    console.log(`Modifier key for this platform: ${modifierKey}`);
+    console.log(`isLinux: ${isLinux}, isWindows: ${isWindows}`);
+
     // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
+
+    // Record registration success rate
+    let totalShortcuts = 0;
+    let successfulRegistrations = 0;
 
     // Register shortcuts based on visibility state
     Object.values(SHORTCUTS).forEach((shortcut) => {
       if ((isVisible || shortcut.alwaysActive) && shortcut.handler) {
+        totalShortcuts++;
         try {
-          // Register primary key
-          const registered = globalShortcut.register(shortcut.key, shortcut.handler);
+          // Register the shortcut with platform-specific modifier
+          let registered = false;
 
-          // For Linux, try the alternative key if primary fails or if it's the toggle visibility shortcut
-          if (isLinux && shortcut.altKey && (!registered || shortcut.key === SHORTCUTS.TOGGLE_VISIBILITY.key)) {
-            console.log(`Registering alternative key for Linux: ${shortcut.altKey}`);
-            globalShortcut.register(shortcut.altKey, shortcut.handler);
-          }
-
-          if (!registered) {
-            console.warn(`Failed to register ${shortcut.key} shortcut`);
+          try {
+            registered = globalShortcut.register(shortcut.key, shortcut.handler);
+            if (registered) {
+              console.log(`Successfully registered shortcut: ${shortcut.key}`);
+              successfulRegistrations++;
+            } else {
+              console.warn(`Failed to register ${shortcut.key} shortcut`);
+            }
+          } catch (regError) {
+            console.warn(`Error registering shortcut ${shortcut.key}: ${regError.message}`);
           }
         } catch (error) {
+          // Log but don't crash the application
           console.error(`Error registering shortcut ${shortcut.key}:`, error);
         }
       }
     });
+
+    // Log registration success statistics
+    console.log(`Hotkey registration stats: ${successfulRegistrations}/${totalShortcuts} successful`);
+
+    return successfulRegistrations > 0; // As long as at least one shortcut works, return true
   } catch (error) {
     console.error("Error updating hotkeys:", error);
+    return false; // Signal overall registration failure
   }
 }
 
@@ -169,33 +188,29 @@ function getShortcuts() {
   return { ...SHORTCUTS };
 }
 
-// Validate that hotkeys are properly registered (especially important for Linux)
+// Validate that hotkeys are properly registered
 function validateHotkeys() {
   try {
     // Check if the toggle visibility shortcut is registered
     const isRegistered = globalShortcut.isRegistered(SHORTCUTS.TOGGLE_VISIBILITY.key);
-
-    // If primary key is not registered on Linux, try registering the alt key
-    if (!isRegistered && isLinux && SHORTCUTS.TOGGLE_VISIBILITY.altKey) {
-      console.log(
-        `Primary key ${SHORTCUTS.TOGGLE_VISIBILITY.key} not registered, trying alternative ${SHORTCUTS.TOGGLE_VISIBILITY.altKey}`,
-      );
-
-      // Register the alternative key
-      if (SHORTCUTS.TOGGLE_VISIBILITY.handler) {
-        const altRegistered = globalShortcut.register(
-          SHORTCUTS.TOGGLE_VISIBILITY.altKey,
-          SHORTCUTS.TOGGLE_VISIBILITY.handler,
-        );
-        return altRegistered;
-      }
-    }
-
     return isRegistered;
   } catch (error) {
     console.error("Error validating hotkeys:", error);
     return false;
   }
+}
+
+// Get platform-specific shortcut keys
+function getPlatformShortcuts() {
+  return {
+    quit: `${modifierKey}+Q`,
+    modelSelection: `${modifierKey}+M`,
+    toggleVisibility: `${modifierKey}+B`,
+    takeScreenshot: `${modifierKey}+H`,
+    areaScreenshot: `${modifierKey}+D`,
+    reset: `${modifierKey}+R`,
+    toggleSplitView: `${modifierKey}+T`,
+  };
 }
 
 module.exports = {
@@ -205,4 +220,5 @@ module.exports = {
   getModifierKey,
   getShortcuts,
   validateHotkeys,
+  getPlatformShortcuts,
 };

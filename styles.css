@@ -546,7 +546,7 @@ body.invisible-mode:hover {
   z-index: 9500;
   -webkit-app-region: drag;
   box-sizing: border-box;
-  height: 50px;
+  height: auto;
   cursor: move;
   overflow-x: auto;
   white-space: nowrap;
