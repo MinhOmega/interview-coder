@@ -227,12 +227,41 @@
     <div class="modal-content">
       <span class="close-modal">&times;</span>
       <h3>Pull Ollama Model</h3>
-      <p class="mb-2">Enter the name of the model to pull:</p>
-      <input type="text" id="model-to-pull" placeholder="e.g., llava:latest" class="w-full mb-1">
-      <div class="helper-text mb-4">Recommended multimodal models: llava, bakllava, deepseek-r1, moondream</div>
+      
+      <p class="mb-2">Select a model to pull from the Ollama Model Library:</p>
+      
+      <div class="model-library-container">
+        <div class="select-container mb-2">
+          <select id="model-library-select" class="model-library-select">
+            <option value="" disabled selected>Select a model to pull</option>
+            <!-- Options will be dynamically populated -->
+          </select>
+        </div>
+        
+        <div id="model-details" class="model-details">
+          <div class="model-info-card">
+            <div class="model-info-header">
+              <div class="model-name">Select a model</div>
+              <div class="model-size-badge">-</div>
+            </div>
+            <div class="model-params">Parameters: -</div>
+            <div class="model-command">Command: <code>ollama run model-name</code></div>
+            <div class="model-requirements">System Requirements: -</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="progress-container mb-4" style="display: none;">
+        <div class="progress-label">Downloading: <span id="progress-percentage">0%</span></div>
+        <div class="progress-bar">
+          <div id="progress-bar-fill" style="width: 0%"></div>
+        </div>
+        <div class="progress-details" id="progress-details">Starting download...</div>
+      </div>
+      
       <div id="pull-status" class="status"></div>
       <div class="flex justify-between mt-4">
-        <button id="confirm-pull" class="btn-success">
+        <button id="confirm-pull" class="btn-success" disabled>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
             style="margin-right: 6px;">
             <path d="M12 4V16M12 16L7 11M12 16L17 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"

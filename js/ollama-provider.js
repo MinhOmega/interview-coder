@@ -224,35 +224,249 @@ async function testOllamaConnection() {
   }
 }
 
-// Pull an Ollama model
+// Library of models for Ollama
+const MODEL_LIBRARY = [
+  { name: "gemma3:1b", params: "1B", size: "815MB", ram: "4GB", family: "Gemma 3" },
+  { name: "gemma3", params: "4B", size: "3.3GB", ram: "8GB", family: "Gemma 3" },
+  { name: "gemma3:12b", params: "12B", size: "8.1GB", ram: "16GB", family: "Gemma 3" },
+  { name: "gemma3:27b", params: "27B", size: "17GB", ram: "32GB", family: "Gemma 3" },
+  { name: "qwq", params: "32B", size: "20GB", ram: "32GB", family: "QwQ" },
+  { name: "deepseek-r1", params: "7B", size: "4.7GB", ram: "8GB", family: "DeepSeek-R1", vision: true },
+  { name: "deepseek-r1:671b", params: "671B", size: "404GB", ram: "512GB", family: "DeepSeek-R1" },
+  { name: "llama3.3", params: "70B", size: "43GB", ram: "64GB", family: "Llama 3.3" },
+  { name: "llama3.2", params: "3B", size: "2.0GB", ram: "8GB", family: "Llama 3.2" },
+  { name: "llama3.2:1b", params: "1B", size: "1.3GB", ram: "4GB", family: "Llama 3.2" },
+  { name: "llama3.2-vision", params: "11B", size: "7.9GB", ram: "16GB", family: "Llama 3.2", vision: true },
+  { name: "llama3.2-vision:90b", params: "90B", size: "55GB", ram: "96GB", family: "Llama 3.2", vision: true },
+  { name: "llama3.1", params: "8B", size: "4.7GB", ram: "8GB", family: "Llama 3.1" },
+  { name: "llama3.1:405b", params: "405B", size: "231GB", ram: "256GB", family: "Llama 3.1" },
+  { name: "phi4", params: "14B", size: "9.1GB", ram: "16GB", family: "Phi 4" },
+  { name: "phi4-mini", params: "3.8B", size: "2.5GB", ram: "8GB", family: "Phi 4 Mini" },
+  { name: "mistral", params: "7B", size: "4.1GB", ram: "8GB", family: "Mistral" },
+  { name: "moondream", params: "1.4B", size: "829MB", ram: "4GB", family: "Moondream 2", vision: true },
+  { name: "neural-chat", params: "7B", size: "4.1GB", ram: "8GB", family: "Neural Chat" },
+  { name: "starling-lm", params: "7B", size: "4.1GB", ram: "8GB", family: "Starling" },
+  { name: "codellama", params: "7B", size: "3.8GB", ram: "8GB", family: "Code Llama" },
+  { name: "llama2-uncensored", params: "7B", size: "3.8GB", ram: "8GB", family: "Llama 2 Uncensored" },
+  { name: "llava", params: "7B", size: "4.5GB", ram: "8GB", family: "LLaVA", vision: true },
+  { name: "granite3.2", params: "8B", size: "4.9GB", ram: "8GB", family: "Granite 3.2" },
+];
+
+// Load model library into dropdown select
+function loadModelLibrary() {
+  const librarySelect = document.getElementById("model-library-select");
+  const confirmPullBtn = document.getElementById("confirm-pull");
+  
+  // Clear existing options
+  while (librarySelect.options.length > 1) {
+    librarySelect.remove(1);
+  }
+  
+  // Sort models by family and size
+  const sortedModels = [...MODEL_LIBRARY].sort((a, b) => {
+    // First sort by family
+    if (a.family !== b.family) {
+      return a.family.localeCompare(b.family);
+    }
+    // Then by parameter size (convert to number first)
+    const aParams = parseFloat(a.params.replace(/[^\d.]/g, ''));
+    const bParams = parseFloat(b.params.replace(/[^\d.]/g, ''));
+    return aParams - bParams;
+  });
+  
+  // Group models by family
+  const modelsByFamily = {};
+  sortedModels.forEach(model => {
+    if (!modelsByFamily[model.family]) {
+      modelsByFamily[model.family] = [];
+    }
+    modelsByFamily[model.family].push(model);
+  });
+  
+  // Create optgroups for each family
+  Object.keys(modelsByFamily).sort().forEach(family => {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = family;
+    
+    modelsByFamily[family].forEach(model => {
+      const option = document.createElement("option");
+      option.value = model.name;
+      option.textContent = `${model.name} (${model.params}, ${model.size})`;
+      option.dataset.params = model.params;
+      option.dataset.size = model.size;
+      option.dataset.ram = model.ram;
+      option.dataset.family = model.family;
+      option.dataset.vision = model.vision ? "true" : "false";
+      
+      optgroup.appendChild(option);
+    });
+    
+    librarySelect.appendChild(optgroup);
+  });
+  
+  // Add change handler to update model details
+  librarySelect.addEventListener("change", () => {
+    updateModelDetails(librarySelect.value);
+    
+    // Enable pull button when a model is selected
+    confirmPullBtn.disabled = !librarySelect.value;
+  });
+}
+
+// Update model details when a model is selected
+function updateModelDetails(modelName) {
+  if (!modelName) return;
+  
+  // Find the model in the library
+  const model = MODEL_LIBRARY.find(m => m.name === modelName);
+  if (!model) return;
+  
+  // Update the info card
+  const modelNameElement = document.querySelector(".model-name");
+  const modelSizeBadge = document.querySelector(".model-size-badge");
+  const modelParams = document.querySelector(".model-params");
+  const modelCommand = document.querySelector(".model-command code");
+  const modelRequirements = document.querySelector(".model-requirements");
+  
+  modelNameElement.textContent = `${model.family} (${model.name})`;
+  modelSizeBadge.textContent = model.size;
+  modelParams.textContent = `Parameters: ${model.params}`;
+  modelCommand.textContent = `ollama run ${model.name}`;
+  
+  // Set requirements based on RAM
+  modelRequirements.textContent = `System Requirements: Minimum ${model.ram} RAM`;
+  
+  // Add vision badge if applicable
+  if (model.vision) {
+    modelNameElement.innerHTML = `${model.family} (${model.name}) <span class="vision-badge">Vision</span>`;
+  }
+}
+
+// Pull an Ollama model with progress tracking
 async function pullOllamaModel(modelName) {
   const pullStatusDiv = document.getElementById("pull-status");
   const confirmPullBtn = document.getElementById("confirm-pull");
   const ollamaUrlInput = document.getElementById("ollama-url");
+  const progressContainer = document.querySelector(".progress-container");
+  const progressBarFill = document.getElementById("progress-bar-fill");
+  const progressPercentage = document.getElementById("progress-percentage");
+  const progressDetails = document.getElementById("progress-details");
 
-  pullStatusDiv.innerHTML = `Pulling model ${modelName}... <span class="loading"></span>`;
+  // If no model name is provided, get it from the select
+  if (!modelName) {
+    const modelSelect = document.getElementById("model-library-select");
+    modelName = modelSelect.value;
+    
+    if (!modelName) {
+      pullStatusDiv.textContent = "Please select a model to pull";
+      pullStatusDiv.className = "status error";
+      return false;
+    }
+  }
+
+  // Reset and show progress elements
+  progressContainer.style.display = "block";
+  progressBarFill.style.width = "0%";
+  progressPercentage.textContent = "0%";
+  progressDetails.textContent = "Starting download...";
+  
+  pullStatusDiv.innerHTML = `Preparing to pull model ${modelName}...`;
   pullStatusDiv.className = "status";
   confirmPullBtn.disabled = true;
 
   try {
     // Always use IPv4 by replacing localhost with 127.0.0.1
     const url = ollamaUrlInput.value.replace("localhost", "127.0.0.1");
+    
+    // Check if the Ollama server is accessible
+    try {
+      const versionCheck = await axios.get(`${url}/api/version`, {
+        timeout: 5000,
+      });
+      
+      if (versionCheck.status !== 200) {
+        throw new Error(`Server returned status ${versionCheck.status}`);
+      }
+      
+      pullStatusDiv.textContent = `Connected to Ollama v${versionCheck.data.version}`;
+    } catch (connectionError) {
+      throw new Error(`Could not connect to Ollama server: ${connectionError.message}`);
+    }
 
     pullStatusDiv.textContent = `Sending pull request for ${modelName}...`;
-
-    // Use Ollama API to pull the model
-    const response = await axios.post(
-      `${url}/api/pull`,
-      {
-        name: modelName,
-        stream: false,
+    
+    // This will track our progress calculation
+    let downloadedBytes = 0;
+    let totalBytes = 0;
+    let startTime = Date.now();
+    let lastUpdate = Date.now();
+    let downloadSpeed = 0;
+    
+    // Use Ollama API to pull the model with streaming for progress updates
+    const response = await axios({
+      method: "post",
+      url: `${url}/api/pull`,
+      data: { name: modelName },
+      responseType: "stream",
+      onDownloadProgress: (progressEvent) => {
+        try {
+          // Handle progress update
+          const currentTime = Date.now();
+          const chunk = progressEvent.event.target.response;
+          
+          if (chunk && typeof chunk === "string") {
+            // Try to parse the JSON response chunks
+            const lines = chunk.split("\n").filter(line => line.trim() !== "");
+            
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line);
+                
+                if (data.status === "pulling manifest" || data.status === "pulling layers") {
+                  progressDetails.textContent = `${data.status}: ${data.digest || ""}`;
+                }
+                
+                if (data.total && data.completed) {
+                  // Update progress percentage
+                  totalBytes = data.total;
+                  downloadedBytes = data.completed;
+                  
+                  const percent = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
+                  progressBarFill.style.width = `${percent}%`;
+                  progressPercentage.textContent = `${percent}%`;
+                  
+                  // Calculate download speed (every 1 second)
+                  if (currentTime - lastUpdate > 1000) {
+                    const elapsedSeconds = (currentTime - startTime) / 1000;
+                    downloadSpeed = downloadedBytes / elapsedSeconds / (1024 * 1024); // MB/s
+                    
+                    // Format the remaining time
+                    const remainingBytes = totalBytes - downloadedBytes;
+                    const remainingTimeSeconds = remainingBytes / (downloadedBytes / elapsedSeconds);
+                    const remainingTimeFormatted = formatTime(remainingTimeSeconds);
+                    
+                    progressDetails.textContent = `Downloaded ${formatSize(downloadedBytes)} of ${formatSize(totalBytes)} (${downloadSpeed.toFixed(2)} MB/s) - ${remainingTimeFormatted} remaining`;
+                    
+                    lastUpdate = currentTime;
+                  }
+                }
+              } catch (jsonError) {
+                // Not valid JSON or other parsing error, ignore
+              }
+            }
+          }
+        } catch (progressError) {
+          console.error("Error processing progress:", progressError);
+        }
       },
-      {
-        timeout: 300000, // 5 minute timeout for pulling
-      },
-    );
+    });
 
-    if (response.data && response.data.status === "success") {
+    if (response.status === 200) {
+      // Set progress to 100% when done
+      progressBarFill.style.width = "100%";
+      progressPercentage.textContent = "100%";
+      progressDetails.textContent = "Download complete!";
+      
       pullStatusDiv.textContent = `Successfully pulled model: ${modelName}`;
       pullStatusDiv.className = "status success";
 
@@ -266,25 +480,54 @@ async function pullOllamaModel(modelName) {
       setTimeout(() => {
         document.getElementById("pull-model-modal").style.display = "none";
         confirmPullBtn.disabled = false;
+        progressContainer.style.display = "none";
+        
+        // Reset the dropdown
+        document.getElementById("model-library-select").selectedIndex = 0;
+        updateModelDetails("");
       }, 2000);
 
       return true;
     } else {
-      pullStatusDiv.textContent = `Error pulling model: ${response.data.status || "Unknown error"}`;
+      pullStatusDiv.textContent = `Error pulling model: ${response.data?.status || "Unknown error"}`;
       pullStatusDiv.className = "status error";
+      progressContainer.style.display = "none";
       confirmPullBtn.disabled = false;
       return false;
     }
   } catch (error) {
     pullStatusDiv.textContent = `Error pulling model: ${error.message}`;
     pullStatusDiv.className = "status error";
+    progressContainer.style.display = "none";
     confirmPullBtn.disabled = false;
     return false;
   }
+}
+
+// Helper function to format file size
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+// Helper function to format time
+function formatTime(seconds) {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const remainingMinutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 module.exports = {
   loadOllamaModels,
   testOllamaConnection,
   pullOllamaModel,
+  loadModelLibrary,
 };

@@ -149,11 +149,38 @@ testConnectionBtn.addEventListener("click", ollamaProvider.testOllamaConnection)
 
 // Pull model button
 pullModelBtn.addEventListener("click", () => {
-  // Suggest a vision model
-  modelToPullInput.value = "llava:latest";
+  // Reset the UI
   pullStatusDiv.textContent = "";
   pullStatusDiv.className = "status";
-  confirmPullBtn.disabled = false;
+  confirmPullBtn.disabled = true;
+  
+  // Reset the progress container
+  const progressContainer = document.querySelector(".progress-container");
+  const progressBarFill = document.getElementById("progress-bar-fill");
+  if (progressContainer) progressContainer.style.display = "none";
+  if (progressBarFill) progressBarFill.style.width = "0%";
+  
+  // Reset model details to default state
+  const modelNameElement = document.querySelector(".model-name");
+  const modelSizeBadge = document.querySelector(".model-size-badge");
+  const modelParams = document.querySelector(".model-params");
+  const modelCommand = document.querySelector(".model-command code");
+  const modelRequirements = document.querySelector(".model-requirements");
+  
+  if (modelNameElement) modelNameElement.textContent = "Select a model";
+  if (modelSizeBadge) modelSizeBadge.textContent = "-";
+  if (modelParams) modelParams.textContent = "Parameters: -";
+  if (modelCommand) modelCommand.textContent = "ollama run model-name";
+  if (modelRequirements) modelRequirements.textContent = "System Requirements: -";
+  
+  // Reset and load the model library dropdown
+  const modelLibrarySelect = document.getElementById("model-library-select");
+  if (modelLibrarySelect) modelLibrarySelect.selectedIndex = 0;
+  
+  // Load the model library
+  ollamaProvider.loadModelLibrary();
+  
+  // Show the modal
   pullModelModal.style.display = "block";
 });
 
@@ -167,11 +194,33 @@ cancelPullBtn.addEventListener("click", () => {
   pullModelModal.style.display = "none";
 });
 
+// Tab handling
+function setupTabs() {
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  
+  tabButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      // Get the tab to show
+      const tabId = button.getAttribute("data-tab");
+      
+      // Deactivate all tabs and buttons
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
+      
+      // Activate the selected tab and button
+      button.classList.add("active");
+      document.getElementById(tabId).classList.add("active");
+    });
+  });
+}
+
 // Confirm pull button
 confirmPullBtn.addEventListener("click", async () => {
-  const modelName = modelToPullInput.value.trim();
+  const modelSelect = document.getElementById("model-library-select");
+  const modelName = modelSelect.value;
+  
   if (!modelName) {
-    pullStatusDiv.textContent = "Please enter a model name";
+    pullStatusDiv.textContent = "Please select a model to pull";
     pullStatusDiv.className = "status error";
     return;
   }
@@ -668,6 +717,9 @@ function initialize() {
 
   // Initialize modals
   initializeModals();
+  
+  // Setup tabs
+  setupTabs();
 
   // Set up keyboard shortcuts
   setupKeyboardShortcuts();
@@ -691,6 +743,16 @@ function initialize() {
 
   // Run once on page load to adjust UI
   utils.adjustUIForScreenSize();
+
+  // Fix progress bar styling
+  const progressBarFill = document.getElementById("progress-bar-fill");
+  if (progressBarFill) {
+    // Make sure styles get applied correctly
+    progressBarFill.style.height = "100%";
+    progressBarFill.style.backgroundColor = "var(--accent-color)";
+    progressBarFill.style.width = "0%";
+    progressBarFill.style.transition = "width 0.3s ease";
+  }
 
   // Handle window resize events to adjust UI
   let resizeTimeout;
