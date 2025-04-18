@@ -36,8 +36,6 @@ if (isDev) {
 
 axios.defaults.family = 4;
 
-let openai = null;
-
 function resetProcess() {
   screenshotManager.resetScreenshots();
   windowManager.updateInstruction(
