@@ -42,6 +42,7 @@ const IPC_CHANNELS = {
   TOGGLE_SPLIT_VIEW: "toggle-split-view",
   UPDATE_SYSTEM_PROMPT: "update-system-prompt",
   GET_SYSTEM_PROMPT: "get-system-prompt",
+  SHOW_HOTKEYS_INFO: "show-hotkeys-info",
 };
 
 module.exports = {

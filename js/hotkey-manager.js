@@ -1,5 +1,6 @@
 const { globalShortcut } = require("electron");
 const { isLinux, isWindows, modifierKey } = require("./config");
+const log = require("electron-log");
 
 let lastToggleTime = 0;
 const TOGGLE_DEBOUNCE_MS = 300;
@@ -10,113 +11,145 @@ const SHORTCUTS = {
     key: `${modifierKey}+B`,
     handler: null,
     alwaysActive: true,
+    description: "Show/Hide the main window",
   },
   PROCESS_SCREENSHOTS: {
     key: `${modifierKey}+Enter`,
     handler: null,
+    description: "Process existing screenshots with AI",
   },
   OPEN_SETTINGS: {
     key: `${modifierKey}+,`,
     handler: null,
+    description: "Open settings window",
   },
   MOVE_LEFT: {
     key: `${modifierKey}+Shift+Left`,
     handler: null,
+    description: "Move window left",
   },
   MOVE_RIGHT: {
     key: `${modifierKey}+Shift+Right`,
     handler: null,
+    description: "Move window right",
   },
   MOVE_UP: {
     key: `${modifierKey}+Shift+Up`,
     handler: null,
+    description: "Move window up",
   },
   MOVE_DOWN: {
     key: `${modifierKey}+Shift+Down`,
     handler: null,
+    description: "Move window down",
   },
   SCROLL_UP: {
     key: `Shift+Up`,
     handler: null,
+    description: "Scroll content up",
   },
   SCROLL_DOWN: {
     key: `Shift+Down`,
     handler: null,
+    description: "Scroll content down",
   },
   INCREASE_WINDOW_SIZE: {
     key: `${modifierKey}+Shift+=`,
     handler: null,
+    description: "Increase window size",
   },
   DECREASE_WINDOW_SIZE: {
     key: `${modifierKey}+Shift+-`,
     handler: null,
+    description: "Decrease window size",
   },
   TAKE_SCREENSHOT: {
     key: `${modifierKey}+H`,
     handler: null,
+    description: "Take a full screenshot and process with AI",
   },
   AREA_SCREENSHOT: {
     key: `${modifierKey}+D`,
     handler: null,
+    description: "Take a screenshot of a selected area and process with AI",
   },
   MULTI_PAGE: {
     key: `${modifierKey}+A`,
     handler: null,
+    description: "Add a screenshot in multi-mode",
   },
   RESET: {
     key: `${modifierKey}+R`,
     handler: null,
+    description: "Reset and start over",
   },
   QUIT: {
     key: `${modifierKey}+Q`,
     handler: null,
-  },
-  MODEL_SELECTION: {
-    key: `${modifierKey}+M`,
-    handler: null,
+    description: "Quit the application",
   },
   TOGGLE_SPLIT_VIEW: {
     key: `${modifierKey}+T`,
     handler: null,
+    description: "Toggle split view",
   },
   TOGGLE_DEVTOOLS: {
     key: `${modifierKey}+Shift+I`,
     handler: null,
+    description: "Toggle developer tools",
+  },
+  SHOW_HOTKEYS: {
+    key: `${modifierKey}+/`,
+    handler: null,
+    description: "Show this hotkey information",
   },
 };
+
+// Wrap original handlers to log hotkey press
+function wrapHandlerWithLogging(shortcutKey, handler) {
+  return () => {
+    log.info(`Hotkey pressed: ${shortcutKey}`);
+    handler();
+  };
+}
 
 // Register shortcut handlers
 function registerHandlers(handlers) {
   Object.keys(handlers).forEach((key) => {
     if (SHORTCUTS[key]) {
+      // Store original handler for wrapping
+      const originalHandler = handlers[key];
+
       // Platform-specific debouncing for toggle visibility
       if ((isLinux || isWindows) && key === "TOGGLE_VISIBILITY") {
-        const originalHandler = handlers[key];
         SHORTCUTS[key].handler = () => {
           const now = Date.now();
           // Prevent rapid firing of toggle which can cause hangs
           if (now - lastToggleTime < TOGGLE_DEBOUNCE_MS) {
-            console.log("Toggle debounced - ignoring rapid keypress");
+            log.info("Toggle debounced - ignoring rapid keypress");
             return;
           }
           lastToggleTime = now;
 
           try {
+            // Log the hotkey press
+            log.info(`Hotkey pressed: ${SHORTCUTS[key].key}`);
             originalHandler();
           } catch (error) {
-            console.error("Error in toggle visibility handler:", error);
+            log.error("Error in toggle visibility handler:", error);
             // Attempt recovery on error by unregistering and re-registering shortcuts
             setTimeout(() => {
               try {
                 updateHotkeys(true);
               } catch (e) {
-                console.error("Failed to recover hotkeys:", e);
+                log.error("Failed to recover hotkeys:", e);
               }
             }, 500);
           }
         };
       } else {
-        SHORTCUTS[key].handler = handlers[key];
+        // Wrap all other handlers with logging
+        SHORTCUTS[key].handler = wrapHandlerWithLogging(SHORTCUTS[key].key, originalHandler);
       }
     }
   });
@@ -143,27 +176,27 @@ function updateHotkeys(isVisible) {
           try {
             registered = globalShortcut.register(shortcut.key, shortcut.handler);
             if (registered) {
-              console.log(`Successfully registered shortcut: ${shortcut.key}`);
+              // Remove verbose logging of each shortcut registration
               successfulRegistrations++;
             } else {
-              console.warn(`Failed to register ${shortcut.key} shortcut`);
+              log.warn(`Failed to register ${shortcut.key} shortcut`);
             }
           } catch (regError) {
-            console.warn(`Error registering shortcut ${shortcut.key}: ${regError.message}`);
+            log.warn(`Error registering shortcut ${shortcut.key}: ${regError.message}`);
           }
         } catch (error) {
           // Log but don't crash the application
-          console.error(`Error registering shortcut ${shortcut.key}:`, error);
+          log.error(`Error registering shortcut ${shortcut.key}:`, error);
         }
       }
     });
 
-    // Log registration success statistics
-    console.log(`Hotkey registration stats: ${successfulRegistrations}/${totalShortcuts} successful`);
+    // Log only overall registration stats instead of individual successes
+    log.info(`Hotkey registration stats: ${successfulRegistrations}/${totalShortcuts} successful`);
 
     return successfulRegistrations > 0; // As long as at least one shortcut works, return true
   } catch (error) {
-    console.error("Error updating hotkeys:", error);
+    log.error("Error updating hotkeys:", error);
     return false; // Signal overall registration failure
   }
 }
@@ -173,7 +206,7 @@ function unregisterAll() {
   try {
     globalShortcut.unregisterAll();
   } catch (error) {
-    console.error("Error unregistering hotkeys:", error);
+    log.error("Error unregistering hotkeys:", error);
   }
 }
 
@@ -187,6 +220,22 @@ function getShortcuts() {
   return { ...SHORTCUTS };
 }
 
+// Format hotkeys for display in a dialog
+function getHotkeysForDisplay() {
+  const hotkeyInfo = [];
+
+  Object.entries(SHORTCUTS).forEach(([key, shortcut]) => {
+    if (shortcut.description) {
+      hotkeyInfo.push({
+        key: shortcut.key,
+        description: shortcut.description,
+      });
+    }
+  });
+
+  return hotkeyInfo;
+}
+
 // Validate that hotkeys are properly registered
 function validateHotkeys() {
   try {
@@ -194,23 +243,9 @@ function validateHotkeys() {
     const isRegistered = globalShortcut.isRegistered(SHORTCUTS.TOGGLE_VISIBILITY.key);
     return isRegistered;
   } catch (error) {
-    console.error("Error validating hotkeys:", error);
+    log.error("Error validating hotkeys:", error);
     return false;
   }
-}
-
-// Get platform-specific shortcut keys
-function getPlatformShortcuts() {
-  return {
-    quit: `${modifierKey}+Q`,
-    modelSelection: `${modifierKey}+M`,
-    toggleVisibility: `${modifierKey}+B`,
-    takeScreenshot: `${modifierKey}+H`,
-    areaScreenshot: `${modifierKey}+D`,
-    reset: `${modifierKey}+R`,
-    toggleSplitView: `${modifierKey}+T`,
-    toggleDevtools: `${modifierKey}+Shift+I`,
-  };
 }
 
 module.exports = {
@@ -219,6 +254,6 @@ module.exports = {
   unregisterAll,
   getModifierKey,
   getShortcuts,
+  getHotkeysForDisplay,
   validateHotkeys,
-  getPlatformShortcuts,
 };

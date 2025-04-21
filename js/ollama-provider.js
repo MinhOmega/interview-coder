@@ -6,7 +6,6 @@ async function loadOllamaModels() {
   const ollamaStatus = document.getElementById("ollama-status");
   const visionModelsNote = document.getElementById("vision-models-note");
   const ollamaModelCards = document.getElementById("ollama-model-cards");
-  const ollamaModelSelect = document.getElementById("ollama-model");
   const ipcRenderer = window.ipcRenderer;
 
   ollamaStatus.innerHTML = '<div class="loading"></div><span>Loading models...</span>';
@@ -24,18 +23,13 @@ async function loadOllamaModels() {
       if (invokeError.message.includes("No handler registered for")) {
         ollamaStatus.textContent = "Ollama support is not fully configured. Other AI providers are still available.";
         ollamaStatus.className = "status error";
-        ollamaModelSelect.innerHTML = '<option value="">Ollama not configured</option>';
         return;
       } else {
         throw invokeError; // Re-throw other errors to be caught below
       }
     }
 
-    // Clear and populate the select
-    ollamaModelSelect.innerHTML = "";
-
     if (models.length === 0) {
-      ollamaModelSelect.innerHTML = '<option value="">No models found</option>';
       ollamaStatus.textContent = "No models found. Is Ollama running?";
       ollamaStatus.className = "status error";
       return;
@@ -69,12 +63,6 @@ async function loadOllamaModels() {
       } else {
         modelGroups.other.push(model);
       }
-
-      // Create select option
-      const option = document.createElement("option");
-      option.value = model.name;
-      option.textContent = model.name;
-      ollamaModelSelect.appendChild(option);
     });
 
     // Add models to cards in order: vision, llama, mistral, other
@@ -207,10 +195,6 @@ async function loadOllamaModels() {
           card.classList.remove("selected");
         });
 
-        // Select this card and update the hidden select
-        modelCard.classList.add("selected");
-        ollamaModelSelect.value = model.name;
-
         // Scroll into view on mobile
         if (window.innerWidth <= 768) {
           modelCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -237,7 +221,6 @@ async function loadOllamaModels() {
     if (!ollamaModelCards.querySelector(".model-card.selected") && ollamaModelCards.firstChild) {
       const firstCard = ollamaModelCards.firstChild;
       firstCard.classList.add("selected");
-      ollamaModelSelect.value = firstCard.getAttribute("data-model");
     }
 
     // Show vision model note if needed
@@ -250,7 +233,6 @@ async function loadOllamaModels() {
   } catch (error) {
     ollamaStatus.textContent = `Error: ${error.message}`;
     ollamaStatus.className = "status error";
-    ollamaModelSelect.innerHTML = '<option value="">Error loading models</option>';
 
     // Check if the error is likely due to Ollama not running
     if (error.message.includes("ECONNREFUSED") || error.message.includes("ECONNRESET")) {
