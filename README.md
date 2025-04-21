@@ -82,7 +82,7 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
 No environment configuration is required to get started. API keys can be entered directly in the application:
 
 1. Launch Interview Coder
-2. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+2. Press `⌘+,` (Mac) or `Ctrl+,` (Windows/Linux) to open the settings
 3. Choose your preferred AI provider (OpenAI, Google Gemini, or Ollama)
 4. Enter your API key when prompted
 5. Select your preferred model
@@ -98,7 +98,7 @@ No environment configuration is required to get started. API keys can be entered
    ollama pull deepseek-r1:14b
    ```
 4. Launch Interview Coder
-5. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+5. Press `⌘+,` (Mac) or `Ctrl+,` (Windows/Linux) to open the settings
 6. Select "Ollama" as your AI provider
 7. Configure the Ollama base URL if needed (default: http://127.0.0.1:11434)
 8. Choose your preferred model from the dropdown
@@ -108,7 +108,7 @@ No environment configuration is required to get started. API keys can be entered
 
 Choose your preferred language for AI responses:
 
-1. Press `⌘+M` (Mac) or `Ctrl+M` (Windows/Linux) to open the model selector
+1. Press `⌘+,` (Mac) or `Ctrl+,` (Windows/Linux) to open the settings
 2. Scroll down to the "Response Language" section
 3. Select your language from the available options:
    - English (default)
@@ -134,7 +134,6 @@ The application will generate all AI responses in your selected language, with s
 | `⌘ + A`            | Add screenshot (multi-page) |
 | `⌘ + Enter`        | Process screenshots         |
 | `⌘ + R`            | Reset current process       |
-| `⌘ + M`            | Open model selector         |
 | `⌘ + T`            | Toggle split view           |
 | `⌘ + ,`            | Open settings               |
 | `⌘ + Q`            | Quit application            |
@@ -143,6 +142,7 @@ The application will generate all AI responses in your selected language, with s
 | `⌘ + Shift + =`    | Increase window size        |
 | `⌘ + Shift + -`    | Decrease window size        |
 | `⌘ + Shift + I`    | Toggle DevTools             |
+| `⌘ + /`            | Show hotkeys                |
 
 ### Windows/Linux
 | Shortcut              | Action                      |
@@ -153,7 +153,6 @@ The application will generate all AI responses in your selected language, with s
 | `Ctrl + A`            | Add screenshot (multi-page) |
 | `Ctrl + Enter`        | Process screenshots         |
 | `Ctrl + R`            | Reset current process       |
-| `Ctrl + M`            | Open model selector         |
 | `Ctrl + T`            | Toggle split view           |
 | `Ctrl + ,`            | Open settings               |
 | `Ctrl + Q`            | Quit application            |
@@ -162,6 +161,7 @@ The application will generate all AI responses in your selected language, with s
 | `Ctrl + Shift + =`    | Increase window size        |
 | `Ctrl + Shift + -`    | Decrease window size        |
 | `Ctrl + Shift + I`    | Toggle DevTools             |
+| `Ctrl + /`            | Show hotkeys                |
 
 > **Note for Linux users:** Alternative key bindings may be used automatically if the primary shortcuts cannot be registered.
 
@@ -203,40 +203,6 @@ npm run dev
 # For Windows
 npm run dev:windows
 ```
-
-### Hot Reload Features
-
-When running in development mode, the application provides the following features:
-
-- **Automatic reloading** when files are changed
-- **Manual reload** with keyboard shortcut `Ctrl+Shift+R` (or `Cmd+Shift+R` on macOS)
-- **Visual indicator** showing "DEV MODE" in the bottom-right corner with a clickable reload button
-- **Force reload option** in the right-click context menu
-- **Independent window reload** - only reloads the window (main or settings) that's affected by the file changes
-- **IPC communication** for development-specific channels between renderer and main processes
-
-### Monitored Files
-
-The following files are monitored for changes:
-
-- **Renderer Files**: HTML, CSS, and renderer JavaScript files
-  - `renderer.js`, `styles.css`, `index.html`
-  - `model-selector.js`, `model-selector.css`, `model-selector.html`
-- **Main Process Files**: `main.js` and all files in the `js/` directory
-  - Excludes `js/dev-config.js` to prevent reload loops
-
-### Development IPC Channels
-
-The application uses a dedicated IPC channel for development:
-
-- `DEV_RELOAD`: Used to trigger a manual reload of all applicable windows
-
-### Debugging
-
-To open the DevTools for debugging:
-- Use keyboard shortcut `Ctrl+Shift+I` (or `Cmd+Shift+I` on macOS)
-- Alternative shortcut: `Ctrl+D` (or `Cmd+D` on macOS)
-- Or right-click and select "Inspect Element" from the context menu
 
 <div align="center">
 <br/>

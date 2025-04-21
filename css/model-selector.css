@@ -788,18 +788,6 @@ button:disabled {
   }
 }
 
-.language-selector {
-  margin-bottom: var(--space-md);
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.language-selector label {
-  font-weight: 500;
-  min-width: 80px;
-}
-
 .language-select {
   flex: 1;
   max-width: 300px;
