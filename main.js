@@ -45,7 +45,7 @@ log.errorHandler.startCatching({
 
 // Replace console with electron-log
 Object.assign(console, log.functions);
-console.log("Starting application with electron-log integration");
+log.info("Starting application with electron-log integration");
 
 if (isDev) {
   try {
@@ -116,60 +116,6 @@ async function processScreenshotsWithAI() {
         hotkeyManager.getModifierKey(),
       ),
     );
-  }
-}
-
-/**
- * Captures a fallback screenshot of the entire screen using Electron's desktopCapturer
- * Used when area screenshot is not available
- */
-async function captureFullScreenFallback() {
-  try {
-    // On macOS, ensure we have proper permissions first
-    if (isMac) {
-      const status = systemPreferences.getMediaAccessStatus("screen");
-      if (status !== "granted") {
-        await systemPreferences.askForMediaAccess("screen");
-        // The actual permission status might not change immediately, but we've at least asked
-      }
-    }
-
-    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
-    const picturesPath = getAppPath("pictures", "");
-    const imagePath = path.join(picturesPath, `fullscreen-${timestamp}.png`);
-
-    // Get screen sources with high resolution thumbnails
-    const sources = await desktopCapturer.getSources({
-      types: ["screen"],
-      thumbnailSize: { width: 3840, height: 2160 }, // Request higher resolution thumbnail
-      fetchWindowIcons: false,
-    });
-
-    if (sources.length === 0) {
-      throw new Error("No screen sources found");
-    }
-
-    // Take screenshot of the primary screen
-    const primarySource = sources[0];
-    const thumbnail = primarySource.thumbnail;
-
-    // Convert to PNG with high quality
-    const pngBuffer = thumbnail.toPNG({ scaleFactor: 1.0 });
-
-    // Save to disk
-    fs.writeFileSync(imagePath, pngBuffer);
-
-    return {
-      buffer: pngBuffer,
-      path: imagePath,
-      dimensions: {
-        width: thumbnail.getSize().width,
-        height: thumbnail.getSize().height,
-      },
-    };
-  } catch (error) {
-    log.error("Error capturing fallback screenshot:", error);
-    throw error;
   }
 }
 
@@ -279,27 +225,6 @@ app.whenReady().then(async () => {
     openai = aiProviders.getOpenAI();
   }
 
-  // Linux-specific initialization
-  if (isLinux) {
-    // Verify that hotkeys are properly registered, especially Ctrl+B
-    setTimeout(() => {
-      try {
-        const isRegistered = hotkeyManager.validateHotkeys();
-        if (!isRegistered) {
-          log.warn("Hotkeys may not be properly registered on Linux. Using fallback mechanisms.");
-
-          // Show Linux shortcuts info
-          const platformShortcuts = hotkeyManager.getPlatformShortcuts();
-          toastManager.info(
-            `For Linux: The key ${platformShortcuts.toggleVisibility} should toggle visibility. Please ensure X11 keyboard support is installed.`,
-          );
-        }
-      } catch (error) {
-        log.error("Error validating hotkeys on Linux:", error);
-      }
-    }, 2000);
-  }
-
   // Handle API key initialization from UI
   ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey) => {
     try {
@@ -364,20 +289,7 @@ app.whenReady().then(async () => {
     SCROLL_DOWN: () => windowManager.scrollContent("down"),
     INCREASE_WINDOW_SIZE: () => windowManager.resizeWindow("increase"),
     DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
-    TOGGLE_DEVTOOLS: () => {
-      try {
-        const mainWindow = windowManager.getMainWindow();
-        if (mainWindow) {
-          if (mainWindow.webContents.isDevToolsOpened()) {
-            mainWindow.webContents.closeDevTools();
-          } else {
-            mainWindow.webContents.openDevTools();
-          }
-        }
-      } catch (error) {
-        log.error("Error toggling DevTools:", error);
-      }
-    },
+    TOGGLE_DEVTOOLS: () => windowManager.toggleDevTools(),
     TAKE_SCREENSHOT: async () => {
       try {
         windowManager.updateInstruction("Taking screenshot...");
@@ -410,7 +322,7 @@ app.whenReady().then(async () => {
             (async () => {
               try {
                 windowManager.updateInstruction("Taking full screen screenshot as fallback...");
-                const result = await captureFullScreenFallback();
+                const result = await screenshotManager.captureFullScreenFallback();
                 const base64Image = `data:image/png;base64,${result.buffer.toString("base64")}`;
                 screenshotManager.addScreenshot(base64Image);
                 toastManager.success(
@@ -477,11 +389,9 @@ app.whenReady().then(async () => {
       }
     },
     RESET: () => resetProcess(),
-    QUIT: () => {
-      app.quit();
-    },
-    MODEL_SELECTION: () => windowManager.createModelSelectionWindow(),
+    QUIT: () => app.quit(),
     TOGGLE_SPLIT_VIEW: () => windowManager.toggleSplitView(),
+    SHOW_HOTKEYS: () => windowManager.showHotkeys(),
   });
 
   screenshotInstance.on("ok", async (event, buffer, data) => {
@@ -600,25 +510,6 @@ app.whenReady().then(async () => {
           }, 2000);
         }
       }, 2000);
-    } else {
-      // Shortcuts registered successfully
-      // Inform users about platform-specific shortcuts
-      if (isDev) {
-        hotkeyManager.getPlatformShortcuts();
-        setTimeout(() => {
-          try {
-            const modifier = hotkeyManager.getModifierKey();
-            const platformName = {
-              linux: "Linux",
-              win32: "Windows",
-              darwin: "macOS",
-            }[process.platform];
-            toastManager.info(`Using ${modifier} as the modifier key on ${platformName}`);
-          } catch (error) {
-            log.error("Error showing modifier key toast:", error);
-          }
-        }, 1000);
-      }
     }
   } catch (hotkeyError) {
     log.error("Error registering hotkeys:", hotkeyError);

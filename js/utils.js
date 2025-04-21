@@ -54,7 +54,6 @@ function selectModelCard(provider, modelId) {
       break;
     case AI_PROVIDERS.OLLAMA:
       modelCards = document.getElementById("ollama-model-cards");
-      selectElement = document.getElementById("ollama-model");
       break;
     default:
       return;

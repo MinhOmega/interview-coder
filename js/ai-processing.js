@@ -117,6 +117,7 @@ async function processScreenshots(
     }
 
     const promptText = createPrompt(screenshots.length, responseLanguage);
+    console.log("🚀 ~ ai-processing.js:120 ~ promptText:", promptText)
 
     const messages = [{ type: "text", text: promptText }];
 
@@ -132,7 +133,6 @@ async function processScreenshots(
 
     if (aiProvider === AI_PROVIDERS.DEFAULT) {
       // Create model selection window when the default provider is selected
-      // This is the same action triggered by Command+M
       windowManager.createModelSelectionWindow();
 
       // Return early since we're opening the model selection window instead of processing

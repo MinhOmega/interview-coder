@@ -6,6 +6,7 @@ const Screenshots = require("electron-screenshots");
 const { getAppPath, isCommandAvailable } = require("./utils");
 const { isLinux, isMac } = require("./config");
 const toastManager = require("./toast-manager");
+const { v4: uuidv4 } = require("uuid");
 
 let screenshots = [];
 let multiPageMode = false;
@@ -21,7 +22,44 @@ function resetScreenshots() {
   return screenshots;
 }
 
+/**
+ * Cleans up old screenshots from the pictures directory
+ */
+function cleanupOldScreenshots() {
+  try {
+    const picturesPath = getAppPath("pictures", "");
+    if (!fs.existsSync(picturesPath)) {
+      fs.mkdirSync(picturesPath, { recursive: true });
+      return;
+    }
+    
+    const files = fs.readdirSync(picturesPath);
+    let deletedCount = 0;
+    
+    files.forEach(file => {
+      if (file.endsWith('.png')) {
+        const filePath = path.join(picturesPath, file);
+        try {
+          fs.unlinkSync(filePath);
+          deletedCount++;
+        } catch (err) {
+          console.error(`Failed to delete old screenshot: ${filePath}`, err);
+        }
+      }
+    });
+    
+    if (deletedCount > 0) {
+      console.log(`Cleaned up ${deletedCount} old screenshots`);
+    }
+  } catch (error) {
+    console.error("Error cleaning up old screenshots:", error);
+  }
+}
+
 function initScreenshotCapture() {
+  // Clean up old screenshots when starting the app
+  cleanupOldScreenshots();
+  
   // Ensure we request permissions early in the app lifecycle
   if (isMac && !hasRequestedPermission) {
     hasRequestedPermission = true;
@@ -62,10 +100,10 @@ const getImageDimensions = (imagePath) => {
 };
 
 const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
-  // Generate filename for the screenshot
-  const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+  // Generate unique filename using UUID
+  const uuid = uuidv4();
   const picturesPath = getAppPath("pictures", "");
-  const imagePath = path.join(picturesPath, `${filenamePrefix}-${timestamp}.png`);
+  const imagePath = path.join(picturesPath, `${filenamePrefix}-${uuid}.png`);
 
   // Save the image to disk
   fs.writeFileSync(imagePath, buffer);
@@ -282,9 +320,10 @@ async function captureScreenshot(mainWindow) {
       }
     }
 
-    const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+    // Generate unique filename using UUID
+    const uuid = uuidv4();
     const picturesPath = getAppPath("pictures", "");
-    const imagePath = path.join(picturesPath, `screenshot-${timestamp}.png`);
+    const imagePath = path.join(picturesPath, `screenshot-${uuid}.png`);
     console.log(`Screenshot will be saved to: ${imagePath}`);
 
     // Hide the window before capturing
@@ -399,6 +438,55 @@ async function captureScreenshot(mainWindow) {
   }
 }
 
+const captureFullScreenFallback = async () => {
+  try {
+    if (isMac) {
+      const status = systemPreferences.getMediaAccessStatus("screen");
+      if (status !== "granted") {
+        await systemPreferences.askForMediaAccess("screen");
+      }
+    }
+
+    // Generate unique filename using UUID
+    const uuid = uuidv4();
+    const picturesPath = getAppPath("pictures", "");
+    const imagePath = path.join(picturesPath, `fullscreen-${uuid}.png`);
+
+    // Get screen sources with high resolution thumbnails
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 3840, height: 2160 }, // Request higher resolution thumbnail
+      fetchWindowIcons: false,
+    });
+
+    if (sources.length === 0) {
+      throw new Error("No screen sources found");
+    }
+
+    // Take screenshot of the primary screen
+    const primarySource = sources[0];
+    const thumbnail = primarySource.thumbnail;
+
+    // Convert to PNG with high quality
+    const pngBuffer = thumbnail.toPNG({ scaleFactor: 1.0 });
+
+    // Save to disk
+    fs.writeFileSync(imagePath, pngBuffer);
+
+    return {
+      buffer: pngBuffer,
+      path: imagePath,
+      dimensions: {
+        width: thumbnail.getSize().width,
+        height: thumbnail.getSize().height,
+      },
+    };
+  } catch (error) {
+    log.error("Error capturing fallback screenshot:", error);
+    throw error;
+  }
+};
+
 function addScreenshot(screenshot) {
   screenshots.push(screenshot);
   return screenshots.length;
@@ -429,4 +517,6 @@ module.exports = {
   setMultiPageMode,
   getMultiPageMode,
   autoHideWindow,
+  captureFullScreenFallback,
+  cleanupOldScreenshots,
 };

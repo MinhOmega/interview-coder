@@ -24,13 +24,11 @@ const messageDiv = document.getElementById("message");
 
 const pullModelModal = document.getElementById("pull-model-modal");
 const closeModalBtn = document.querySelector(".close-modal");
-const modelToPullInput = document.getElementById("model-to-pull");
 const pullStatusDiv = document.getElementById("pull-status");
 const confirmPullBtn = document.getElementById("confirm-pull");
 const cancelPullBtn = document.getElementById("cancel-pull");
 
 // Language selector elements
-const languageSelect = document.getElementById("response-language");
 const languageCardsContainer = document.getElementById("language-cards");
 const sectionToggles = document.querySelectorAll(".section-toggle");
 
@@ -84,11 +82,9 @@ async function loadCurrentSettings() {
 
   // Set language selection based on settings
   if (currentSettings.responseLanguage) {
-    languageSelect.value = currentSettings.responseLanguage;
     selectLanguageCard(currentSettings.responseLanguage);
   } else {
     // Default to English
-    languageSelect.value = "en";
     selectLanguageCard("en");
   }
 
@@ -153,33 +149,33 @@ pullModelBtn.addEventListener("click", () => {
   pullStatusDiv.textContent = "";
   pullStatusDiv.className = "status";
   confirmPullBtn.disabled = true;
-  
+
   // Reset the progress container
   const progressContainer = document.querySelector(".progress-container");
   const progressBarFill = document.getElementById("progress-bar-fill");
   if (progressContainer) progressContainer.style.display = "none";
   if (progressBarFill) progressBarFill.style.width = "0%";
-  
+
   // Reset model details to default state
   const modelNameElement = document.querySelector(".model-name");
   const modelSizeBadge = document.querySelector(".model-size-badge");
   const modelParams = document.querySelector(".model-params");
   const modelCommand = document.querySelector(".model-command code");
   const modelRequirements = document.querySelector(".model-requirements");
-  
+
   if (modelNameElement) modelNameElement.textContent = "Select a model";
   if (modelSizeBadge) modelSizeBadge.textContent = "-";
   if (modelParams) modelParams.textContent = "Parameters: -";
   if (modelCommand) modelCommand.textContent = "ollama run model-name";
   if (modelRequirements) modelRequirements.textContent = "System Requirements: -";
-  
+
   // Reset and load the model library dropdown
   const modelLibrarySelect = document.getElementById("model-library-select");
   if (modelLibrarySelect) modelLibrarySelect.selectedIndex = 0;
-  
+
   // Load the model library
   ollamaProvider.loadModelLibrary();
-  
+
   // Show the modal
   pullModelModal.style.display = "block";
 });
@@ -198,7 +194,7 @@ cancelPullBtn.addEventListener("click", () => {
 confirmPullBtn.addEventListener("click", async () => {
   const modelSelect = document.getElementById("model-library-select");
   const modelName = modelSelect.value;
-  
+
   if (!modelName) {
     pullStatusDiv.textContent = "Please select a model to pull";
     pullStatusDiv.className = "status error";
@@ -235,7 +231,6 @@ function selectLanguageCard(languageCode) {
 // Function to populate language options dynamically
 function populateLanguageOptions() {
   // Clear any existing options
-  languageSelect.innerHTML = "";
   languageCardsContainer.innerHTML = "";
 
   // Get available languages from the config manager
@@ -254,7 +249,6 @@ function populateLanguageOptions() {
     }
 
     option.textContent = displayName;
-    languageSelect.appendChild(option);
 
     // Create language card
     const card = document.createElement("div");
@@ -284,7 +278,6 @@ function populateLanguageOptions() {
     // Add click handler
     card.addEventListener("click", () => {
       selectLanguageCard(code);
-      languageSelect.value = code;
     });
 
     // Add keyboard support
@@ -292,7 +285,6 @@ function populateLanguageOptions() {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         selectLanguageCard(code);
-        languageSelect.value = code;
       }
     });
 
@@ -349,11 +341,6 @@ function restoreSectionStates() {
     console.error("Error restoring section states", err);
   }
 }
-
-// Event listener for language select dropdown
-languageSelect.addEventListener("change", () => {
-  selectLanguageCard(languageSelect.value);
-});
 
 // Save button handler
 saveBtn.addEventListener("click", async () => {
@@ -416,9 +403,7 @@ saveBtn.addEventListener("click", async () => {
       : document.getElementById("gemini-model").value;
   } else {
     const selectedCard = document.getElementById("ollama-model-cards").querySelector(".model-card.selected");
-    currentModel = selectedCard
-      ? selectedCard.getAttribute("data-model")
-      : document.getElementById("ollama-model").value;
+    currentModel = selectedCard ? selectedCard.getAttribute("data-model") : "";
   }
 
   // Validate selection
@@ -468,7 +453,9 @@ saveBtn.addEventListener("click", async () => {
   }
 
   // Get selected language
-  const responseLanguage = languageSelect.value;
+  const responseLanguage = languageCardsContainer
+    .querySelector(".language-card.selected")
+    .getAttribute("data-language");
 
   // Disable the save button to prevent multiple clicks
   saveBtn.disabled = true;
@@ -697,7 +684,7 @@ function initialize() {
 
   // Initialize modals
   initializeModals();
-  
+
   // Set up keyboard shortcuts
   setupKeyboardShortcuts();
 
