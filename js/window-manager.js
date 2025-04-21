@@ -1,8 +1,8 @@
-const { BrowserWindow, screen } = require("electron");
+const { BrowserWindow, screen, app } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
 const { isLinux } = require("./config");
-const path = require("path");
 const log = require("electron-log");
+const hotkeyManager = require("./hotkey-manager");
 
 let mainWindow;
 let modelListWindow;
@@ -19,7 +19,7 @@ function createMainWindow() {
   const windowHeight = 800;
 
   // Check if in development mode
-  const isDev = process.env.NODE_ENV === "development" || !require("electron").app.isPackaged;
+  const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
   mainWindow = new BrowserWindow({
     width: windowWidth,
@@ -29,26 +29,28 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      devTools: true, // Always enable DevTools in both dev and production
-      additionalArguments: ["--allow-file-access-from-files"], // Add additional arguments for better compatibility
-      webSecurity: !isDev, // Disable web security in dev for easier debugging
+      devTools: true,
+      additionalArguments: ["--allow-file-access-from-files"],
+      webSecurity: !isDev,
     },
     frame: false,
     transparent: true,
-    backgroundColor: "#00000000", // Transparent background
+    backgroundColor: "#00000000",
     alwaysOnTop: true,
     paintWhenInitiallyHidden: true,
-    contentProtection: false, // Disable content protection to ensure DevTools work properly
-    movable: true, // Ensure window is movable
+    contentProtection: false,
+    movable: true,
     roundedCorners: true,
-    titleBarStyle: "hidden", // Hide title bar completely
+    titleBarStyle: "hidden",
     titleBarOverlay: false,
-    trafficLightPosition: { x: -999, y: -999 }, // Move traffic lights far off-screen
+    trafficLightPosition: { x: -999, y: -999 },
     fullscreenable: true,
     skipTaskbar: true,
     autoHideMenuBar: true,
-    hasShadow: true, // Add shadow for better visibility
-    enableLargerThanScreen: false, // Prevent window from being larger than screen
+    hasShadow: true,
+    enableLargerThanScreen: false,
+    focusable: true,
+    type: "panel",
   });
 
   mainWindow.loadFile("index.html");
@@ -211,9 +213,7 @@ function toggleWindowVisibility(forceState) {
         log.error("Error sending visibility update:", sendError);
       }
 
-      // Update hotkeys based on visibility (import hotkeyManager if needed)
       try {
-        const hotkeyManager = require("./hotkey-manager");
         hotkeyManager.updateHotkeys(isWindowVisible);
       } catch (hotkeyError) {
         log.error("Error updating hotkeys:", hotkeyError);
@@ -299,13 +299,20 @@ function resizeWindow(direction) {
 // Function to scroll content in the result area
 function scrollContent(direction) {
   if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return;
-  
+
   try {
     const scrollAmount = direction === "up" ? -300 : 300;
     mainWindow.webContents.send(IPC_CHANNELS.SCROLL_CONTENT, scrollAmount);
   } catch (error) {
     log.error("Error in scrollContent:", error);
   }
+}
+
+// Function to toggle DevTools
+function toggleDevTools() {
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return;
+
+  mainWindow.webContents.toggleDevTools();
 }
 
 // Get the main window
@@ -326,7 +333,7 @@ function getWindowVisibility() {
 // Update the instruction in the main window
 function updateInstruction(instruction) {
   if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return;
-  
+
   try {
     if (!instruction || instruction.trim() === "") {
       // If instruction is empty, hide the instruction banner
@@ -349,6 +356,22 @@ function getDefaultInstructions(multiPageMode, screenshotsLength, modifierKey) {
   return `${modifierKey}+B: Toggle visibility \n ${modifierKey}+H: Take screenshot \n ${modifierKey}+R: Reset \n ${modifierKey}+T: Toggle split view`;
 }
 
+const showHotkeys = () => {
+  try {
+    // Get formatted hotkey information
+    const hotkeyInfo = hotkeyManager.getHotkeysForDisplay();
+
+    // Send to renderer to display
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send(IPC_CHANNELS.SHOW_HOTKEYS_INFO, hotkeyInfo);
+    }
+
+    log.info("Displayed hotkey information");
+  } catch (error) {
+    log.error(`${hotkeyManager.getModifierKey()}+/ error:`, error);
+  }
+};
+
 module.exports = {
   createMainWindow,
   createModelSelectionWindow,
@@ -362,4 +385,6 @@ module.exports = {
   getWindowVisibility,
   updateInstruction,
   getDefaultInstructions,
+  toggleDevTools,
+  showHotkeys,
 };

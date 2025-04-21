@@ -3,6 +3,7 @@ const { processMarkdown } = require("./js/markdown-processor");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
+const hotkeysModal = require("./js/hotkeys-modal");
 const log = require("electron-log");
 
 // Variables for tracking state
@@ -490,7 +491,7 @@ async function updateModelBadge() {
       log.error("Error getting model settings from main process:", error);
       // Set default badge text to indicate error
       const badge = document.getElementById("model-badge");
-      badge.textContent = `Press ${modifierKey}+M to set model`;
+      badge.textContent = `Press ${modifierKey}+, to set model`;
       return;
     }
 
@@ -511,7 +512,7 @@ async function updateModelBadge() {
 
     const modelName = settings.currentModel;
     badge.textContent =
-      providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+M to change model.`;
+      providerName && modelName ? `${providerName}: ${modelName}` : `Please press ${modifierKey}+, to change model.`;
   } catch (error) {
     log.error("Error updating model badge:", error);
     // Ensure badge always shows something useful even on complete failure
@@ -742,15 +743,9 @@ const onEventDOMContentLoaded = async () => {
   }
 
   // System prompt button functionality
-  const systemPromptBtn = document.getElementById("btn-system-prompt");
   const updateSystemPromptBtn = document.getElementById("update-system-prompt");
   const cancelSystemPromptBtn = document.getElementById("cancel-system-prompt");
   const clearSystemPromptBtn = document.getElementById("clear-system-prompt");
-  const devToolsBtn = document.getElementById("btn-devtools");
-
-  if (systemPromptBtn) {
-    systemPromptBtn.addEventListener("click", toggleSystemPrompt);
-  }
 
   if (updateSystemPromptBtn) {
     updateSystemPromptBtn.addEventListener("click", updateSystemPrompt);
@@ -764,19 +759,6 @@ const onEventDOMContentLoaded = async () => {
     clearSystemPromptBtn.addEventListener("click", clearSystemPrompt);
   }
 
-  // DevTools button functionality
-  if (devToolsBtn) {
-    devToolsBtn.addEventListener("click", () => {
-      try {
-        log.info("DevTools button clicked");
-        ipcRenderer.send(IPC_CHANNELS.TOGGLE_DEVTOOLS);
-      } catch (error) {
-        log.error("Error toggling DevTools:", error);
-        logError(`Failed to open DevTools: ${error.message}`);
-      }
-    });
-  }
-
   // Load saved system prompt if available
   await loadSystemPrompt();
 
@@ -784,6 +766,9 @@ const onEventDOMContentLoaded = async () => {
   if (toggleSystemPromptBtn) {
     toggleSystemPromptBtn.addEventListener("click", toggleSystemPrompt);
   }
+
+  // Initialize the hotkeys modal
+  hotkeysModal.initHotkeysModal();
 };
 
 // Handle the start of a chat message stream

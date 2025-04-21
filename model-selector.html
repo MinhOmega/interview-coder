@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
   <title>Select AI Model</title>
-  <link rel="stylesheet" href="model-selector.css">
+  <link rel="stylesheet" href="css/model-selector.css">
 </head>
 
 <body>
@@ -148,10 +148,6 @@
         <!-- Model cards will be added dynamically -->
       </div>
 
-      <select id="ollama-model" class="mt-2">
-        <option value="loading">Loading...</option>
-      </select>
-
       <div id="vision-models-note" class="helper-text mt-1 mb-2" style="display: none;">
         For image processing, it's recommended to use multi-modal models like:
         llava, bakllava, deepseek-r1, or moondream
@@ -190,13 +186,6 @@
       <p class="helper-text mb-2">Choose the language for AI responses. The AI will generate solutions in this language.
       </p>
 
-      <div class="language-selector">
-        <label for="response-language">Language:</label>
-        <select id="response-language" class="language-select">
-          <!-- Languages will be populated dynamically from the LANGUAGES object -->
-        </select>
-      </div>
-
       <div class="language-cards" id="language-cards">
         <!-- Language cards will be populated dynamically from the LANGUAGES object -->
       </div>
@@ -227,13 +216,13 @@
     <div class="modal-content">
       <span class="close-modal">&times;</span>
       <h3>Pull Ollama Model</h3>
-      
+
       <p class="mb-2">Select a model to pull from the Ollama Model Library:</p>
-      
+
       <div id="system-specs" class="system-specs mb-2">
         <!-- System specs will be populated here -->
       </div>
-      
+
       <div class="model-library-container">
         <div class="select-container mb-2">
           <select id="model-library-select" class="model-library-select">
@@ -241,12 +230,12 @@
             <!-- Options will be dynamically populated -->
           </select>
         </div>
-        
+
         <div class="compatibility-legend">
           <div class="legend-item"><span class="legend-icon compatible">✅</span> Compatible with your system</div>
           <div class="legend-item"><span class="legend-icon incompatible">⚠️</span> May not be compatible</div>
         </div>
-        
+
         <div id="model-details" class="model-details">
           <div class="model-info-card">
             <div class="model-info-header">
@@ -259,7 +248,7 @@
           </div>
         </div>
       </div>
-      
+
       <div class="progress-container mb-4" style="display: none;">
         <div class="progress-label">
           <span>Downloading Model</span>
@@ -270,7 +259,7 @@
         </div>
         <div class="progress-details" id="progress-details">Preparing download...</div>
       </div>
-      
+
       <div id="pull-status" class="status"></div>
       <div class="flex justify-between mt-4">
         <button id="confirm-pull" class="btn-success" disabled>

@@ -128,6 +128,7 @@ async function processMarkdown(markdown) {
       const copyButton = document.createElement("button");
       copyButton.className = "copy-code-button";
       copyButton.textContent = "Copy";
+      copyButton.setAttribute("data-has-listener", "false");
 
       // Extract language from class
       let language = "";
