@@ -6,6 +6,7 @@ const windowManager = require("./window-manager");
 const { getUserDataPath } = require("./utils");
 const fs = require("fs");
 const toastManager = require("./toast-manager");
+const log = require("electron-log");
 
 const basePrompt = `I need you to analyze this problem carefully and provide the best possible solution with excellent performance and readability.
 
@@ -36,8 +37,18 @@ Provide a clear understanding of what the problem is asking, including:
 - Any trade-offs or alternative approaches you considered
 
 # Implementation
-- Provide a complete, well-commented solution
-- Ensure the code is clean, readable, and follows best practices
+- Start with a high-level overview of your solution strategy
+- Break down your implementation into logical steps, explaining each step before showing the code
+- For each significant code segment:
+  * First explain what you're going to do and why
+  * Then show the implementation with clean, well-structured code
+  * Use descriptive variable names that clearly indicate purpose
+- Structure your code naturally as a human developer would (not top-to-bottom sequential)
+- Group related logic and functionality together
+- Include detailed bilingual comments in both English and the user's selected language for all key parts
+- Comments should explain WHY, not just WHAT the code does
+- Demonstrate proper error handling and edge case coverage
+- Apply clean code principles and best practices
 
 # Complexity
 Analyze the efficiency of your solution:
@@ -56,6 +67,7 @@ Format your response in clear, well-structured Markdown with proper code blocks 
  * @returns {string} The prompt for the AI
  */
 function createPrompt(screenshotsCount, language = "en") {
+  log.info("Create prompt with language:", language);
   let prompt = "";
   if (screenshotsCount === 1) {
     prompt = `The screenshot shows a programming problem or question. ${basePrompt}`;
@@ -77,7 +89,7 @@ function createPrompt(screenshotsCount, language = "en") {
     return prompt;
   }
 
-  return `${prompt}\n\nIMPORTANT: Please respond entirely in ${languageMap[language]} language.`;
+  return `${prompt}\n\nIMPORTANT: Please respond entirely in ${languageMap[language]} language. For the Implementation section, provide all code comments in both English and ${languageMap[language]} side-by-side. Example: /* This validates the input (English) / Esto valida la entrada (Spanish) */`;
 }
 
 /**
@@ -117,7 +129,7 @@ async function processScreenshots(
     }
 
     const promptText = createPrompt(screenshots.length, responseLanguage);
-    console.log("🚀 ~ ai-processing.js:120 ~ promptText:", promptText)
+    log.info("Prompt text in processScreenshots:", promptText);
 
     const messages = [{ type: "text", text: promptText }];
 
@@ -227,12 +239,12 @@ async function processScreenshots(
 
     mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
   } catch (err) {
-    console.error("Error in processScreenshots:", err);
-    console.error("Stack trace:", err.stack);
+    log.error("Error in processScreenshots:", err);
+    log.error("Stack trace:", err.stack);
 
     if (err.response) {
-      console.error("Response status:", err.response.status);
-      console.error("Response data:", JSON.stringify(err.response.data));
+      log.error("Response status:", err.response.status);
+      log.error("Response data:", JSON.stringify(err.response.data));
     }
 
     mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
@@ -321,7 +333,7 @@ async function processChatMessage(window, messageHistory, systemPrompt) {
     // Send response back to renderer
     window.webContents.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
   } catch (error) {
-    console.error("Error in processChatMessage:", error);
+    log.error("Error in processChatMessage:", error);
     toastManager.error(`${error.message}`);
     // Send a fallback error response
     window.webContents.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
@@ -344,7 +356,7 @@ function getSystemPrompt() {
       return fs.readFileSync(systemPromptFile, "utf8");
     }
   } catch (error) {
-    console.error("Error loading system prompt:", error);
+    log.error("Error loading system prompt:", error);
   }
   return "";
 }
