@@ -1223,3 +1223,108 @@ textarea {
     transform: translateY(0);
   }
 }
+/* Update notification styles */
+.update-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #2a2a2a;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  max-width: 350px;
+  animation: slide-in 0.3s ease-out;
+}
+
+.update-notification-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.update-notification button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  margin-right: 8px;
+  cursor: pointer;
+  background: #3a3a3a;
+  color: white;
+  transition: background 0.2s;
+}
+
+.update-notification button:hover {
+  background: #4a4a4a;
+}
+
+.update-notification button.primary {
+  background: #4a69ff;
+}
+
+.update-notification button.primary:hover {
+  background: #3a59ff;
+}
+
+.update-notification.update-ready {
+  background: #363c4a;
+  border-left: 4px solid #4a69ff;
+}
+
+.update-notification.update-ready.highlight {
+  background: #3a4156;
+  border-left: 4px solid #4a69ff;
+  animation: pulse 2s infinite;
+}
+
+.update-notification.major-update {
+  background: #3a4156;
+  border-left: 4px solid #ff6b4a;
+}
+
+.update-message {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.update-progress-container {
+  margin-top: 8px;
+}
+
+.update-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-text {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 4px;
+  display: block;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 105, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(74, 105, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 105, 255, 0);
+  }
+}

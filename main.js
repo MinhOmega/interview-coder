@@ -12,6 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
 const log = require("electron-log");
+const { autoUpdater } = require("electron-updater");
 
 const configManager = require("./js/config-manager");
 const windowManager = require("./js/window-manager");
@@ -20,6 +21,7 @@ const hotkeyManager = require("./js/hotkey-manager");
 const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
+const updater = require("./js/updater");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac, isWindows } = require("./js/config");
@@ -142,6 +144,15 @@ app.whenReady().then(async () => {
   }
 
   const mainWindow = windowManager.createMainWindow();
+
+  // Initialize the updater with the main window with enhanced options
+  updater.init(mainWindow, {
+    forceUpdate: false,        // We'll handle force update based on version
+    allowPrerelease: false,    // Set to true to allow prerelease versions
+    autoCheck: true,           // Auto-check for updates periodically
+    checkInterval: 60,         // Check for updates every 60 minutes
+    forceMajorUpdate: true     // Add option to force update on major version changes
+  });
 
   // Initialize AI clients from saved config
   const initStatus = aiProviders.initializeFromConfig();
@@ -481,9 +492,46 @@ app.whenReady().then(async () => {
     await processScreenshotsWithAI();
   });
 
-  // Register right-click context menu with DevTools
+  // Listen for successful update
+  autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded successfully:', info);
+    toastManager.success(`Update ${info.version} has been downloaded and is ready to install.`);
+    
+    // Send notification to renderer
+    if (mainWindow) {
+      mainWindow.webContents.send('update-ready', info);
+    }
+  });
+
+  // Remove application menu to make the app cleaner
+  Menu.setApplicationMenu(null);
+  
+  // Add minimal context menu with update options
   mainWindow.webContents.on("context-menu", (_, params) => {
     const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Check for Updates",
+        click: async () => {
+          try {
+            await updater.checkForUpdates();
+          } catch (error) {
+            log.error('Error checking for updates:', error);
+            toastManager.error('Failed to check for updates: ' + error.message);
+          }
+        },
+      },
+      {
+        label: "Force Update",
+        click: async () => {
+          try {
+            await updater.forceCheckAndUpdate();
+          } catch (error) {
+            log.error('Error forcing update:', error);
+            toastManager.error('Failed to force update: ' + error.message);
+          }
+        },
+      },
+      { type: 'separator' },
       {
         label: "Inspect Element",
         click: () => {
@@ -507,6 +555,29 @@ app.whenReady().then(async () => {
       }
     } catch (error) {
       log.error("Error clearing conversation:", error);
+    }
+  });
+
+  // Setup IPC handlers for updater
+  ipcMain.handle(IPC_CHANNELS.CHECK_FOR_UPDATES, async () => {
+    await updater.checkForUpdates();
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FORCE_UPDATE, async () => {
+    await updater.forceCheckAndUpdate();
+    return { success: true };
+  });
+
+  // Add handler for quit and install
+  ipcMain.on('quit-and-install', () => {
+    log.info('User requested to quit and install update');
+    
+    try {
+      updater.quitAndInstall();
+    } catch (error) {
+      log.error('Error during quit and install:', error);
+      app.quit(); // Fallback to just quitting
     }
   });
 });

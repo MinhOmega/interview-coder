@@ -1045,6 +1045,132 @@ const onChatMessageStreamEnd = async (_, response) => {
   }
 };
 
+// Add update notification functions
+const onUpdateAvailable = (_, info) => {
+  console.log("Update available:", info);
+  const updateBar = document.createElement("div");
+  updateBar.className = "update-notification";
+  updateBar.innerHTML = `
+    <div class="update-notification-content">
+      <span>Update available: v${info.version}</span>
+      <button id="download-update">Download</button>
+    </div>
+  `;
+
+  document.body.appendChild(updateBar);
+
+  document.getElementById("download-update").addEventListener("click", () => {
+    ipcRenderer.invoke(IPC_CHANNELS.FORCE_UPDATE);
+    updateBar.remove();
+  });
+};
+
+const onMajorUpdateAvailable = (_, info) => {
+  console.log("Major update available:", info);
+  const updateBar = document.createElement("div");
+  updateBar.className = "update-notification major-update";
+  updateBar.innerHTML = `
+    <div class="update-notification-content">
+      <span>Important update available: v${info.version}</span>
+      <div class="update-message">This is a major update with new features and improvements.</div>
+      <div class="update-progress-container">
+        <progress class="update-progress" value="0" max="100"></progress>
+        <span class="progress-text">Download starting...</span>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(updateBar);
+
+  // Major updates are auto-downloaded, so just show progress
+  const progressBar = updateBar.querySelector(".update-progress");
+  const progressText = updateBar.querySelector(".progress-text");
+
+  // Update the progress when we get progress events
+  const progressHandler = (_, progress) => {
+    if (progressBar && progressText) {
+      progressBar.value = progress.percent;
+      progressText.textContent = `Downloading: ${Math.round(progress.percent)}%`;
+    }
+  };
+
+  // Listen for progress updates
+  ipcRenderer.on(IPC_CHANNELS.UPDATE_PROGRESS, progressHandler);
+
+  // Remove the progress listener when update is downloaded
+  ipcRenderer.once(IPC_CHANNELS.UPDATE_DOWNLOADED, () => {
+    ipcRenderer.removeListener(IPC_CHANNELS.UPDATE_PROGRESS, progressHandler);
+    updateBar.remove(); // Remove this notification as the downloaded one will appear
+  });
+};
+
+const onUpdateDownloaded = (_, info) => {
+  console.log("Update downloaded:", info);
+  const updateBar = document.createElement("div");
+  updateBar.className = "update-notification update-ready";
+  updateBar.innerHTML = `
+    <div class="update-notification-content">
+      <span>Update ready: v${info.version}</span>
+      <button id="restart-now">Restart Now</button>
+      <button id="restart-later">Later</button>
+    </div>
+  `;
+
+  document.body.appendChild(updateBar);
+
+  document.getElementById("restart-now").addEventListener("click", () => {
+    ipcRenderer.send("quit-and-install");
+  });
+
+  document.getElementById("restart-later").addEventListener("click", () => {
+    updateBar.remove();
+  });
+};
+
+const onUpdateReady = (_, info) => {
+  // This is the same as onUpdateDownloaded but with a different styling
+  console.log("Update ready to install:", info);
+  const updateBar = document.createElement("div");
+  updateBar.className = "update-notification update-ready highlight";
+  updateBar.innerHTML = `
+    <div class="update-notification-content">
+      <span>Update v${info.version} is ready to install!</span>
+      <button id="restart-now" class="primary">Restart Now</button>
+      <button id="restart-later">Later</button>
+    </div>
+  `;
+
+  document.body.appendChild(updateBar);
+
+  document.getElementById("restart-now").addEventListener("click", () => {
+    ipcRenderer.send("quit-and-install");
+  });
+
+  document.getElementById("restart-later").addEventListener("click", () => {
+    updateBar.remove();
+  });
+};
+
+const onUpdateError = (_, error) => {
+  console.error("Update error:", error);
+  // Only show errors in notification bar if they're important for the user to know
+  if (error.includes("internet") || error.includes("connection") || error.includes("network")) {
+    onNotification({
+      type: "error",
+      message: `Update error: ${error}`,
+    });
+  }
+};
+
+const onUpdateProgress = (_, progress) => {
+  console.log(`Download progress: ${Math.round(progress.percent)}%`);
+  // Optionally show a progress bar or notification for the download
+  const progressBar = document.querySelector(".update-progress");
+  if (progressBar) {
+    progressBar.value = progress.percent;
+  }
+};
+
 // Set up IPC event listeners
 ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, onUpdateInstruction);
 ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, onHideInstruction);
@@ -1065,6 +1191,13 @@ ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, onChatMessageResponse);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START, onChatMessageStreamStart);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, onChatMessageStreamEnd);
+// Add update event listeners
+ipcRenderer.on(IPC_CHANNELS.UPDATE_AVAILABLE, onUpdateAvailable);
+ipcRenderer.on(IPC_CHANNELS.MAJOR_UPDATE_AVAILABLE, onMajorUpdateAvailable);
+ipcRenderer.on(IPC_CHANNELS.UPDATE_DOWNLOADED, onUpdateDownloaded);
+ipcRenderer.on(IPC_CHANNELS.UPDATE_READY, onUpdateReady);
+ipcRenderer.on(IPC_CHANNELS.UPDATE_ERROR, onUpdateError);
+ipcRenderer.on(IPC_CHANNELS.UPDATE_PROGRESS, onUpdateProgress);
 
 document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 document.addEventListener("contextmenu", onEventContextMenu);
