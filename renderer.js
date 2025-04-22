@@ -23,6 +23,30 @@ let isChatMode = false;
 
 let streamingMessageElement = null;
 
+// Add a utility function for logging errors
+function logError(message, extraData = {}) {
+  log.error(`[ERROR] ${message}`, extraData);
+
+  // Display in DevTools console with platform details
+  const platformInfo = {
+    platform: navigator.platform,
+    userAgent: navigator.userAgent,
+    os: {
+      isMac,
+      isLinux,
+      isWindows,
+      platform: process.platform,
+    },
+  };
+
+  log.error("Error Details:", {
+    message,
+    timestamp: new Date().toISOString(),
+    ...extraData,
+    platformInfo,
+  });
+}
+
 const onUpdateInstruction = (_, instruction) => {
   const banner = document.getElementById("instruction-banner");
   banner.innerHTML = instruction.replace(/\n/g, "<br>");
@@ -220,6 +244,17 @@ const onScreenSharingDetected = () => {
 };
 
 const onScrollContent = (_, scrollAmount) => {
+  if (isSplitView) {
+    // If in split view, scroll the chat messages container
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (messagesContainer) {
+      messagesContainer.scrollBy({
+        top: scrollAmount,
+        behavior: "smooth",
+      });
+      return;
+    }
+  }
   const resultContentWrapper = document.getElementById("result-content-wrapper");
   if (resultContentWrapper) {
     resultContentWrapper.scrollBy({
@@ -972,27 +1007,3 @@ document.querySelectorAll(".shortcut").forEach((el) => {
 });
 
 updateModelBadge();
-
-// Add a utility function for logging errors
-function logError(message, extraData = {}) {
-  log.error(`[ERROR] ${message}`, extraData);
-
-  // Display in DevTools console with platform details
-  const platformInfo = {
-    platform: navigator.platform,
-    userAgent: navigator.userAgent,
-    os: {
-      isMac,
-      isLinux,
-      isWindows,
-      platform: process.platform,
-    },
-  };
-
-  log.error("Error Details:", {
-    message,
-    timestamp: new Date().toISOString(),
-    ...extraData,
-    platformInfo,
-  });
-}

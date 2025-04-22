@@ -42,7 +42,7 @@ function createMainWindow() {
     autoHideMenuBar: true,
     hasShadow: true,
     enableLargerThanScreen: false,
-    focusable: false,
+    focusable: true,
     type: "panel",
   });
 
