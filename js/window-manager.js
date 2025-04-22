@@ -18,9 +18,6 @@ function createMainWindow() {
   const windowWidth = 1000;
   const windowHeight = 800;
 
-  // Check if in development mode
-  const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
-
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -29,16 +26,12 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      devTools: true,
-      additionalArguments: ["--allow-file-access-from-files"],
-      webSecurity: !isDev,
     },
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
     alwaysOnTop: true,
     paintWhenInitiallyHidden: true,
-    contentProtection: false,
     movable: true,
     roundedCorners: true,
     titleBarStyle: "hidden",
@@ -54,43 +47,7 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile("index.html");
-
-  // Ensure DevTools works in all environments
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-    // Allow DevTools to be opened with both standard shortcuts
-    const isMac = process.platform === "darwin";
-    const isDevToolsShortcut1 =
-      (isMac && input.meta && input.alt && input.key.toLowerCase() === "i") ||
-      (!isMac && input.control && input.shift && input.key.toLowerCase() === "i");
-
-    const isDevToolsShortcut2 =
-      (isMac && input.meta && input.control && input.key.toLowerCase() === "i") ||
-      (!isMac && input.control && input.alt && input.key.toLowerCase() === "i");
-
-    if (isDevToolsShortcut1 || isDevToolsShortcut2) {
-      // Force DevTools to open regardless of environment
-      setTimeout(() => {
-        if (!mainWindow.webContents.isDevToolsOpened()) {
-          mainWindow.webContents.openDevTools();
-        }
-      }, 100);
-      event.preventDefault();
-    }
-  });
-
-  // Allow F12 to also open DevTools (common convention)
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "F12") {
-      setTimeout(() => {
-        if (!mainWindow.webContents.isDevToolsOpened()) {
-          mainWindow.webContents.openDevTools();
-        } else {
-          mainWindow.webContents.closeDevTools();
-        }
-      }, 100);
-      event.preventDefault();
-    }
-  });
+  mainWindow.setContentProtection(true);
 
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
