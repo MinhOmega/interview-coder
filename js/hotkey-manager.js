@@ -81,7 +81,12 @@ const SHORTCUTS = {
   RESET: {
     key: `${modifierKey}+R`,
     handler: null,
-    description: "Reset and start over",
+    description: "Reset the chat in split view",
+  },
+  CREATE_NEW_CHAT: {
+    key: `${modifierKey}+N`,
+    handler: null,
+    description: "Create a new chat",
   },
   QUIT: {
     key: `${modifierKey}+Q`,

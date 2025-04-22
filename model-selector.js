@@ -534,6 +534,10 @@ function setupKeyboardShortcuts() {
           saveBtn.click();
           e.preventDefault();
           break;
+        case ",": // Open settings (close this window since it's already open)
+          window.close();
+          e.preventDefault();
+          break;
       }
     }
 
