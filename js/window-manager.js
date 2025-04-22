@@ -87,12 +87,17 @@ function createModelSelectionWindow() {
 }
 
 // Toggle split view in the main window (for Command+T)
-function toggleSplitView() {
-  if (!mainWindow) return;
+function toggleSplitView(forceState) {
+  if (!mainWindow) return false;
 
   try {
-    // Send a message to the renderer process to toggle split view
-    mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_SPLIT_VIEW);
+    // If forceState is provided (true or false), use it to set the state explicitly
+    if (typeof forceState === 'boolean') {
+      mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, { forceState });
+    } else {
+      // Otherwise just toggle the current state
+      mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_SPLIT_VIEW);
+    }
     return true;
   } catch (error) {
     log.error("Error in toggleSplitView:", error);
