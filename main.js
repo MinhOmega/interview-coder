@@ -25,6 +25,7 @@ const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac, isWindows } = require("./js/config");
 const toastManager = require("./js/toast-manager");
 const macOSPermissions = isMac ? require("./js/macos-permissions") : null;
+const ChatHandler = require("./js/chat-handler");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -68,6 +69,9 @@ if (isDev) {
 }
 
 axios.defaults.family = 4;
+
+// Initialize ChatHandler
+let chatHandler;
 
 function resetProcess() {
   screenshotManager.resetScreenshots();
@@ -137,85 +141,6 @@ app.whenReady().then(async () => {
     }
   }
 
-  // Create application menu with DevTools access
-  const template = [
-    ...(isMac
-      ? [
-          {
-            label: app.name,
-            submenu: [
-              { role: "about" },
-              { type: "separator" },
-              { role: "services" },
-              { type: "separator" },
-              { role: "hide" },
-              { role: "hideOthers" },
-              { role: "unhide" },
-              { type: "separator" },
-              { role: "quit" },
-            ],
-          },
-        ]
-      : []),
-    {
-      label: "Edit",
-      submenu: [
-        { role: "undo" },
-        { role: "redo" },
-        { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-      ],
-    },
-    {
-      label: "View",
-      submenu: [
-        { role: "reload" },
-        { role: "forceReload" },
-        { role: "toggleDevTools", accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" },
-      ],
-    },
-    {
-      label: "Window",
-      submenu: [
-        { role: "minimize" },
-        { role: "zoom" },
-        ...(isMac
-          ? [{ type: "separator" }, { role: "front" }, { type: "separator" }, { role: "window" }]
-          : [{ role: "close" }]),
-      ],
-    },
-    {
-      label: "Debug",
-      submenu: [
-        {
-          label: "Toggle DevTools",
-          accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I",
-          click: () => {
-            const mainWindow = windowManager.getMainWindow();
-            if (mainWindow) {
-              if (mainWindow.webContents.isDevToolsOpened()) {
-                mainWindow.webContents.closeDevTools();
-              } else {
-                mainWindow.webContents.openDevTools();
-              }
-            }
-          },
-        },
-      ],
-    },
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
-
   const mainWindow = windowManager.createMainWindow();
 
   // Initialize AI clients from saved config
@@ -224,6 +149,9 @@ app.whenReady().then(async () => {
   if (initStatus.openai) {
     openai = aiProviders.getOpenAI();
   }
+
+  // Initialize ChatHandler
+  chatHandler = new ChatHandler(aiProviders, configManager);
 
   // Handle API key initialization from UI
   ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey) => {
@@ -392,6 +320,22 @@ app.whenReady().then(async () => {
     QUIT: () => app.quit(),
     TOGGLE_SPLIT_VIEW: () => windowManager.toggleSplitView(),
     SHOW_HOTKEYS: () => windowManager.showHotkeys(),
+    CREATE_NEW_CHAT: () => {
+      // First toggle split view off if it's on
+      const mainWindow = windowManager.getMainWindow();
+      if (mainWindow) {
+        // Toggle off then on to create a new chat
+        if (windowManager.toggleSplitView(false)) {
+          // Force off
+          windowManager.toggleSplitView(true); // Force on
+          log.info("Created new chat via hotkey");
+        } else {
+          // Just toggle on if it was already off
+          windowManager.toggleSplitView(true); // Force on
+          log.info("Created new chat via hotkey (already off)");
+        }
+      }
+    },
   });
 
   screenshotInstance.on("ok", async (event, buffer, data) => {
@@ -548,6 +492,22 @@ app.whenReady().then(async () => {
       },
     ]);
     contextMenu.popup();
+  });
+
+  // Listen for clear conversation command
+  ipcMain.on(IPC_CHANNELS.CLEAR_CONVERSATION, (event) => {
+    try {
+      // Get the window ID from the sender
+      const windowId = event.sender.id;
+
+      // Clear the conversation for this window
+      if (chatHandler) {
+        chatHandler.clearConversation(windowId);
+        log.info(`Cleared conversation for window ${windowId}`);
+      }
+    } catch (error) {
+      log.error("Error clearing conversation:", error);
+    }
   });
 });
 

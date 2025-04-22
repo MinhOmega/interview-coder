@@ -15,7 +15,7 @@
 ![Platform - Windows, macOS, Linux](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 ![Electron Version](https://img.shields.io/badge/electron-v35.1.2-blue)
-![Version](https://img.shields.io/badge/version-v1.5.2-green)
+![Version](https://img.shields.io/badge/version-v1.5.5-green)
 
 </div>
 
@@ -126,42 +126,44 @@ The application will generate all AI responses in your selected language, with s
 ## ⌨️ Keyboard Shortcuts
 
 ### macOS
-| Shortcut           | Action                      |
-| ------------------ | --------------------------- |
-| `⌘ + B`            | Toggle window visibility    |
-| `⌘ + H`            | Capture window screenshot   |
-| `⌘ + D`            | Capture selected area       |
-| `⌘ + A`            | Add screenshot (multi-page) |
-| `⌘ + Enter`        | Process screenshots         |
-| `⌘ + R`            | Reset current process       |
-| `⌘ + T`            | Toggle split view           |
-| `⌘ + ,`            | Open settings               |
-| `⌘ + Q`            | Quit application            |
-| `⌘ + Shift + ↑↓←→` | Move window                 |
-| `Shift + ↑↓`       | Scroll up/down              |
-| `⌘ + Shift + =`    | Increase window size        |
-| `⌘ + Shift + -`    | Decrease window size        |
-| `⌘ + Shift + I`    | Toggle DevTools             |
-| `⌘ + /`            | Show hotkeys                |
+| Shortcut           | Action                                            |
+| ------------------ | ------------------------------------------------- |
+| `⌘ + B`            | Toggle window visibility                          |
+| `⌘ + H`            | Capture window screenshot                         |
+| `⌘ + D`            | Capture selected area                             |
+| `⌘ + A`            | Add screenshot (multi-page)                       |
+| `⌘ + Enter`        | Process screenshots                               |
+| `⌘ + R`            | Reset current process or reset chat in split view |
+| `⌘ + N`            | Create new chat                                   |
+| `⌘ + T`            | Toggle split view                                 |
+| `⌘ + ,`            | Open settings                                     |
+| `⌘ + Q`            | Quit application                                  |
+| `⌘ + Shift + ↑↓←→` | Move window                                       |
+| `Shift + ↑↓`       | Scroll up/down (working in split view)            |
+| `⌘ + Shift + =`    | Increase window size                              |
+| `⌘ + Shift + -`    | Decrease window size                              |
+| `⌘ + Shift + I`    | Toggle DevTools                                   |
+| `⌘ + /`            | Show hotkeys                                      |
 
 ### Windows/Linux
-| Shortcut              | Action                      |
-| --------------------- | --------------------------- |
-| `Ctrl + B`            | Toggle window visibility    |
-| `Ctrl + H`            | Capture window screenshot   |
-| `Ctrl + D`            | Capture selected area       |
-| `Ctrl + A`            | Add screenshot (multi-page) |
-| `Ctrl + Enter`        | Process screenshots         |
-| `Ctrl + R`            | Reset current process       |
-| `Ctrl + T`            | Toggle split view           |
-| `Ctrl + ,`            | Open settings               |
-| `Ctrl + Q`            | Quit application            |
-| `Ctrl + Shift + ↑↓←→` | Move window                 |
-| `Shift + ↑↓`          | Scroll up/down              |
-| `Ctrl + Shift + =`    | Increase window size        |
-| `Ctrl + Shift + -`    | Decrease window size        |
-| `Ctrl + Shift + I`    | Toggle DevTools             |
-| `Ctrl + /`            | Show hotkeys                |
+| Shortcut              | Action                                            |
+| --------------------- | ------------------------------------------------- |
+| `Ctrl + B`            | Toggle window visibility                          |
+| `Ctrl + H`            | Capture window screenshot                         |
+| `Ctrl + D`            | Capture selected area                             |
+| `Ctrl + A`            | Add screenshot (multi-page)                       |
+| `Ctrl + Enter`        | Process screenshots                               |
+| `Ctrl + R`            | Reset current process or reset chat in split view |
+| `Ctrl + N`            | Create new chat                                   |
+| `Ctrl + T`            | Toggle split view                                 |
+| `Ctrl + ,`            | Open settings                                     |
+| `Ctrl + Q`            | Quit application                                  |
+| `Ctrl + Shift + ↑↓←→` | Move window                                       |
+| `Shift + ↑↓`          | Scroll up/down (working in split view)            |
+| `Ctrl + Shift + =`    | Increase window size                              |
+| `Ctrl + Shift + -`    | Decrease window size                              |
+| `Ctrl + Shift + I`    | Toggle DevTools                                   |
+| `Ctrl + /`            | Show hotkeys                                      |
 
 > **Note for Linux users:** Alternative key bindings may be used automatically if the primary shortcuts cannot be registered.
 
@@ -203,6 +205,11 @@ npm run dev
 # For Windows
 npm run dev:windows
 ```
+
+## Chat Features
+
+- Reset Chat: You can reset the current chat to its initial state by pressing `⌘+R` (Mac) or `Ctrl+R` (Windows/Linux) while in split view.
+- New Chat: You can create a new chat session by pressing `⌘+N` (Mac) or `Ctrl+N` (Windows/Linux).
 
 <div align="center">
 <br/>

@@ -265,10 +265,18 @@ const onScrollContent = (_, scrollAmount) => {
 };
 
 // Toggle split view functionality
-function toggleSplitView() {
-  if (isChatMode) return; // Don't allow toggling split view in chat-only mode
+function toggleSplitView(event) {
+  if (isChatMode) return;
 
-  isSplitView = !isSplitView;
+  let newState;
+  if (event && event.forceState !== undefined) {
+    newState = event.forceState;
+    if (isSplitView === newState) return;
+  } else {
+    newState = !isSplitView;
+  }
+
+  isSplitView = newState;
 
   const standardView = document.getElementById("standard-view");
   const splitView = document.getElementById("split-view");
@@ -294,6 +302,11 @@ function toggleSplitView() {
     // Setup resize handle
     setupResizeHandle();
 
+    // Reset message history when toggling to split view
+    if (event && event.forceState) {
+      resetChat();
+    }
+
     // Focus split chat input
     document.getElementById("split-chat-input").focus();
   } else {
@@ -309,6 +322,10 @@ function toggleSplitView() {
 // Add a function to clean up the DOM properly
 function cleanupResultContent() {
   try {
+    if (isSplitView) {
+      resetChat();
+      return;
+    }
     // Get the wrapper
     const wrapper = document.getElementById("result-content-wrapper");
     if (!wrapper) return;
@@ -750,6 +767,58 @@ const onEventMessage = (event) => {
   }
 };
 
+// Reset chat function
+function resetChat() {
+  try {
+    // Clear message history
+    messageHistory = [];
+    window.messageHistory = messageHistory;
+
+    // Clear UI - get the messages container and remove all messages
+    const messagesContainer = document.getElementById("split-messages-container");
+
+    // Remove all message elements but keep the typing indicator
+    const typingIndicator = document.getElementById("split-typing-indicator");
+
+    // Store the typing indicator to reattach later
+    if (typingIndicator) {
+      typingIndicator.remove();
+    }
+
+    // Clear all messages
+    messagesContainer.innerHTML = "";
+
+    // Add back typing indicator
+    if (typingIndicator) {
+      messagesContainer.appendChild(typingIndicator);
+    }
+
+    // Add initial AI greeting message
+    const initialMessage = document.createElement("div");
+    initialMessage.classList.add("message", "ai-message");
+    initialMessage.textContent = "Hello! How can I help you today?";
+    messagesContainer.appendChild(initialMessage);
+
+    // Clear stream-related variables
+    streamBuffer = "";
+    streamingMessageElement = null;
+
+    // Hide typing indicator if it's visible
+    if (typingIndicator) {
+      typingIndicator.classList.remove("visible");
+    }
+
+    // Notify the main process to clear the conversation for this window
+    ipcRenderer.send(IPC_CHANNELS.CLEAR_CONVERSATION);
+
+    // Show notification
+    toastManager.success("Chat has been reset");
+  } catch (error) {
+    log.error("Error resetting chat:", error);
+    toastManager.error("Failed to reset chat: " + error.message);
+  }
+}
+
 const onEventDOMContentLoaded = async () => {
   const splitSendBtn = document.getElementById("split-send-btn");
   const splitChatInput = document.getElementById("split-chat-input");
@@ -991,7 +1060,7 @@ ipcRenderer.on(IPC_CHANNELS.CLEAR_RESULT, cleanupResultContent);
 ipcRenderer.on(IPC_CHANNELS.MODEL_CHANGED, updateModelBadge);
 ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, onScreenSharingDetected);
 ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, onScrollContent);
-ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, toggleSplitView);
+ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, (_, data) => toggleSplitView(data));
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, onChatMessageResponse);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START, onChatMessageStreamStart);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk);

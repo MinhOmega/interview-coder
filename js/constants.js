@@ -43,6 +43,7 @@ const IPC_CHANNELS = {
   UPDATE_SYSTEM_PROMPT: "update-system-prompt",
   GET_SYSTEM_PROMPT: "get-system-prompt",
   SHOW_HOTKEYS_INFO: "show-hotkeys-info",
+  CLEAR_CONVERSATION: "clear-conversation",
 };
 
 module.exports = {
