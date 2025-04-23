@@ -335,16 +335,16 @@ async function loadConversation() {
     if (messages && messages.length > 0) {
       log.info(`Loaded ${messages.length} messages from conversation history`);
 
-      // Clear existing UI messages first
-      const messagesContainer = document.getElementById("split-messages-container");
-      messagesContainer.innerHTML = "";
-
-      // Clear any existing streaming message
+      // Clean up streaming state
+      streamBuffer = "";
       if (streamingMessageElement) {
         streamingMessageElement.remove();
         streamingMessageElement = null;
-        streamBuffer = "";
       }
+
+      // Clear existing UI messages first
+      const messagesContainer = document.getElementById("split-messages-container");
+      messagesContainer.innerHTML = "";
 
       // Add typing indicator but keep it hidden initially
       const typingIndicator = document.createElement("div");
@@ -432,18 +432,19 @@ const onChatMessageResponse = async (_, response) => {
     typingIndicator.classList.remove("visible");
   }
 
-  // Clear any existing streaming message element
+  // Clean up any existing streaming state
   if (streamingMessageElement) {
     streamingMessageElement.remove();
     streamingMessageElement = null;
-    streamBuffer = "";
   }
+  streamBuffer = "";
 
   // Add AI message to UI using the markdown processor
   await addAIMessage(response.content);
 
   // Add to message history
   messageHistory.push(response);
+  window.messageHistory = messageHistory;
 
   // Scroll to bottom
   scrollToBottom(document.getElementById("split-messages-container"));
@@ -464,6 +465,13 @@ function sendMessage(inputElement) {
   inputElement.value = "";
   inputElement.style.height = "auto";
 
+  // Reset stream state
+  streamBuffer = "";
+  if (streamingMessageElement) {
+    streamingMessageElement.remove();
+    streamingMessageElement = null;
+  }
+
   // Scroll to bottom
   const messagesContainer = document.getElementById("split-messages-container");
   scrollToBottom(messagesContainer);
@@ -478,12 +486,6 @@ function sendMessage(inputElement) {
 
   // Send to main process with system prompt information
   ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, [lastMessage], systemPrompt);
-
-  // Clear any existing streaming message element
-  if (streamingMessageElement) {
-    streamingMessageElement.remove();
-    streamingMessageElement = null;
-  }
 
   // Show typing indicator while waiting for response
   const typingIndicator = document.getElementById("split-typing-indicator");
@@ -517,14 +519,7 @@ async function addMessage(text, sender) {
 
   // If this is a user message, ensure the typing indicator is correctly positioned
   if (sender === "user") {
-    // First, remove any existing streaming message element
-    if (streamingMessageElement) {
-      streamingMessageElement.remove();
-      streamingMessageElement = null;
-      streamBuffer = "";
-    }
-
-    // Then make sure the typing indicator is the last element
+    // Make sure the typing indicator is the last element
     const typingIndicator = document.getElementById("split-typing-indicator");
     if (typingIndicator) {
       // Remove it first to ensure proper placement if it already exists in the DOM
@@ -887,14 +882,12 @@ function resetChat() {
     messageHistory = [];
     window.messageHistory = messageHistory;
 
+    // Reset stream variables
+    streamBuffer = "";
+    streamingMessageElement = null;
+
     // Clear UI - get the messages container and remove all messages
     const messagesContainer = document.getElementById("split-messages-container");
-
-    // Clear any existing streaming message
-    if (streamingMessageElement) {
-      streamingMessageElement.remove();
-      streamingMessageElement = null;
-    }
 
     // Remove all message elements but keep the typing indicator
     const typingIndicator = document.getElementById("split-typing-indicator");
@@ -919,10 +912,6 @@ function resetChat() {
     initialMessage.classList.add("message", "ai-message");
     initialMessage.textContent = "Hello! How can I help you today?";
     messagesContainer.appendChild(initialMessage);
-
-    // Clear stream-related variables
-    streamBuffer = "";
-    streamingMessageElement = null;
 
     // Notify the main process to clear the conversation for this window
     ipcRenderer.send(IPC_CHANNELS.CLEAR_CONVERSATION);
@@ -996,31 +985,21 @@ const onChatMessageStreamStart = () => {
   try {
     log.info("Chat stream started");
 
-    // Get the typing indicator element
+    // Show typing indicator for initial loading
     const typingIndicator = document.getElementById("split-typing-indicator");
-
-    // Hide typing indicator when we start showing actual streamed content
     if (typingIndicator) {
-      typingIndicator.classList.remove("visible");
+      typingIndicator.classList.add("visible");
     }
 
-    // Create a streaming message element
-    const messagesContainer = document.getElementById("split-messages-container");
-    if (!messagesContainer) return;
-
-    // Check if there's already a streaming message element
-    if (!streamingMessageElement) {
-      streamingMessageElement = document.createElement("div");
-      streamingMessageElement.classList.add("message", "ai-message", "streaming-message");
-      streamingMessageElement.id = "streaming-message";
-      messagesContainer.appendChild(streamingMessageElement);
-    }
-
-    // Clear the stream buffer but keep the element
+    // Reset stream buffer and message element
     streamBuffer = "";
+    streamingMessageElement = null;
 
-    // Scroll to bottom to show streaming message
-    scrollToBottom(messagesContainer);
+    // Scroll to show typing indicator
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (messagesContainer) {
+      scrollToBottom(messagesContainer);
+    }
   } catch (error) {
     log.error("Error in chat stream start handler:", error);
   }
@@ -1029,60 +1008,49 @@ const onChatMessageStreamStart = () => {
 // Handle a chunk of the chat message stream
 const onChatMessageStreamChunk = async (_, chunk, fullText) => {
   try {
-    // Create the streaming message element if it doesn't exist
-    if (!streamingMessageElement) {
-      const messagesContainer = document.getElementById("split-messages-container");
-      if (!messagesContainer) return;
+    // Update the stream buffer with new content
+    if (fullText && fullText.length > 0) {
+      streamBuffer = fullText;
+    } else if (chunk) {
+      streamBuffer += chunk;
+    }
 
-      // Hide typing indicator since we're showing actual content now
+    // Make sure we have content to display
+    if (!streamBuffer || streamBuffer.trim() === "") {
+      return;
+    }
+
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (!messagesContainer) return;
+
+    // When we get the first chunk, hide typing indicator and create streaming message element
+    if (!streamingMessageElement) {
+      // Hide typing indicator since we're now showing actual content
       const typingIndicator = document.getElementById("split-typing-indicator");
       if (typingIndicator) {
         typingIndicator.classList.remove("visible");
       }
 
+      // Create new message element for streaming content
       streamingMessageElement = document.createElement("div");
-      streamingMessageElement.classList.add("message", "ai-message", "streaming-message");
-      streamingMessageElement.id = "streaming-message";
+      streamingMessageElement.classList.add("message", "ai-message");
       messagesContainer.appendChild(streamingMessageElement);
     }
 
-    // Update the buffer with the new content
-    if (fullText && fullText.length > 0) {
-      // If fullText is provided, use it (complete replacement)
-      streamBuffer = fullText;
-    } else if (chunk) {
-      // Otherwise append the chunk
-      streamBuffer += chunk;
-    }
-
-    // Ensure we have content to display
-    if (!streamBuffer || streamBuffer.trim() === "") {
-      return;
-    }
-
-    // Render the markdown
+    // Update content in streaming message
     try {
       const html = await processMarkdown(streamBuffer);
-      if (streamingMessageElement) {
-        streamingMessageElement.innerHTML = html;
+      streamingMessageElement.innerHTML = html;
 
-        // Setup code copy buttons
-        setupCodeCopyButtons(streamingMessageElement);
-      }
-    } catch (markdownError) {
-      log.error("Error processing markdown:", markdownError);
-      // Fallback to plain text if markdown processing fails
-      if (streamingMessageElement) {
-        streamingMessageElement.textContent = streamBuffer;
-      }
+      // Setup code copy buttons
+      setupCodeCopyButtons(streamingMessageElement);
+    } catch (error) {
+      log.error("Error processing markdown:", error);
+      streamingMessageElement.textContent = streamBuffer;
     }
 
-    // Auto-scroll if user is at the bottom
-    const messagesContainer = document.getElementById("split-messages-container");
-    if (
-      messagesContainer &&
-      messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 50
-    ) {
+    // Auto-scroll if near bottom
+    if (messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 50) {
       scrollToBottom(messagesContainer);
     }
   } catch (error) {
@@ -1101,67 +1069,50 @@ const onChatMessageStreamEnd = async (_, response) => {
       typingIndicator.classList.remove("visible");
     }
 
-    // Get content from response or use the accumulated buffer if response is empty
+    // Get final content from response or buffer
     const content = response && response.content ? response.content : streamBuffer;
 
-    // Make sure we have some content to display
-    if (!content || content.trim() === "") {
-      log.warn("No content to display at stream end");
-      return;
-    }
-
-    // Update the streaming message with finalized content
+    // If we have a streaming message element, finalize it
     if (streamingMessageElement) {
+      // Final update to the message content
       try {
         const html = await processMarkdown(content);
         streamingMessageElement.innerHTML = html;
-        streamingMessageElement.classList.remove("streaming-message");
-        streamingMessageElement.removeAttribute("id");
-
-        // Setup code copy buttons one final time
         setupCodeCopyButtons(streamingMessageElement);
-      } catch (markdownError) {
-        log.error("Error processing final markdown:", markdownError);
-        // Fallback to plain text
+      } catch (error) {
+        log.error("Error processing final markdown:", error);
         streamingMessageElement.textContent = content;
       }
+    }
+    // If no streaming element was created but we have content, add a new message
+    else if (content && content.trim() !== "") {
+      await addAIMessage(content);
+    }
 
-      // Add to message history - create response object if not provided
+    // Add to message history
+    if (content && content.trim() !== "") {
       const messageToAdd = response || { role: "assistant", content: content };
       messageHistory.push(messageToAdd);
-      window.messageHistory = messageHistory; // Update global copy
+      window.messageHistory = messageHistory;
+    }
 
-      // Reset stream variables but AFTER we've used them
-      const finishedElement = streamingMessageElement;
-      streamingMessageElement = null;
-      streamBuffer = "";
+    // Clean up
+    streamBuffer = "";
+    streamingMessageElement = null;
 
-      // Scroll to bottom one final time
-      const messagesContainer = document.getElementById("split-messages-container");
-      if (messagesContainer) {
-        scrollToBottom(messagesContainer);
-      }
-    } else {
-      log.warn("No streaming message element found at stream end");
-
-      // As a fallback, create a new message if we don't have an element
-      if (content) {
-        await addAIMessage(content);
-
-        // Add to message history
-        const messageToAdd = response || { role: "assistant", content: content };
-        messageHistory.push(messageToAdd);
-        window.messageHistory = messageHistory; // Update global copy
-      }
+    // Final scroll
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (messagesContainer) {
+      scrollToBottom(messagesContainer);
     }
   } catch (error) {
     log.error("Error finalizing chat stream:", error);
 
-    // Try to recover by adding the content as a regular message
-    if (streamBuffer) {
+    // Recovery attempt
+    if (streamBuffer && !streamingMessageElement) {
       await addAIMessage(streamBuffer);
       messageHistory.push({ role: "assistant", content: streamBuffer });
-      window.messageHistory = messageHistory; // Update global copy
+      window.messageHistory = messageHistory;
     }
   }
 };
