@@ -308,8 +308,13 @@ async function processChatMessage(window, messageHistory, systemPrompt) {
         throw new Error("Gemini AI client is not initialized. Please go to Settings and enter your API key.");
       }
 
+      // Handle system prompts for Gemini by converting to user prompts if needed
       const geminiMessages = messages.map((msg) => {
-        return { role: msg.role === "user" ? "user" : "model", parts: [{ text: msg.content }] };
+        // For Gemini, convert system role to user role since Gemini doesn't support system
+        if (msg.role === "system") {
+          return { role: "user", parts: [{ text: msg.content }] };
+        }
+        return { role: msg.role === "assistant" ? "model" : "user", parts: [{ text: msg.content }] };
       });
 
       const result = await geminiAI.generateContent({

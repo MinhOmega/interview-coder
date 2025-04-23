@@ -331,15 +331,22 @@ async function loadConversation() {
   try {
     // Get messages from main process
     const messages = await ipcRenderer.invoke(IPC_CHANNELS.GET_CONVERSATION);
-    
+
     if (messages && messages.length > 0) {
       log.info(`Loaded ${messages.length} messages from conversation history`);
-      
+
       // Clear existing UI messages first
       const messagesContainer = document.getElementById("split-messages-container");
       messagesContainer.innerHTML = "";
-      
-      // Add typing indicator
+
+      // Clear any existing streaming message
+      if (streamingMessageElement) {
+        streamingMessageElement.remove();
+        streamingMessageElement = null;
+        streamBuffer = "";
+      }
+
+      // Add typing indicator but keep it hidden initially
       const typingIndicator = document.createElement("div");
       typingIndicator.id = "split-typing-indicator";
       typingIndicator.className = "typing-indicator";
@@ -348,12 +355,14 @@ async function loadConversation() {
         <span class="typing-dot"></span>
         <span class="typing-dot"></span>
       `;
+      // Ensure it's not visible by default
+      typingIndicator.classList.remove("visible");
       messagesContainer.appendChild(typingIndicator);
-      
+
       // Reset message history array
       messageHistory = [];
       window.messageHistory = messageHistory;
-      
+
       // Add messages to UI and history array
       for (const message of messages) {
         if (message.role === "user") {
@@ -361,28 +370,28 @@ async function loadConversation() {
         } else if (message.role === "assistant") {
           await addAIMessage(message.content);
         }
-        
+
         // Add to history array
         messageHistory.push(message);
       }
-      
+
       // Update global reference
       window.messageHistory = messageHistory;
-      
+
       // Scroll to bottom
       scrollToBottom(messagesContainer);
-      
+
       toastManager.success(`Loaded conversation with ${messages.length} messages`);
     } else {
       log.info("No existing conversation found, starting fresh chat");
-      
+
       // Clear conversation display and add initial greeting
       resetChat();
     }
   } catch (error) {
     log.error("Error loading conversation:", error);
     toastManager.error("Failed to load conversation: " + error.message);
-    
+
     // Fallback to a fresh chat on error
     resetChat();
   }
@@ -419,7 +428,16 @@ function cleanupResultContent() {
 const onChatMessageResponse = async (_, response) => {
   // Hide typing indicator before showing the AI message
   const typingIndicator = document.getElementById("split-typing-indicator");
-  typingIndicator.classList.remove("visible");
+  if (typingIndicator) {
+    typingIndicator.classList.remove("visible");
+  }
+
+  // Clear any existing streaming message element
+  if (streamingMessageElement) {
+    streamingMessageElement.remove();
+    streamingMessageElement = null;
+    streamBuffer = "";
+  }
 
   // Add AI message to UI using the markdown processor
   await addAIMessage(response.content);
@@ -452,15 +470,21 @@ function sendMessage(inputElement) {
 
   // Create message array with system prompt if available
   const messageArray = [...messageHistory];
-  
+
   // Only send the most recent user message to save bandwidth and processing time
   // Since the backend maintains the full conversation history by window ID
   // We only need to send the new message
   const lastMessage = messageArray[messageArray.length - 1];
-  
+
   // Send to main process with system prompt information
   ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, [lastMessage], systemPrompt);
-  
+
+  // Clear any existing streaming message element
+  if (streamingMessageElement) {
+    streamingMessageElement.remove();
+    streamingMessageElement = null;
+  }
+
   // Show typing indicator while waiting for response
   const typingIndicator = document.getElementById("split-typing-indicator");
   if (typingIndicator) {
@@ -491,12 +515,24 @@ async function addMessage(text, sender) {
 
   messagesContainer.appendChild(messageDiv);
 
-  // If this is a user message, show the typing indicator right after it
+  // If this is a user message, ensure the typing indicator is correctly positioned
   if (sender === "user") {
-    // Ensure the typing indicator is in the correct position
+    // First, remove any existing streaming message element
+    if (streamingMessageElement) {
+      streamingMessageElement.remove();
+      streamingMessageElement = null;
+      streamBuffer = "";
+    }
+
+    // Then make sure the typing indicator is the last element
     const typingIndicator = document.getElementById("split-typing-indicator");
-    messagesContainer.appendChild(typingIndicator);
-    typingIndicator.classList.add("visible");
+    if (typingIndicator) {
+      // Remove it first to ensure proper placement if it already exists in the DOM
+      typingIndicator.remove();
+      // Append it after the user message
+      messagesContainer.appendChild(typingIndicator);
+      // But don't show it yet - that happens when we send the message
+    }
   }
 
   scrollToBottom(messagesContainer);
@@ -854,6 +890,12 @@ function resetChat() {
     // Clear UI - get the messages container and remove all messages
     const messagesContainer = document.getElementById("split-messages-container");
 
+    // Clear any existing streaming message
+    if (streamingMessageElement) {
+      streamingMessageElement.remove();
+      streamingMessageElement = null;
+    }
+
     // Remove all message elements but keep the typing indicator
     const typingIndicator = document.getElementById("split-typing-indicator");
 
@@ -867,6 +909,8 @@ function resetChat() {
 
     // Add back typing indicator
     if (typingIndicator) {
+      // Reset visibility state before adding back
+      typingIndicator.classList.remove("visible");
       messagesContainer.appendChild(typingIndicator);
     }
 
@@ -879,11 +923,6 @@ function resetChat() {
     // Clear stream-related variables
     streamBuffer = "";
     streamingMessageElement = null;
-
-    // Hide typing indicator if it's visible
-    if (typingIndicator) {
-      typingIndicator.classList.remove("visible");
-    }
 
     // Notify the main process to clear the conversation for this window
     ipcRenderer.send(IPC_CHANNELS.CLEAR_CONVERSATION);
@@ -957,10 +996,12 @@ const onChatMessageStreamStart = () => {
   try {
     log.info("Chat stream started");
 
-    // Show typing indicator
+    // Get the typing indicator element
     const typingIndicator = document.getElementById("split-typing-indicator");
+
+    // Hide typing indicator when we start showing actual streamed content
     if (typingIndicator) {
-      typingIndicator.classList.add("visible");
+      typingIndicator.classList.remove("visible");
     }
 
     // Create a streaming message element
@@ -978,7 +1019,7 @@ const onChatMessageStreamStart = () => {
     // Clear the stream buffer but keep the element
     streamBuffer = "";
 
-    // Scroll to bottom to show typing
+    // Scroll to bottom to show streaming message
     scrollToBottom(messagesContainer);
   } catch (error) {
     log.error("Error in chat stream start handler:", error);
@@ -993,16 +1034,16 @@ const onChatMessageStreamChunk = async (_, chunk, fullText) => {
       const messagesContainer = document.getElementById("split-messages-container");
       if (!messagesContainer) return;
 
-      streamingMessageElement = document.createElement("div");
-      streamingMessageElement.classList.add("message", "ai-message", "streaming-message");
-      streamingMessageElement.id = "streaming-message";
-      messagesContainer.appendChild(streamingMessageElement);
-
-      // Hide typing indicator since we're now showing actual content
+      // Hide typing indicator since we're showing actual content now
       const typingIndicator = document.getElementById("split-typing-indicator");
       if (typingIndicator) {
         typingIndicator.classList.remove("visible");
       }
+
+      streamingMessageElement = document.createElement("div");
+      streamingMessageElement.classList.add("message", "ai-message", "streaming-message");
+      streamingMessageElement.id = "streaming-message";
+      messagesContainer.appendChild(streamingMessageElement);
     }
 
     // Update the buffer with the new content
@@ -1128,36 +1169,35 @@ const onChatMessageStreamEnd = async (_, response) => {
 // Handler for showing an animated update button in the toolbar
 const onShowUpdateToolbarButton = (_, updateData) => {
   try {
-    log.info('Showing update toolbar button:', updateData);
-    
+    log.info("Showing update toolbar button:", updateData);
+
     // Get the existing button element
-    const updateButton = document.getElementById('update-toolbar-button');
-    const updateButtonText = document.getElementById('update-button-text');
-    
+    const updateButton = document.getElementById("update-toolbar-button");
+    const updateButtonText = document.getElementById("update-button-text");
+
     // Update the button text based on update type
-    const buttonText = updateData.requiresRestart 
+    const buttonText = updateData.requiresRestart
       ? `Update to v${updateData.latestVersion} (Requires Restart)`
       : `Update to v${updateData.latestVersion}`;
-    
+
     updateButtonText.textContent = buttonText;
-    
+
     // Add click handler to show update dialog again
     updateButton.onclick = () => {
       ipcRenderer.send(IPC_CHANNELS.SHOW_UPDATE_DIALOG, updateData);
     };
-    
+
     // Show the button
-    updateButton.style.display = 'flex';
-    
+    updateButton.style.display = "flex";
+
     // Show a toast notification with restart information
     const notificationMessage = updateData.requiresRestart
       ? `A new version (v${updateData.latestVersion}) is available! The app will need to restart after updating.`
       : `A new version (v${updateData.latestVersion}) is available! Click the button in the top-right corner to update.`;
-    
+
     toastManager.info(notificationMessage);
-    
   } catch (error) {
-    log.error('Error showing update toolbar button:', error);
+    log.error("Error showing update toolbar button:", error);
   }
 };
 

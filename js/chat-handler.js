@@ -82,9 +82,25 @@ class ChatHandler {
 
       // Create a copy of messages with system prompt if available
       let messagesWithSystem = [...messages];
+      
+      // Always include system prompt at the beginning if it exists
+      // For empty chats or new conversations, this ensures the system prompt is included
+      // For existing conversations, we may need to replace the first message if it's already a system prompt
       if (currentSystemPrompt) {
-        // Insert system prompt at beginning if not already there
-        if (messagesWithSystem.length === 0 || messagesWithSystem[0].role !== "system") {
+        if (messagesWithSystem.length === 0) {
+          // For new conversations, add the system prompt as the first message
+          messagesWithSystem.unshift({
+            role: "system",
+            content: currentSystemPrompt,
+          });
+        } else if (messagesWithSystem[0].role === "system") {
+          // If the first message is already a system prompt, replace it
+          messagesWithSystem[0] = {
+            role: "system", 
+            content: currentSystemPrompt
+          };
+        } else {
+          // Otherwise, add it at the beginning
           messagesWithSystem.unshift({
             role: "system",
             content: currentSystemPrompt,
@@ -97,6 +113,8 @@ class ChatHandler {
       try {
         switch (provider) {
           case AI_PROVIDERS.GEMINI:
+            // For Gemini, system prompts are handled specially in the generateWithGemini method
+            // by converting them to user messages (since Gemini doesn't support system role)
             response = await this.generateWithGemini(
               messagesWithSystem,
               currentModel,
@@ -282,8 +300,9 @@ class ChatHandler {
         // Add system message at the beginning if it exists
         const messagesForModel = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
         
-        // Convert to Gemini format
-        const geminiMessages = messagesForModel.map(msg => {
+        // Convert to Gemini format using our helper function
+        const geminiMessages = this._formatMessagesForProvider(messagesForModel, AI_PROVIDERS.GEMINI).map(msg => {
+          // Convert "assistant" role to "model" for Gemini
           const role = msg.role === "assistant" ? "model" : msg.role;
           return { role, parts: [{ text: msg.content }] };
         });
@@ -376,13 +395,15 @@ class ChatHandler {
         const nonSystemMessages = messages.filter(msg => msg.role !== "system");
         
         // Use up to the last 10 messages to stay within context limits
+        // For very large messages, consider limiting further
         const recentMessages = nonSystemMessages.slice(-10);
         
         // Add system message at the beginning if it exists
         const messagesForModel = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
         
-        // Convert to Gemini format
-        const geminiMessages = messagesForModel.map(msg => {
+        // Convert to Gemini format using our helper function
+        const geminiMessages = this._formatMessagesForProvider(messagesForModel, AI_PROVIDERS.GEMINI).map(msg => {
+          // Convert "assistant" role to "model" for Gemini
           const role = msg.role === "assistant" ? "model" : msg.role;
           return { role, parts: [{ text: msg.content }] };
         });
@@ -664,7 +685,15 @@ class ChatHandler {
    * @param {Array} messages The conversation messages
    */
   saveConversation(windowId, messages) {
-    this.conversations.set(windowId, messages);
+    // For all providers, we want to save the conversation history without system messages
+    // This ensures we don't lose context but don't duplicate system messages
+    const messagesWithoutSystem = messages.filter(msg => msg.role !== "system");
+    
+    // Store the conversation history for this window
+    this.conversations.set(windowId, messagesWithoutSystem);
+    
+    // Log how many messages are being stored
+    console.log(`Saved ${messagesWithoutSystem.length} messages for window ${windowId}`);
   }
 
   /**
@@ -682,6 +711,32 @@ class ChatHandler {
    */
   clearConversation(windowId) {
     this.conversations.delete(windowId);
+  }
+
+  /**
+   * Formats a message array to ensure system prompts are properly handled
+   * This is necessary because different AI providers handle system prompts differently
+   * @param {Array} messages Array of messages with potential system prompts
+   * @param {string} provider The AI provider ID (GEMINI, OPENAI, etc.)
+   * @returns {Array} Properly formatted messages for the specific provider
+   * @private
+   */
+  _formatMessagesForProvider(messages, provider) {
+    // Create a copy of the messages
+    const formattedMessages = [...messages];
+    
+    // For Gemini, convert system messages to user messages
+    if (provider === AI_PROVIDERS.GEMINI) {
+      return formattedMessages.map(msg => {
+        if (msg.role === "system") {
+          return { role: "user", content: msg.content };
+        }
+        return msg;
+      });
+    }
+    
+    // For other providers, we can use the messages as they are
+    return formattedMessages;
   }
 }
 
