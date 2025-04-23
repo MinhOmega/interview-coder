@@ -1,13 +1,4 @@
-const {
-  app,
-  BrowserWindow,
-  ipcMain,
-  nativeImage,
-  desktopCapturer,
-  systemPreferences,
-  Menu,
-  MenuItem,
-} = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage, Menu, MenuItem, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
@@ -26,6 +17,7 @@ const { isLinux, isMac, isWindows } = require("./js/config");
 const toastManager = require("./js/toast-manager");
 const macOSPermissions = isMac ? require("./js/macos-permissions") : null;
 const ChatHandler = require("./js/chat-handler");
+const UpdateManager = require("./js/update-manager");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -72,6 +64,8 @@ axios.defaults.family = 4;
 
 // Initialize ChatHandler
 let chatHandler;
+// Initialize UpdateManager
+let updateManager;
 
 function resetProcess() {
   screenshotManager.resetScreenshots();
@@ -152,6 +146,10 @@ app.whenReady().then(async () => {
 
   // Initialize ChatHandler
   chatHandler = new ChatHandler(aiProviders, configManager);
+
+  // Initialize update manager
+  updateManager = new UpdateManager(mainWindow);
+  updateManager.startUpdateChecking();
 
   // Handle API key initialization from UI
   ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey) => {
@@ -509,6 +507,14 @@ app.whenReady().then(async () => {
       log.error("Error clearing conversation:", error);
     }
   });
+
+  // Handle update action from renderer
+  ipcMain.on(IPC_CHANNELS.UPDATE_ACTION, (event, data) => {
+    if (data.action === "download" && data.url) {
+      shell.openExternal(data.url);
+      log.info(`Opening update download URL: ${data.url}`);
+    }
+  });
 });
 
 app.on("window-all-closed", () => {
@@ -528,4 +534,9 @@ app.on("activate", () => {
       log.error("Error updating hotkeys on activate:", error);
     }
   }
+});
+
+app.on("before-quit", () => {
+  // Stop update checking when app is about to quit
+  updateManager.stopUpdateChecking();
 });

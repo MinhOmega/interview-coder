@@ -1154,11 +1154,36 @@ textarea {
   }
 }
 
-/* Streaming message styles */
 .streaming-message {
   position: relative;
   animation: pulse-border 2s infinite;
   border-left: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+
+.update-toolbar-button {
+  position: relative;
+  background-color: #2196F3;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 9500;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  animation: pulse-button 2s infinite;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
+  margin-left: auto;
+  border: 1px solid rgba(80, 80, 80, 0.3);
+  -webkit-app-region: no-drag;
+}
+
+.update-toolbar-button:hover {
+  background-color: #0b7dda;
+  transform: translateY(-1px);
 }
 
 @keyframes shimmer {
@@ -1210,6 +1235,18 @@ textarea {
   50% {
     opacity: 0.8;
   }
+
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 105, 255, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 8px rgba(74, 105, 255, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 105, 255, 0);
+  }
 }
 
 @keyframes fade-in {
@@ -1221,5 +1258,31 @@ textarea {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pulse-button {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
