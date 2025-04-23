@@ -75,9 +75,9 @@ class ChatHandler {
 
       console.log(`Processing message with ${provider} using model ${currentModel}`);
 
-      // Default to streaming for Gemini if not specified
+      // Default to streaming for Gemini and Ollama if not specified
       if (useStreaming === undefined) {
-        useStreaming = provider === AI_PROVIDERS.GEMINI;
+        useStreaming = provider === AI_PROVIDERS.GEMINI || provider === AI_PROVIDERS.OLLAMA;
       }
 
       // Create a copy of messages with system prompt if available
@@ -106,7 +106,13 @@ class ChatHandler {
             );
             break;
           case AI_PROVIDERS.OLLAMA:
-            response = await this.generateWithOllama(messagesWithSystem, currentModel);
+            response = await this.generateWithOllama(
+              messagesWithSystem,
+              currentModel,
+              useStreaming,
+              streamCallback,
+              windowId,
+            );
             break;
           case AI_PROVIDERS.OPENAI:
             response = await this.generateWithOpenAI(
@@ -136,7 +142,7 @@ class ChatHandler {
                 windowId,
               );
             } else if (this.configManager.getOllamaUrl) {
-              response = await this.generateWithOllama(messagesWithSystem, "llama2");
+              response = await this.generateWithOllama(messagesWithSystem, "llama2", useStreaming, streamCallback, windowId);
             } else {
               throw new Error(`No AI providers are configured. Please go to Settings and configure an AI provider.`);
             }
@@ -165,7 +171,7 @@ class ChatHandler {
           );
         } else if (provider !== AI_PROVIDERS.OLLAMA) {
           console.log("Trying fallback with Ollama...");
-          response = await this.generateWithOllama(messagesWithSystem, "llama2");
+          response = await this.generateWithOllama(messagesWithSystem, "llama2", useStreaming, streamCallback, windowId);
         } else {
           // If we've tried all options, rethrow the original error
           throw providerError;
@@ -173,12 +179,15 @@ class ChatHandler {
       }
 
       // If streaming, the response is handled through callbacks
-      if (useStreaming && provider !== AI_PROVIDERS.OLLAMA) {
+      if (useStreaming) {
         return response;
       }
 
-      // Save conversation for context (but without system prompt in history)
-      this.saveConversation(windowId, messages.concat([response]));
+      // For non-streaming responses, save conversation for context (but without system prompt in history)
+      if (!response.streaming) {
+        const historyWithoutSystem = messages.filter(msg => msg.role !== "system");
+        this.saveConversation(windowId, historyWithoutSystem.concat([response]));
+      }
 
       return response;
     } catch (error) {
@@ -227,241 +236,187 @@ class ChatHandler {
         throw new Error("Gemini client not initialized. Please go to Settings and enter your API key.");
       }
 
-      // If streaming is requested, use the generateWithGemini function from aiProviders
-      if (streaming) {
-        // Extract system message if present
-        let systemPrompt = "";
-        if (messages.length > 0 && messages[0].role === "system") {
-          systemPrompt = messages[0].content;
+      // Check for existing conversation context for this window
+      if (windowId) {
+        const existingConversation = this.getConversation(windowId);
+        if (existingConversation && existingConversation.length > 0) {
+          console.log(`Using existing conversation context for Gemini (window ${windowId}): ${existingConversation.length} messages`);
         }
-
-        // Get only the most recent user message and the previous assistant message (if available)
-        // This significantly reduces context length and token usage
-        const recentMessages = [];
-        
-        // Find the last user message
-        let lastUserMessageIndex = -1;
-        for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].role === "user") {
-            lastUserMessageIndex = i;
-            break;
-          }
-        }
-        
-        // If we found a user message
-        if (lastUserMessageIndex !== -1) {
-          // Add the previous assistant message if it exists
-          if (lastUserMessageIndex > 0 && messages[lastUserMessageIndex - 1].role === "assistant") {
-            const assistantMsg = messages[lastUserMessageIndex - 1];
-            if (assistantMsg.content && assistantMsg.content.trim() !== "") {
-              recentMessages.push({
-                type: "text",
-                text: assistantMsg.content,
-              });
-            }
-          }
-          
-          // Add the user message
-          const userMsg = messages[lastUserMessageIndex];
-          if (userMsg.content && userMsg.content.trim() !== "") {
-            // If there's a system prompt, add it to the user message
-            if (systemPrompt) {
-              recentMessages.push({
-                type: "text",
-                text: "System instructions: " + systemPrompt + "\n\n" + userMsg.content,
-              });
-            } else {
-              recentMessages.push({
-                type: "text",
-                text: userMsg.content,
-              });
-            }
-          }
-          
-          // Handle any image type attached to the user message
-          if (userMsg.type === "image_url" && userMsg.image_url) {
-            try {
-              // Ensure proper image_url format for Gemini API
-              let formattedImageUrl;
-              if (typeof userMsg.image_url === "object" && userMsg.image_url.url) {
-                // Already in the correct format: { url: "data:image/..." }
-                formattedImageUrl = userMsg.image_url;
-              } else if (typeof userMsg.image_url === "string") {
-                // Convert string format to object format
-                formattedImageUrl = { url: userMsg.image_url };
-              } else {
-                throw new Error("Invalid image_url format");
-              }
-
-              recentMessages.push({
-                type: "image_url",
-                image_url: formattedImageUrl,
-              });
-            } catch (error) {
-              console.error("Error processing image message:", error);
-              // Continue without the image if there's an error
-            }
-          }
-        } else {
-          // If no user message found, add a default message
-          recentMessages.push({
-            type: "text",
-            text: systemPrompt ? `System instructions: ${systemPrompt}\n\nHello` : "Hello",
-          });
-        }
-
-        // Safety check - ensure we have at least one message
-        if (recentMessages.length === 0) {
-          recentMessages.push({
-            type: "text",
-            text: "Hello",
-          });
-        }
-
-        // Debug log showing the formatted messages to send to Gemini
-        console.log("Formatted messages for Gemini:", JSON.stringify(recentMessages, null, 2));
-        // Also log the count of messages for easier debugging
-        console.log(`Sending ${recentMessages.length} formatted messages to Gemini API`);
-
-        // Use the streaming implementation from aiProviders
-        const streamingResult = await this.aiProviders.generateWithGemini(
-          recentMessages,
-          model || "gemini-pro",
-          true,
-        );
-
-        // If a streamCallback is provided, set up event listeners
-        if (streamCallback) {
-          let fullText = "";
-
-          streamingResult.emitter.on("chunk", (chunk) => {
-            fullText += chunk;
-            streamCallback("chunk", chunk, fullText);
-          });
-
-          streamingResult.emitter.on("complete", (text) => {
-            streamCallback("complete", text);
-
-            // Save the conversation with the final response
-            if (windowId) {
-              this.saveConversation(
-                windowId,
-                messages.concat([
-                  {
-                    role: "assistant",
-                    content: text,
-                  },
-                ]),
-              );
-            }
-          });
-
-          streamingResult.emitter.on("error", (error) => {
-            console.error("Gemini streaming error:", error);
-            streamCallback("error", error);
-          });
-        }
-
-        return streamingResult;
       }
 
-      const safetySettings = [
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-      ];
+      // If streaming is requested, use the streaming approach
+      if (streaming && streamCallback) {
+        // Signal stream start
+        streamCallback("start");
 
-      // For non-streaming mode, handle similarly - use only most recent context
-      // Extract system message if present
-      let systemPrompt = "";
-      if (messages.length > 0 && messages[0].role === "system") {
-        systemPrompt = messages[0].content;
-        messages = messages.slice(1); // Remove system message from array
-      }
+        // Convert messages to Gemini format
+        // Gemini uses 'model' for AI messages instead of 'assistant'
+        const safetySettings = [
+          {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+        ];
 
-      // Get the last conversation turn (1-2 messages) to reduce context
-      const recentMessages = [];
-      
-      if (messages.length > 0) {
-        // Get last assistant message (if it exists) and the last user message
-        let lastUserIndex = messages.length - 1;
-        while (lastUserIndex >= 0 && messages[lastUserIndex].role !== "user") {
-          lastUserIndex--;
-        }
+        // Only consider the most recent messages to avoid token limits
+        // Always include the system prompt if present
+        const systemMessage = messages.find(msg => msg.role === "system");
+        const nonSystemMessages = messages.filter(msg => msg.role !== "system");
         
-        // If we found a user message
-        if (lastUserIndex >= 0) {
-          // Add previous assistant message if it exists
-          if (lastUserIndex > 0 && messages[lastUserIndex - 1].role === "assistant") {
-            recentMessages.push({
-              role: "model",
-              parts: [{ text: messages[lastUserIndex - 1].content }]
-            });
-          }
+        // Use up to the last 10 messages to stay within context limits
+        // For very large messages, consider limiting further
+        const recentMessages = nonSystemMessages.slice(-10);
+        
+        // Add system message at the beginning if it exists
+        const messagesForModel = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
+        
+        // Convert to Gemini format
+        const geminiMessages = messagesForModel.map(msg => {
+          const role = msg.role === "assistant" ? "model" : msg.role;
+          return { role, parts: [{ text: msg.content }] };
+        });
+
+        // Get the specific model
+        const geminiModel = geminiClient.getGenerativeModel({ 
+          model: model || "gemini-pro",
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+          },
+          safetySettings
+        });
+
+        try {
+          // Create a chat session
+          const chat = geminiModel.startChat({
+            history: geminiMessages.slice(0, -1), // All but the last message
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 8192,
+            },
+            safetySettings
+          });
+
+          // Get the last message to send
+          const lastMessage = geminiMessages[geminiMessages.length - 1];
           
-          // Add the user message with system prompt
-          const userContent = systemPrompt 
-            ? `System instructions: ${systemPrompt}\n\n${messages[lastUserIndex].content}`
-            : messages[lastUserIndex].content;
+          // Send the message and stream the response
+          const streamingResponse = await chat.sendMessageStream(lastMessage.parts);
+
+          // Process the stream
+          let fullResponse = "";
+          
+          for await (const chunk of streamingResponse.stream) {
+            const chunkText = chunk.text();
+            fullResponse += chunkText;
             
-          recentMessages.push({
-            role: "user",
-            parts: [{ text: userContent }]
-          });
-        } else {
-          // Fallback if no user message found
-          recentMessages.push({
-            role: "user",
-            parts: [{ text: systemPrompt ? `System instructions: ${systemPrompt}\n\nHello` : "Hello" }]
-          });
+            // Send the chunk to the callback
+            streamCallback("chunk", chunkText, fullResponse);
+          }
+          
+          // Create the final response
+          const finalResponse = {
+            role: "assistant",
+            content: fullResponse
+          };
+          
+          // Signal stream completion
+          streamCallback("complete", finalResponse, fullResponse);
+          
+          // Save the conversation if window ID is provided
+          if (windowId) {
+            // Get the recent history without system messages
+            const historyWithoutSystem = messages.filter(msg => msg.role !== "system");
+            this.saveConversation(windowId, historyWithoutSystem.concat([finalResponse]));
+          }
+          
+          return { streaming: true };
+        } catch (streamError) {
+          console.error("Error with Gemini streaming:", streamError);
+          streamCallback("error", streamError);
+          throw streamError;
         }
-      } else if (systemPrompt) {
-        // If only system prompt exists
-        recentMessages.push({
-          role: "user",
-          parts: [{ text: `System instructions: ${systemPrompt}\n\nHello` }]
-        });
       } else {
-        // Complete fallback
-        recentMessages.push({
-          role: "user",
-          parts: [{ text: "Hello" }]
+        // Standard non-streaming approach
+        // Set up safety settings to allow more content through
+        const safetySettings = [
+          {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+        ];
+
+        // Only consider the most recent messages to avoid token limits
+        // Always include the system prompt if present
+        const systemMessage = messages.find(msg => msg.role === "system");
+        const nonSystemMessages = messages.filter(msg => msg.role !== "system");
+        
+        // Use up to the last 10 messages to stay within context limits
+        const recentMessages = nonSystemMessages.slice(-10);
+        
+        // Add system message at the beginning if it exists
+        const messagesForModel = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
+        
+        // Convert to Gemini format
+        const geminiMessages = messagesForModel.map(msg => {
+          const role = msg.role === "assistant" ? "model" : msg.role;
+          return { role, parts: [{ text: msg.content }] };
         });
+
+        // Get the specific model
+        const geminiModel = geminiClient.getGenerativeModel({ model: model || "gemini-pro" });
+
+        // Generate response
+        const result = await geminiModel.generateContent({
+          contents: geminiMessages,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+          },
+          safetySettings,
+        });
+
+        const response = result.response;
+        const text = response.text();
+
+        const finalResponse = {
+          role: "assistant",
+          content: text,
+        };
+
+        // Save the conversation if window ID is provided
+        if (windowId) {
+          // Get the recent history without system messages
+          const historyWithoutSystem = messages.filter(msg => msg.role !== "system");
+          this.saveConversation(windowId, historyWithoutSystem.concat([finalResponse]));
+        }
+
+        return finalResponse;
       }
-
-      // Get the specific model
-      const geminiModel = geminiClient.getGenerativeModel({ model: model || "gemini-pro" });
-
-      // Generate response
-      const result = await geminiModel.generateContent({
-        contents: recentMessages,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 8192,
-        },
-        safetySettings,
-      });
-
-      const response = result.response;
-      const text = response.text();
-
-      return {
-        role: "assistant",
-        content: text,
-      };
     } catch (error) {
       console.error("Error generating with Gemini:", error);
       throw error;
@@ -472,9 +427,12 @@ class ChatHandler {
    * Generate a response using Ollama
    * @param {Array} messages The conversation history
    * @param {string} model The Ollama model to use
-   * @returns {Promise<Object>} The response
+   * @param {boolean} streaming Whether to use streaming (default: false)
+   * @param {function} streamCallback Optional callback function for handling streaming responses
+   * @param {number} windowId Optional window ID for managing conversations
+   * @returns {Promise<Object>} The response or streaming handler
    */
-  async generateWithOllama(messages, model) {
+  async generateWithOllama(messages, model, streaming = false, streamCallback, windowId) {
     try {
       // Get Ollama URL from config
       const ollamaUrl = this.configManager.getCurrentSettings().ollamaUrl;
@@ -488,24 +446,109 @@ class ChatHandler {
         content: msg.content,
       }));
 
-      // API call to Ollama
-      const response = await axios.post(`${ollamaUrl}/api/chat`, {
-        model: model || "llama2",
-        messages: formattedMessages,
-        stream: false,
-        options: {
-          temperature: 0.7,
-        },
-      });
-
-      if (!response.data || !response.data.message) {
-        throw new Error("Invalid response from Ollama");
+      // Check for existing conversation context for this window
+      if (windowId) {
+        const existingConversation = this.getConversation(windowId);
+        if (existingConversation && existingConversation.length > 0) {
+          console.log(`Using existing conversation context for Ollama (window ${windowId}): ${existingConversation.length} messages`);
+        }
       }
 
-      return {
-        role: "assistant",
-        content: response.data.message.content,
-      };
+      // If streaming is requested, handle it
+      if (streaming && streamCallback) {
+        // Signal stream start
+        streamCallback("start");
+        
+        // Setup for stream handling
+        let fullResponse = "";
+        
+        try {
+          // API call to Ollama with streaming
+          const response = await axios.post(`${ollamaUrl}/api/chat`, {
+            model: model || "llama2",
+            messages: formattedMessages,
+            stream: true,
+            options: {
+              temperature: 0.7,
+            },
+          }, {
+            responseType: 'stream'
+          });
+          
+          // Handle the stream
+          response.data.on('data', (chunk) => {
+            try {
+              const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
+              
+              for (const line of lines) {
+                const data = JSON.parse(line);
+                if (data.message && data.message.content) {
+                  const chunkText = data.message.content;
+                  fullResponse += chunkText;
+                  
+                  // Send each chunk to the callback
+                  streamCallback("chunk", chunkText, fullResponse);
+                }
+              }
+            } catch (error) {
+              console.error("Error parsing Ollama stream chunk:", error);
+            }
+          });
+          
+          // On completion
+          response.data.on('end', () => {
+            const finalResponse = {
+              role: "assistant",
+              content: fullResponse
+            };
+            
+            // Signal stream completion
+            streamCallback("complete", finalResponse, fullResponse);
+            
+            // Save the conversation if window ID is provided
+            if (windowId) {
+              // Get the recent history without system messages
+              const historyWithoutSystem = messages.filter(msg => msg.role !== "system");
+              this.saveConversation(windowId, historyWithoutSystem.concat([finalResponse]));
+            }
+          });
+          
+          // Return a placeholder since actual response is handled via callbacks
+          return { streaming: true };
+        } catch (streamError) {
+          console.error("Error with Ollama streaming:", streamError);
+          streamCallback("error", streamError);
+          throw streamError;
+        }
+      } else {
+        // Non-streaming request
+        const response = await axios.post(`${ollamaUrl}/api/chat`, {
+          model: model || "llama2",
+          messages: formattedMessages,
+          stream: false,
+          options: {
+            temperature: 0.7,
+          },
+        });
+
+        if (!response.data || !response.data.message) {
+          throw new Error("Invalid response from Ollama");
+        }
+
+        const result = {
+          role: "assistant",
+          content: response.data.message.content,
+        };
+        
+        // Save the conversation if window ID is provided
+        if (windowId) {
+          // Get the recent history without system messages
+          const historyWithoutSystem = messages.filter(msg => msg.role !== "system");
+          this.saveConversation(windowId, historyWithoutSystem.concat([result]));
+        }
+
+        return result;
+      }
     } catch (error) {
       console.error("Error generating with Ollama:", error);
       throw error;

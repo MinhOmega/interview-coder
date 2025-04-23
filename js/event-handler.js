@@ -180,8 +180,8 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
         }
       }
 
-      // Always use streaming for Gemini responses
-      const useStreaming = provider === AI_PROVIDERS.GEMINI;
+      // Enable streaming for both Gemini and Ollama
+      const useStreaming = provider === AI_PROVIDERS.GEMINI || provider === AI_PROVIDERS.OLLAMA;
 
       // Set up streaming callback to handle chunks of text
       const streamCallback = (type, chunk, fullText) => {
@@ -195,7 +195,7 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
           // Signal streaming completion to the renderer
           event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, {
             role: "assistant",
-            content: fullText,
+            content: typeof fullText === 'string' ? fullText : chunk.content || '',
           });
         } else if (type === "error") {
           // Signal error to the renderer
@@ -208,13 +208,36 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
         }
       };
 
-      // Process the message with system prompt if provided, with streaming enabled
-      const response = await chatHandler.processMessage(messages, windowId, systemPrompt, useStreaming, streamCallback);
-
-      // For non-streaming responses or Ollama (which doesn't support streaming yet)
-      if (!useStreaming || provider === AI_PROVIDERS.OLLAMA) {
-        // Send response back to the renderer
-        event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
+      // Load previous conversation for context if available
+      const existingConversation = chatHandler.getConversation(windowId);
+      if (existingConversation && existingConversation.length > 0) {
+        console.log(`Found existing conversation for window ${windowId} with ${existingConversation.length} messages`);
+        
+        // Only add the new user message from the current messages array
+        const lastUserMessage = messages[messages.length - 1];
+        
+        // Combine existing conversation with new message
+        const combinedMessages = [...existingConversation, lastUserMessage];
+        console.log(`Combined ${combinedMessages.length} messages for processing`);
+        
+        // Process the message with system prompt if provided, with streaming enabled
+        const response = await chatHandler.processMessage(combinedMessages, windowId, systemPrompt, useStreaming, streamCallback);
+        
+        // For non-streaming responses send them directly
+        if (!useStreaming) {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
+        }
+      } else {
+        // No existing conversation, just use the messages as provided
+        console.log(`No existing conversation for window ${windowId}, using ${messages.length} messages`);
+        
+        // Process the message with system prompt if provided, with streaming enabled
+        const response = await chatHandler.processMessage(messages, windowId, systemPrompt, useStreaming, streamCallback);
+        
+        // For non-streaming responses send them directly
+        if (!useStreaming) {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
+        }
       }
     } catch (error) {
       console.error("Error processing chat message:", error);
@@ -312,6 +335,28 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     if (data.action === "download" && data.url) {
       shell.openExternal(data.url);
       log.info(`Opening update download URL: ${data.url}`);
+    }
+  });
+
+  // Handle getting conversation for a window
+  ipcMain.handle(IPC_CHANNELS.GET_CONVERSATION, (event) => {
+    try {
+      // Get the window ID from the sender
+      const windowId = event.sender.id;
+
+      // Get the conversation for this window
+      if (chatHandler) {
+        const conversation = chatHandler.getConversation(windowId);
+        if (conversation) {
+          log.info(`Retrieved conversation for window ${windowId} with ${conversation.length} messages`);
+          return conversation;
+        }
+      }
+      
+      return []; // Return empty array if no conversation found
+    } catch (error) {
+      log.error("Error retrieving conversation:", error);
+      return [];
     }
   });
 

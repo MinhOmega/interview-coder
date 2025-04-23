@@ -306,9 +306,12 @@ function toggleSplitView(event) {
     // Setup resize handle
     setupResizeHandle();
 
-    // Reset message history when toggling to split view
-    if (event && event.forceState) {
+    // Only reset chat if explicitly forced to (not on regular toggle)
+    if (event && event.forceReset) {
       resetChat();
+    } else {
+      // Try to load existing conversation
+      loadConversation();
     }
 
     // Focus split chat input
@@ -321,6 +324,68 @@ function toggleSplitView(event) {
 
   // Notify about toggle
   toastManager.success("Split view " + (isSplitView ? "enabled" : "disabled"));
+}
+
+// Load conversation from main process
+async function loadConversation() {
+  try {
+    // Get messages from main process
+    const messages = await ipcRenderer.invoke(IPC_CHANNELS.GET_CONVERSATION);
+    
+    if (messages && messages.length > 0) {
+      log.info(`Loaded ${messages.length} messages from conversation history`);
+      
+      // Clear existing UI messages first
+      const messagesContainer = document.getElementById("split-messages-container");
+      messagesContainer.innerHTML = "";
+      
+      // Add typing indicator
+      const typingIndicator = document.createElement("div");
+      typingIndicator.id = "split-typing-indicator";
+      typingIndicator.className = "typing-indicator";
+      typingIndicator.innerHTML = `
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      `;
+      messagesContainer.appendChild(typingIndicator);
+      
+      // Reset message history array
+      messageHistory = [];
+      window.messageHistory = messageHistory;
+      
+      // Add messages to UI and history array
+      for (const message of messages) {
+        if (message.role === "user") {
+          await addMessage(message.content, "user");
+        } else if (message.role === "assistant") {
+          await addAIMessage(message.content);
+        }
+        
+        // Add to history array
+        messageHistory.push(message);
+      }
+      
+      // Update global reference
+      window.messageHistory = messageHistory;
+      
+      // Scroll to bottom
+      scrollToBottom(messagesContainer);
+      
+      toastManager.success(`Loaded conversation with ${messages.length} messages`);
+    } else {
+      log.info("No existing conversation found, starting fresh chat");
+      
+      // Clear conversation display and add initial greeting
+      resetChat();
+    }
+  } catch (error) {
+    log.error("Error loading conversation:", error);
+    toastManager.error("Failed to load conversation: " + error.message);
+    
+    // Fallback to a fresh chat on error
+    resetChat();
+  }
 }
 
 // Add a function to clean up the DOM properly
@@ -387,12 +452,20 @@ function sendMessage(inputElement) {
 
   // Create message array with system prompt if available
   const messageArray = [...messageHistory];
-  if (systemPrompt) {
-    messageArray.unshift({ role: "system", content: systemPrompt });
-  }
-
+  
+  // Only send the most recent user message to save bandwidth and processing time
+  // Since the backend maintains the full conversation history by window ID
+  // We only need to send the new message
+  const lastMessage = messageArray[messageArray.length - 1];
+  
   // Send to main process with system prompt information
-  ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, messageArray, systemPrompt);
+  ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, [lastMessage], systemPrompt);
+  
+  // Show typing indicator while waiting for response
+  const typingIndicator = document.getElementById("split-typing-indicator");
+  if (typingIndicator) {
+    typingIndicator.classList.add("visible");
+  }
 }
 
 // Add a user message to the UI
@@ -1015,6 +1088,7 @@ const onChatMessageStreamEnd = async (_, response) => {
       // Add to message history - create response object if not provided
       const messageToAdd = response || { role: "assistant", content: content };
       messageHistory.push(messageToAdd);
+      window.messageHistory = messageHistory; // Update global copy
 
       // Reset stream variables but AFTER we've used them
       const finishedElement = streamingMessageElement;
@@ -1036,6 +1110,7 @@ const onChatMessageStreamEnd = async (_, response) => {
         // Add to message history
         const messageToAdd = response || { role: "assistant", content: content };
         messageHistory.push(messageToAdd);
+        window.messageHistory = messageHistory; // Update global copy
       }
     }
   } catch (error) {
@@ -1045,6 +1120,7 @@ const onChatMessageStreamEnd = async (_, response) => {
     if (streamBuffer) {
       await addAIMessage(streamBuffer);
       messageHistory.push({ role: "assistant", content: streamBuffer });
+      window.messageHistory = messageHistory; // Update global copy
     }
   }
 };
