@@ -43,6 +43,8 @@ function configure(options = {}) {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = allowPrerelease;
   autoUpdater.forceDevUpdateConfig = process.env.NODE_ENV === 'development';
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.disableWebInstaller = false;
   
   // Store the options
   this.forceMajorUpdate = forceMajorUpdate;
@@ -121,6 +123,7 @@ function setupAutoUpdateEvents() {
   // Update is available but not yet downloaded
   autoUpdater.on('update-available', (info) => {
     log.info('Update available:', info);
+    log.info('Update files:', JSON.stringify(info.files || []));
     updateAvailable = true;
     
     const currentVersion = app.getVersion();
@@ -183,6 +186,17 @@ function setupAutoUpdateEvents() {
   autoUpdater.on('error', (error) => {
     log.error('Auto updater error:', error);
     isCheckingForUpdates = false;
+    
+    // Try troubleshooting if it looks like a file name mismatch error
+    if (error.message && (
+      error.message.includes('file not found') || 
+      error.message.includes('no matching') || 
+      error.message.includes('artifact') ||
+      error.message.includes('download')
+    )) {
+      log.info('Error suggests filename mismatch, attempting troubleshooting...');
+      troubleshootUpdateDownload();
+    }
     
     if (mainWindow) {
       mainWindow.webContents.send('update-error', error.message);
@@ -426,11 +440,59 @@ function isNewer(version1, version2) {
   return false; // Versions are equal
 }
 
+/**
+ * Try to fix update issues by resetting the updater and retrying with explicit artifact pattern
+ * This helps when updater is failing due to name mismatches
+ * @returns {Promise<void>}
+ */
+async function troubleshootUpdateDownload() {
+  log.info('Troubleshooting update download issues...');
+  
+  try {
+    // Reset autoUpdater state
+    autoUpdater.removeAllListeners();
+    
+    // Re-setup event listeners
+    setupAutoUpdateEvents();
+    
+    // Try with explicit pattern matching
+    autoUpdater.logger.info('Trying with explicit artifact pattern matching');
+    
+    // Use explicit pattern based on platform
+    if (process.platform === 'darwin') {
+      autoUpdater.addAuthHeader('x-artifact-name: Interview-Coder-${arch}.${ext}');
+    } else if (process.platform === 'win32') {
+      autoUpdater.addAuthHeader('x-artifact-name: Interview-Coder.${ext}');
+    } else if (process.platform === 'linux') {
+      autoUpdater.addAuthHeader('x-artifact-name: Interview-Coder.${ext}');
+    }
+    
+    // Try again
+    await autoUpdater.checkForUpdates();
+    
+  } catch (error) {
+    log.error('Error during update troubleshooting:', error);
+    
+    // Fall back to manual update as last resort
+    tryFallbackUpdateCheck(true);
+  }
+}
+
+/**
+ * Check if an update has been downloaded and is ready to install
+ * @returns {boolean} - Whether an update has been downloaded
+ */
+function getUpdateDownloaded() {
+  return updateDownloaded;
+}
+
 module.exports = {
   init,
   configure,
   checkForUpdates,
   forceCheckAndUpdate,
   tryFallbackUpdateCheck,
-  quitAndInstall
+  quitAndInstall,
+  troubleshootUpdateDownload,
+  getUpdateDownloaded
 }; 

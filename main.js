@@ -601,3 +601,20 @@ app.on("activate", () => {
     }
   }
 });
+
+// Add quit handling for updates
+app.on('before-quit', (event) => {
+  log.info('Application is about to quit');
+
+  // Check if there's a downloaded update waiting to be installed
+  if (updater.getUpdateDownloaded()) {
+    log.info('Update is downloaded and ready to install on quit');
+  }
+});
+
+app.on('will-quit', () => {
+  log.info('Application will quit now');
+  
+  // Unregister all shortcuts when the app is about to quit
+  hotkeyManager.unregisterAllShortcuts();
+});
