@@ -15,7 +15,7 @@
 ![Platform - Windows, macOS, Linux](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 ![Electron Version](https://img.shields.io/badge/electron-v35.1.2-blue)
-![Version](https://img.shields.io/badge/version-v1.5.5-green)
+![Version](https://img.shields.io/badge/version-v1.5.8-green)
 
 </div>
 
@@ -122,6 +122,18 @@ Choose your preferred language for AI responses:
 4. Save settings to apply your language preference
 
 The application will generate all AI responses in your selected language, with solution approaches tailored to your language preference.
+
+## 🔧 Troubleshooting
+
+### macOS Issues
+
+If you encounter issues opening the application on macOS due to security restrictions or "app is damaged" warnings, try running the following command in Terminal:
+
+```bash
+xattr -cr /Applications/Interview\ Coder.app
+```
+
+This removes quarantine attributes that might prevent the app from running properly on macOS.
 
 ## ⌨️ Keyboard Shortcuts
 

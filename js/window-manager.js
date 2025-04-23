@@ -1,58 +1,95 @@
 const { BrowserWindow, screen, app } = require("electron");
 const { IPC_CHANNELS } = require("./constants");
-const { isLinux } = require("./config");
+const { isLinux, isMac } = require("./config");
 const log = require("electron-log");
 const hotkeyManager = require("./hotkey-manager");
+const { ipcMain } = require("electron");
 
 let mainWindow;
 let modelListWindow;
 let isWindowVisible = true;
+// Track if a major update is available
+let hasMajorUpdateDialog = false;
 
 // Create the main application window
 function createMainWindow() {
-  // Get primary display dimensions for centering
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: displayWidth, height: displayHeight } = primaryDisplay.workAreaSize;
+  try {
+    log.info("Creating main window");
 
-  // Window dimensions
-  const windowWidth = 1000;
-  const windowHeight = 800;
+    // Get primary display dimensions for centering
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: displayWidth, height: displayHeight } = primaryDisplay.workAreaSize;
 
-  mainWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    x: Math.floor((displayWidth - windowWidth) / 2),
-    y: Math.floor((displayHeight - windowHeight) / 2),
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-    frame: false,
-    transparent: true,
-    backgroundColor: "#00000000",
-    alwaysOnTop: true,
-    paintWhenInitiallyHidden: true,
-    movable: true,
-    roundedCorners: true,
-    titleBarStyle: "hidden",
-    titleBarOverlay: false,
-    trafficLightPosition: { x: -999, y: -999 },
-    fullscreenable: true,
-    skipTaskbar: true,
-    autoHideMenuBar: true,
-    hasShadow: true,
-    enableLargerThanScreen: false,
-    focusable: true,
-    type: "panel",
-  });
+    // Window dimensions
+    const windowWidth = 1000;
+    const windowHeight = 800;
 
-  mainWindow.loadFile("index.html");
-  mainWindow.setContentProtection(true);
+    mainWindow = new BrowserWindow({
+      width: windowWidth,
+      height: windowHeight,
+      x: Math.floor((displayWidth - windowWidth) / 2),
+      y: Math.floor((displayHeight - windowHeight) / 2),
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+      frame: false,
+      transparent: true,
+      backgroundColor: "#00000000",
+      alwaysOnTop: true,
+      paintWhenInitiallyHidden: true,
+      movable: true,
+      roundedCorners: true,
+      titleBarStyle: "hidden",
+      titleBarOverlay: false,
+      trafficLightPosition: { x: -999, y: -999 },
+      fullscreenable: true,
+      skipTaskbar: true,
+      autoHideMenuBar: true,
+      hasShadow: true,
+      enableLargerThanScreen: false,
+      focusable: true,
+      type: "panel",
+    });
 
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+    mainWindow.loadFile("index.html");
+    mainWindow.setContentProtection(true);
 
-  return mainWindow;
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+
+    // Listen for the update-available event to track major updates
+    ipcMain.on(IPC_CHANNELS.UPDATE_AVAILABLE, (_, data) => {
+      if (data && data.isMajorUpdate) {
+        hasMajorUpdateDialog = true;
+        log.info("Major update detected, preventing window close");
+      }
+    });
+
+    // Handle window close attempt
+    mainWindow.on("close", (event) => {
+      // If there's a major update dialog showing, prevent window close
+      if (hasMajorUpdateDialog) {
+        event.preventDefault();
+        log.info("Prevented window close due to pending major update");
+
+        // Re-show the update dialog
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(IPC_CHANNELS.SHOW_UPDATE_DIALOG, {
+            isMajorUpdate: true,
+            currentVersion: app.getVersion(),
+            latestVersion: "newer version", // This is a fallback in case data is lost
+            downloadUrl: `https://github.com/MinhOmega/interview-coder/releases/latest`,
+          });
+        }
+      }
+    });
+
+    return mainWindow;
+  } catch (error) {
+    log.error("Error creating main window:", error);
+    return null;
+  }
 }
 
 // Create model selection window
@@ -92,7 +129,7 @@ function toggleSplitView(forceState) {
 
   try {
     // If forceState is provided (true or false), use it to set the state explicitly
-    if (typeof forceState === 'boolean') {
+    if (typeof forceState === "boolean") {
       mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, { forceState });
     } else {
       // Otherwise just toggle the current state
