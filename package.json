@@ -1,6 +1,6 @@
 {
   "name": "interview-coders",
-  "version": "1.5.6",
+  "version": "1.5.7",
   "main": "main.js",
   "description": "Interview Coder is an Electron application that captures and analyzes screenshots using AI (OpenAI, Google Gemini, or Ollama). It features global keyboard shortcuts, multi-page mode for complex questions, real-time streaming responses, and supports both cloud and local AI models. The app provides a customizable UI with transparent, always-on-top windows and markdown-rendered responses, making it ideal for processing coding questions, generating code, or providing detailed answers from screenshots.",
   "author": {
@@ -71,7 +71,7 @@
       "publish": [
         "github"
       ],
-      "artifactName": "${productName}-${arch}.${ext}"
+      "artifactName": "Interview-Coder-${arch}.${ext}"
     },
     "dmg": {
       "icon": "build/logo.icns",
@@ -95,7 +95,7 @@
       "title": "Install Interview Coder",
       "sign": false,
       "writeUpdateInfo": true,
-      "artifactName": "${productName}-${arch}.${ext}"
+      "artifactName": "Interview-Coder-${arch}.${ext}"
     },
     "win": {
       "icon": "build/logo.ico",
@@ -103,7 +103,7 @@
         "nsis",
         "portable"
       ],
-      "artifactName": "${productName}.${ext}",
+      "artifactName": "Interview-Coder.${ext}",
       "publish": [
         "github"
       ]
@@ -124,7 +124,7 @@
         "rpm"
       ],
       "category": "Development",
-      "artifactName": "${productName}.${ext}",
+      "artifactName": "Interview-Coder.${ext}",
       "publish": [
         "github"
       ]
