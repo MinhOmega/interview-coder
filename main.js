@@ -218,6 +218,7 @@ app.whenReady().then(async () => {
     TOGGLE_DEVTOOLS: () => windowManager.toggleDevTools(),
     TAKE_SCREENSHOT: async () => {
       try {
+        resetProcess();
         windowManager.updateInstruction("Taking screenshot...");
         const img = await screenshotManager.captureScreenshot(mainWindow);
         screenshotManager.addScreenshot(img);
@@ -237,6 +238,7 @@ app.whenReady().then(async () => {
     },
     AREA_SCREENSHOT: () => {
       try {
+        resetProcess();
         if (isLinux) {
           // Check if ImageMagick's import command is available
           if (!isCommandAvailable("import")) {
