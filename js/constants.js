@@ -44,7 +44,6 @@ const IPC_CHANNELS = {
   GET_SYSTEM_PROMPT: "get-system-prompt",
   SHOW_HOTKEYS_INFO: "show-hotkeys-info",
   CLEAR_CONVERSATION: "clear-conversation",
-  // Auto update channels
   CHECK_FOR_UPDATES: "check-for-updates",
   FORCE_UPDATE: "force-update",
   UPDATE_AVAILABLE: "update-available",
@@ -54,6 +53,7 @@ const IPC_CHANNELS = {
   UPDATE_PROGRESS: "update-progress",
   MAJOR_UPDATE_AVAILABLE: "major-update-available",
   UPDATE_READY: "update-ready",
+  QUIT_AND_INSTALL: "quit-and-install",
 };
 
 module.exports = {

@@ -571,14 +571,46 @@ app.whenReady().then(async () => {
   });
 
   // Add handler for quit and install
-  ipcMain.on('quit-and-install', () => {
+  ipcMain.on(IPC_CHANNELS.QUIT_AND_INSTALL, () => {
     log.info('User requested to quit and install update');
     
     try {
-      updater.quitAndInstall();
+      // Set a flag to ensure update is properly applied
+      app.userQuitForUpdate = true;
+      
+      // Display confirmation message for user
+      if (mainWindow) {
+        mainWindow.webContents.send('notification', {
+          type: 'success',
+          body: 'Applying update, application will restart shortly...'
+        });
+        
+        // Give UI time to show message before proceeding with install
+        setTimeout(() => {
+          log.info('Executing quit and install procedure');
+          
+          // Add error handler for autoUpdater
+          autoUpdater.once('error', (error) => {
+            log.error('Error during update installation:', error);
+            
+            // Force quit as fallback
+            setTimeout(() => app.quit(), 1500);
+          });
+          
+          // Now call the updater module to perform quit and install
+          updater.quitAndInstall();
+        }, 1000);
+      } else {
+        // If no window, just proceed directly
+        updater.quitAndInstall();
+      }
     } catch (error) {
       log.error('Error during quit and install:', error);
-      app.quit(); // Fallback to just quitting
+      
+      // Fallback to just quitting - the app should install update on next restart
+      setTimeout(() => {
+        app.quit();
+      }, 1000);
     }
   });
 });
@@ -607,8 +639,39 @@ app.on('before-quit', (event) => {
   log.info('Application is about to quit');
 
   // Check if there's a downloaded update waiting to be installed
-  if (updater.getUpdateDownloaded()) {
+  if (updater.getUpdateDownloaded() && !app.userQuitForUpdate) {
     log.info('Update is downloaded and ready to install on quit');
+    
+    // For macOS, handle this differently due to the signature issue
+    if (process.platform === 'darwin') {
+      log.info('Handling macOS update installation');
+      
+      // Prevent the default quit
+      event.preventDefault();
+      
+      try {
+        // Attempt to run the updater with silent install
+        log.info('Attempting silent update installation');
+        
+        // Set flag to avoid loops
+        app.userQuitForUpdate = true;
+        
+        // Give a short delay before applying update
+        setTimeout(() => {
+          try {
+            updater.quitAndInstall();
+          } catch (err) {
+            log.error('Failed to apply update on quit:', err);
+            // Fallback to normal quit
+            app.quit();
+          }
+        }, 500);
+      } catch (error) {
+        log.error('Error during before-quit update check:', error);
+        // Continue with normal quit
+        app.quit();
+      }
+    }
   }
 });
 

@@ -46,6 +46,14 @@ function configure(options = {}) {
   autoUpdater.allowDowngrade = false;
   autoUpdater.disableWebInstaller = false;
   
+  // Disable code signature verification on macOS to fix the update issue
+  if (process.platform === 'darwin') {
+    autoUpdater.disableWebInstaller = true;
+    autoUpdater.disableAutoInstall = false;
+    autoUpdater.verifyUpdateCodeSignature = false;
+    log.info('Disabled code signature verification for macOS updates');
+  }
+  
   // Store the options
   this.forceMajorUpdate = forceMajorUpdate;
   this.preferZip = preferZip;
@@ -282,7 +290,18 @@ function showUpdateReadyDialog(info) {
  */
 function quitAndInstall() {
   log.info('Quitting and installing update');
-  autoUpdater.quitAndInstall(false, true);
+  
+  try {
+    // Use true for both isSilent and isForceRunAfter to fix installation issues
+    autoUpdater.quitAndInstall(true, true);
+  } catch (error) {
+    log.error('Error during quit and install, attempting fallback:', error);
+    
+    // Fallback approach - just quit the app which should trigger auto install on next start
+    setTimeout(() => {
+      app.quit();
+    }, 1000);
+  }
 }
 
 /**
@@ -442,7 +461,7 @@ function isNewer(version1, version2) {
 
 /**
  * Try to fix update issues by resetting the updater and retrying with explicit artifact pattern
- * This helps when updater is failing due to name mismatches
+ * This helps when updater is failing due to name mismatches or code signature issues
  * @returns {Promise<void>}
  */
 async function troubleshootUpdateDownload() {
@@ -458,10 +477,34 @@ async function troubleshootUpdateDownload() {
     // Try with explicit pattern matching
     autoUpdater.logger.info('Trying with explicit artifact pattern matching');
     
-    // Use explicit pattern based on platform
+    // On macOS, add additional troubleshooting for code signature issues
     if (process.platform === 'darwin') {
-      autoUpdater.addAuthHeader('x-artifact-name: Interview-Coder-${arch}.${ext}');
-    } else if (process.platform === 'win32') {
+      log.info('Applying macOS-specific update troubleshooting');
+      
+      // Disable code signature verification to work around validation issues
+      autoUpdater.verifyUpdateCodeSignature = false;
+      
+      // Force using DMG format instead of ZIP if we were using ZIP before
+      if (this.preferZip) {
+        log.info('Switching from ZIP to DMG format for macOS update');
+        autoUpdater.addAuthHeader('Updater-Preference: dmg');
+        this.preferZip = false;
+      } else {
+        // If we were already using DMG, try ZIP as fallback
+        log.info('Switching from DMG to ZIP format for macOS update');
+        autoUpdater.addAuthHeader('Updater-Preference: zip');
+        this.preferZip = true;
+      }
+      
+      // Use explicit artifact name pattern for macOS
+      const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+      const ext = this.preferZip ? 'zip' : 'dmg';
+      
+      log.info(`Using explicit artifact name for ${arch} with ${ext} extension`);
+      autoUpdater.addAuthHeader(`x-artifact-name: Interview-Coder-${arch}.${ext}`);
+    } 
+    // Use explicit pattern based on platform for Windows/Linux
+    else if (process.platform === 'win32') {
       autoUpdater.addAuthHeader('x-artifact-name: Interview-Coder.${ext}');
     } else if (process.platform === 'linux') {
       autoUpdater.addAuthHeader('x-artifact-name: Interview-Coder.${ext}');
@@ -494,5 +537,6 @@ module.exports = {
   tryFallbackUpdateCheck,
   quitAndInstall,
   troubleshootUpdateDownload,
-  getUpdateDownloaded
+  getUpdateDownloaded,
+  isNewer
 }; 

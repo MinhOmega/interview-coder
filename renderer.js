@@ -1119,7 +1119,7 @@ const onUpdateDownloaded = (_, info) => {
   document.body.appendChild(updateBar);
 
   document.getElementById("restart-now").addEventListener("click", () => {
-    ipcRenderer.send("quit-and-install");
+    ipcRenderer.send(IPC_CHANNELS.QUIT_AND_INSTALL);
   });
 
   document.getElementById("restart-later").addEventListener("click", () => {
@@ -1143,7 +1143,7 @@ const onUpdateReady = (_, info) => {
   document.body.appendChild(updateBar);
 
   document.getElementById("restart-now").addEventListener("click", () => {
-    ipcRenderer.send("quit-and-install");
+    ipcRenderer.send(IPC_CHANNELS.QUIT_AND_INSTALL);
   });
 
   document.getElementById("restart-later").addEventListener("click", () => {
@@ -1153,8 +1153,41 @@ const onUpdateReady = (_, info) => {
 
 const onUpdateError = (_, error) => {
   console.error("Update error:", error);
+  
+  // Check for code signature verification error
+  const isCodeSignatureError = error && (
+    error.includes("code signature") || 
+    error.includes("signature") ||
+    error.includes("verification") ||
+    error.includes("did not pass validation")
+  );
+
+  if (isCodeSignatureError) {
+    // Create a special error notification for code signature issues
+    const updateBar = document.createElement("div");
+    updateBar.className = "update-notification";
+    updateBar.innerHTML = `
+      <div class="update-notification-content">
+        <span>Update installation issue detected</span>
+        <p>There was an issue with the update signature. You can try again or download manually.</p>
+        <button id="try-again-update" class="primary">Try Again</button>
+        <button id="dismiss-update-error">Dismiss</button>
+      </div>
+    `;
+
+    document.body.appendChild(updateBar);
+
+    document.getElementById("try-again-update").addEventListener("click", () => {
+      ipcRenderer.invoke(IPC_CHANNELS.FORCE_UPDATE);
+      updateBar.remove();
+    });
+
+    document.getElementById("dismiss-update-error").addEventListener("click", () => {
+      updateBar.remove();
+    });
+  } 
   // Only show errors in notification bar if they're important for the user to know
-  if (error.includes("internet") || error.includes("connection") || error.includes("network")) {
+  else if (error.includes("internet") || error.includes("connection") || error.includes("network")) {
     onNotification({
       type: "error",
       message: `Update error: ${error}`,
