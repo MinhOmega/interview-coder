@@ -4,7 +4,11 @@ const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { isMac, isLinux, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
 const hotkeysModal = require("./js/hotkeys-modal");
+const UpdateManager = require("./js/update-manager");
 const log = require("electron-log");
+
+// Initialize update notification handler for renderer
+const updateNotification = UpdateManager.createNotificationHandler();
 
 // Variables for tracking state
 let isWindowVisible = true;
@@ -1045,6 +1049,42 @@ const onChatMessageStreamEnd = async (_, response) => {
   }
 };
 
+// Handler for showing an animated update button in the toolbar
+const onShowUpdateToolbarButton = (_, updateData) => {
+  try {
+    log.info('Showing update toolbar button:', updateData);
+    
+    // Get the existing button element
+    const updateButton = document.getElementById('update-toolbar-button');
+    const updateButtonText = document.getElementById('update-button-text');
+    
+    // Update the button text based on update type
+    const buttonText = updateData.requiresRestart 
+      ? `Update to v${updateData.latestVersion} (Requires Restart)`
+      : `Update to v${updateData.latestVersion}`;
+    
+    updateButtonText.textContent = buttonText;
+    
+    // Add click handler to show update dialog again
+    updateButton.onclick = () => {
+      ipcRenderer.send(IPC_CHANNELS.SHOW_UPDATE_DIALOG, updateData);
+    };
+    
+    // Show the button
+    updateButton.style.display = 'flex';
+    
+    // Show a toast notification with restart information
+    const notificationMessage = updateData.requiresRestart
+      ? `A new version (v${updateData.latestVersion}) is available! The app will need to restart after updating.`
+      : `A new version (v${updateData.latestVersion}) is available! Click the button in the top-right corner to update.`;
+    
+    toastManager.info(notificationMessage);
+    
+  } catch (error) {
+    log.error('Error showing update toolbar button:', error);
+  }
+};
+
 // Set up IPC event listeners
 ipcRenderer.on(IPC_CHANNELS.UPDATE_INSTRUCTION, onUpdateInstruction);
 ipcRenderer.on(IPC_CHANNELS.HIDE_INSTRUCTION, onHideInstruction);
@@ -1065,6 +1105,7 @@ ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, onChatMessageResponse);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START, onChatMessageStreamStart);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, onChatMessageStreamEnd);
+ipcRenderer.on(IPC_CHANNELS.SHOW_UPDATE_TOOLBAR_BUTTON, onShowUpdateToolbarButton);
 
 document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 document.addEventListener("contextmenu", onEventContextMenu);

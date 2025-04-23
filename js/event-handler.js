@@ -1,11 +1,11 @@
-const { ipcMain, app, desktopCapturer, Menu, BrowserWindow, systemPreferences } = require("electron");
+const { ipcMain, app, desktopCapturer, Menu, BrowserWindow, systemPreferences, shell, dialog } = require("electron");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./constants");
 const { isLinux, isWindows, isMac, modifierKey } = require("./config");
 const ChatHandler = require("./chat-handler");
 const fs = require("fs");
 const { getUserDataPath } = require("./utils");
 const toastManager = require("./toast-manager");
-
+const log = require("electron-log");
 let chatHandler;
 
 /**
@@ -52,29 +52,29 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     if (mainWindow) {
       try {
         console.log(`Toggling DevTools on platform: ${process.platform}`);
-        
+
         // Check if DevTools are already open
         const isDevToolsOpen = mainWindow.webContents.isDevToolsOpened();
-        console.log(`DevTools are currently ${isDevToolsOpen ? 'open' : 'closed'}`);
-        
+        console.log(`DevTools are currently ${isDevToolsOpen ? "open" : "closed"}`);
+
         if (isDevToolsOpen) {
           mainWindow.webContents.closeDevTools();
-          console.log('DevTools closed successfully');
+          console.log("DevTools closed successfully");
         } else {
           // Platform-specific DevTools settings
           let options = {};
-          
+
           // For macOS, open devtools in detached mode by default
-          if (process.platform === 'darwin') {
-            options = { mode: 'detach' };
+          if (process.platform === "darwin") {
+            options = { mode: "detach" };
           }
-          
+
           mainWindow.webContents.openDevTools(options);
-          console.log('DevTools opened successfully with options:', options);
+          console.log("DevTools opened successfully with options:", options);
         }
       } catch (error) {
         console.error(`Error toggling DevTools on ${process.platform}:`, error);
-        
+
         // Provide more detailed error info to help debugging
         const errorInfo = {
           message: error.message,
@@ -82,19 +82,19 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
           platform: process.platform,
           electronVersion: process.versions.electron,
           nodeVersion: process.versions.node,
-          chromeVersion: process.versions.chrome
+          chromeVersion: process.versions.chrome,
         };
-        
-        console.error('DevTools error details:', errorInfo);
-        
+
+        console.error("DevTools error details:", errorInfo);
+
         // Try an alternative approach for problematic platforms
         try {
           if (!mainWindow.webContents.isDevToolsOpened()) {
-            console.log('Trying alternative method to open DevTools...');
+            console.log("Trying alternative method to open DevTools...");
             mainWindow.webContents.openDevTools();
           }
         } catch (altError) {
-          console.error('Alternative DevTools method also failed:', altError);
+          console.error("Alternative DevTools method also failed:", altError);
         }
       }
     }
@@ -260,6 +260,58 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     } catch (error) {
       console.error("Error updating system prompt:", error);
       toastManager.error(`Failed to update system prompt: ${error.message}`);
+    }
+  });
+
+  // Handle showing update dialog from renderer process
+  ipcMain.on(IPC_CHANNELS.SHOW_UPDATE_DIALOG, async (event, updateData) => {
+    try {
+      log.info("Showing update dialog:", updateData);
+
+      const isMajorUpdate = updateData.isMajorUpdate;
+      const dialogOptions = {
+        type: "info",
+        title: isMajorUpdate ? "Major Update Required" : "Update Available",
+        message: isMajorUpdate
+          ? `A new major version (v${updateData.latestVersion}) is available.`
+          : `A new version (v${updateData.latestVersion}) is available.`,
+        detail: isMajorUpdate
+          ? "This update is required to continue using the application."
+          : `Current version: v${updateData.currentVersion}`,
+        buttons: isMajorUpdate ? ["Download"] : ["Download", "Later"],
+        defaultId: 0,
+        cancelId: isMajorUpdate ? -1 : 1, // No cancel option for major updates
+      };
+
+      // For major updates, disable the close button
+      if (isMajorUpdate) {
+        dialogOptions.noLink = true;
+      }
+
+      // Show the dialog and get user response
+      const { response } = await dialog.showMessageBox(mainWindow, dialogOptions);
+      if (response === 1) {
+        // Later button
+        // Show an animated button in the toolbar
+        log.info("User chose to update later, showing toolbar button");
+        event.sender.send(IPC_CHANNELS.SHOW_UPDATE_TOOLBAR_BUTTON, updateData);
+      }
+
+      // For major updates, re-show the dialog if user tried to dismiss it
+      if (isMajorUpdate) {
+        // Small timeout to prevent immediate re-display
+        app.exit(0);
+      }
+    } catch (error) {
+      log.error("Error showing update dialog:", error);
+    }
+  });
+
+  // Handle update action from renderer
+  ipcMain.on(IPC_CHANNELS.UPDATE_ACTION, (event, data) => {
+    if (data.action === "download" && data.url) {
+      shell.openExternal(data.url);
+      log.info(`Opening update download URL: ${data.url}`);
     }
   });
 
