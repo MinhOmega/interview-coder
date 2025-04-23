@@ -312,7 +312,7 @@ function setupSectionToggles() {
         collapsedSections[sectionId] = isCollapsed;
         localStorage.setItem("collapsed-sections", JSON.stringify(collapsedSections));
       } catch (err) {
-        console.error("Error saving section state", err);
+        log.error("Error saving section state", err);
       }
     });
   });
@@ -338,29 +338,34 @@ function restoreSectionStates() {
       }
     }
   } catch (err) {
-    console.error("Error restoring section states", err);
+    log.error("Error restoring section states", err);
   }
 }
 
 // Save button handler
 saveBtn.addEventListener("click", async () => {
+  log.info("Save Settings button clicked.");
   const selectedRadio = document.querySelector('input[name="aiProvider"]:checked');
 
   // Check if a provider has been selected
   if (!selectedRadio) {
+    log.warn("Save attempted without selecting an AI provider.");
     messageDiv.textContent = "Please select an AI provider first";
     messageDiv.className = "status error";
     return;
   }
 
   const aiProvider = selectedRadio.value;
+  log.info("Selected AI Provider:", aiProvider);
   let currentModel;
 
   // Check if we need to initialize API clients based on the selected provider
   if (aiProvider === AI_PROVIDERS.OPENAI) {
+    log.info("Processing OpenAI selection.");
     // Ensure we have an API key for OpenAI
     const openaiKey = API_KEYS.openai.key;
     if (!openaiKey) {
+      log.warn("OpenAI selected, but API key is missing.");
       messageDiv.textContent = "Please enter your OpenAI API key first";
       messageDiv.className = "status error";
       return;
@@ -369,8 +374,9 @@ saveBtn.addEventListener("click", async () => {
     // Initialize OpenAI client with the current key
     try {
       await ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, AI_PROVIDERS.OPENAI, openaiKey);
+      log.info("OpenAI client initialized successfully.");
     } catch (err) {
-      console.error("Failed to initialize OpenAI client:", err);
+      log.error("Failed to initialize OpenAI client:", err);
       messageDiv.textContent = "Failed to initialize OpenAI client";
       messageDiv.className = "status error";
       return;
@@ -378,10 +384,13 @@ saveBtn.addEventListener("click", async () => {
 
     const selectedCard = openaiModelCards.querySelector(".model-card.selected");
     currentModel = selectedCard ? selectedCard.getAttribute("data-model") : openaiModelSelect.value;
+    log.info("Selected OpenAI model:", currentModel);
   } else if (aiProvider === AI_PROVIDERS.GEMINI) {
+    log.info("Processing Gemini selection.");
     // Ensure we have an API key for Gemini
     const geminiKey = API_KEYS.gemini.key;
     if (!geminiKey) {
+      log.warn("Gemini selected, but API key is missing.");
       messageDiv.textContent = "Please enter your Gemini API key first";
       messageDiv.className = "status error";
       return;
@@ -390,8 +399,9 @@ saveBtn.addEventListener("click", async () => {
     // Initialize Gemini client with the current key
     try {
       await ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, AI_PROVIDERS.GEMINI, geminiKey);
+      log.info("Gemini client initialized successfully.");
     } catch (err) {
-      console.error("Failed to initialize Gemini client:", err);
+      log.error("Failed to initialize Gemini client:", err);
       messageDiv.textContent = "Failed to initialize Gemini client";
       messageDiv.className = "status error";
       return;
@@ -401,34 +411,51 @@ saveBtn.addEventListener("click", async () => {
     currentModel = selectedCard
       ? selectedCard.getAttribute("data-model")
       : document.getElementById("gemini-model").value;
+    log.info("Selected Gemini model:", currentModel);
   } else {
-    const selectedCard = document.getElementById("ollama-model-cards").querySelector(".model-card.selected");
+    // This block handles Ollama
+    log.info("Processing Ollama selection.");
+    const ollamaModelCardsContainer = document.getElementById("ollama-model-cards");
+    if (!ollamaModelCardsContainer) {
+      log.error("Ollama model cards container not found.");
+      messageDiv.textContent = "Internal error: Could not find Ollama model list.";
+      messageDiv.className = "status error";
+      return;
+    }
+    const selectedCard = ollamaModelCardsContainer.querySelector(".model-card.selected");
+    log.info("Attempting to find selected Ollama model card. Container:", ollamaModelCardsContainer);
+    log.info("Selected Ollama card element:", selectedCard);
     currentModel = selectedCard ? selectedCard.getAttribute("data-model") : "";
+    log.info("Selected Ollama model:", currentModel);
   }
 
-  // Validate selection
+  // Validate selection (specifically important for Ollama)
   if (
     aiProvider === AI_PROVIDERS.OLLAMA &&
     (!currentModel || currentModel === "loading" || currentModel === "Ollama not configured")
   ) {
+    log.warn("Ollama model validation failed. currentModel:", currentModel);
     messageDiv.textContent = "Please select a valid Ollama model";
     messageDiv.className = "status error";
     return;
   }
 
-  // Validate that a model is selected
+  // Validate that a model is selected (general check)
   if (!currentModel) {
+    log.warn("Model selection validation failed. No model selected for provider:", aiProvider);
     messageDiv.textContent = "Please select a model";
     messageDiv.className = "status error";
     return;
   }
 
-  // For Ollama, always ensure we're using IPv4
+  // For Ollama, always ensure we're using IPv4 and test connection
   let ollamaUrl = ollamaUrlInput.value;
   if (aiProvider === AI_PROVIDERS.OLLAMA) {
     ollamaUrl = ollamaUrl.replace("localhost", "127.0.0.1");
+    log.info("Using Ollama URL:", ollamaUrl);
 
     // If using Ollama, test the connection first
+    log.info("Testing Ollama connection...");
     messageDiv.innerHTML = 'Testing Ollama connection... <span class="loading"></span>';
     messageDiv.className = "status";
 
@@ -438,14 +465,17 @@ saveBtn.addEventListener("click", async () => {
         validateStatus: false,
       });
 
+      log.info("Ollama connection test response status:", connectionTest.status);
       if (connectionTest.status !== 200) {
+        log.error(`Ollama connection test failed. Status: ${connectionTest.status}`);
         messageDiv.textContent = `Could not connect to Ollama at ${ollamaUrl}. Check if Ollama is running.`;
         messageDiv.className = "status error";
         return;
       }
-
+      log.info("Ollama connection test successful.");
       // Connection successful, continue with saving
     } catch (error) {
+      log.error("Ollama connection test threw an error:", error);
       messageDiv.textContent = `Connection to Ollama failed: ${error.message}`;
       messageDiv.className = "status error";
       return;
@@ -453,24 +483,28 @@ saveBtn.addEventListener("click", async () => {
   }
 
   // Get selected language
-  const responseLanguage = languageCardsContainer
-    .querySelector(".language-card.selected")
-    .getAttribute("data-language");
+  const selectedLanguageCard = languageCardsContainer.querySelector(".language-card.selected");
+  const responseLanguage = selectedLanguageCard ? selectedLanguageCard.getAttribute("data-language") : "en"; // Default to 'en' if somehow none selected
+  log.info("Selected response language:", responseLanguage);
 
   // Disable the save button to prevent multiple clicks
   saveBtn.disabled = true;
+  log.info("Save button disabled.");
 
   // Create settings object to save
   const settings = {
     aiProvider,
     currentModel,
-    ollamaUrl,
+    ollamaUrl, // Save the potentially modified URL
     responseLanguage,
   };
+  log.info("Settings object prepared:", settings);
 
   try {
     // Update settings through the IPC channel to be persisted in the main process
+    log.info("Sending UPDATE_MODEL_SETTINGS IPC message...");
     ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, settings);
+    log.info("IPC message sent successfully.");
 
     // Show success message
     messageDiv.textContent = "Settings saved!";
@@ -480,21 +514,26 @@ saveBtn.addEventListener("click", async () => {
     try {
       // Check if we were opened by a parent window
       if (window.opener) {
+        log.info("Notifying parent window of settings update.");
         window.opener.postMessage({ type: "model-settings-updated", settings }, "*");
+      } else {
+        log.warn("No parent window (opener) found to notify.");
       }
     } catch (e) {
-      console.error("Error notifying parent window:", e);
+      log.error("Error notifying parent window:", e);
     }
 
     // Close window after a brief delay
+    log.info("Closing window shortly...");
     setTimeout(() => {
       window.close();
     }, 800);
   } catch (error) {
-    console.error("Error saving settings:", error);
+    log.error("Error saving settings via IPC:", error);
     messageDiv.textContent = "Could not save settings: " + error.message;
     messageDiv.className = "status error";
-    saveBtn.disabled = false;
+    saveBtn.disabled = false; // Re-enable button on error
+    log.info("Save button re-enabled after error.");
   }
 });
 
@@ -697,6 +736,27 @@ function initialize() {
 
   // Set up section toggles
   setupSectionToggles();
+
+  // --- Add event listener for dynamically added Ollama cards ---
+  const ollamaModelCardsContainer = document.getElementById("ollama-model-cards");
+  if (ollamaModelCardsContainer) {
+    ollamaModelCardsContainer.addEventListener("click", (event) => {
+      // Find the closest ancestor that is a model-card
+      const clickedCard = event.target.closest(".model-card");
+
+      if (clickedCard) {
+        // Deselect all cards within the Ollama container
+        ollamaModelCardsContainer.querySelectorAll(".model-card").forEach((card) => {
+          card.classList.remove("selected");
+        });
+
+        // Select the clicked card
+        clickedCard.classList.add("selected");
+        log.info(`Ollama model card selected: ${clickedCard.getAttribute("data-model")}`);
+      }
+    });
+  }
+  // --- End of added listener ---
 
   // Listen for visibility updates from main process
   ipcRenderer.on(IPC_CHANNELS.UPDATE_VISIBILITY, (event, isVisible) => {
