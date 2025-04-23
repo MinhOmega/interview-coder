@@ -1,11 +1,13 @@
-version: 1.5.6
-files:
-  - url: Interview-Coder-x64.dmg
-    sha512: cNaA5rbAgjnZcfOnNOtR2lnkQcgnPex5o5wG4S9jeuhnSMjEc6moJjm+uNy+AhYcMmNxainM+IVvxDIz7KYLCw==
-    size: 103133538
-  - url: Interview-Coder-arm64.dmg
-    sha512: 1CHOsOOkrqjcQlun3/XyG9UJqK/nocofUnKaEeYry+LvMtiW8ZkgmA53cyEgIVSMZuOl1V5siRKvyQdXyxnUhg==
-    size: 99883839
-path: Interview-Coder-x64.dmg
-sha512: cNaA5rbAgjnZcfOnNOtR2lnkQcgnPex5o5wG4S9jeuhnSMjEc6moJjm+uNy+AhYcMmNxainM+IVvxDIz7KYLCw==
-releaseDate: '2025-04-22T08:36:29.181Z'
+{
+  "version": "1.5.7",
+  "files": [
+    {
+      "url": "Interview Coder-1.5.7-mac.zip",
+      "sha512": "mock-sha512-hash-mac",
+      "size": 12345678
+    }
+  ],
+  "path": "Interview Coder-1.5.7-mac.zip",
+  "sha512": "mock-sha512-hash-mac",
+  "releaseDate": "2025-04-23T03:32:16.806Z"
+}

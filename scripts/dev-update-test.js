@@ -37,6 +37,18 @@ console.log(`Next version for testing: ${nextVersion}`);
 // Serve static files from the update server directory
 app.use('/updates', express.static(updateServerDir));
 
+// Add an explicit route for update files
+app.get('/updates/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(updateServerDir, filename);
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send('File not found');
+  }
+});
+
 // Create mock latest.yml for the specific platform
 function createMockUpdateFiles() {
   // Determine platform
@@ -54,17 +66,20 @@ function createMockUpdateFiles() {
   const mockFiles = [];
   
   if (isMac) {
+    // Create a filename without spaces for better URL handling
+    const macFileName = `Interview Coder-${nextVersion}-mac.zip`;
+    
     // Mock macOS update files
     const latestMacYml = {
       version: nextVersion,
       files: [
         {
-          url: `Interview Coder-${nextVersion}-mac.zip`,
+          url: macFileName,
           sha512: 'mock-sha512-hash-mac',
           size: 12345678,
         }
       ],
-      path: `Interview Coder-${nextVersion}-mac.zip`,
+      path: macFileName,
       sha512: 'mock-sha512-hash-mac',
       releaseDate: new Date().toISOString()
     };
@@ -74,9 +89,15 @@ function createMockUpdateFiles() {
       JSON.stringify(latestMacYml, null, 2)
     );
     
-    // Create empty zip file for mock
+    // Create empty zip file for mock in both locations to ensure it's found
     fs.writeFileSync(
-      path.join(versionDir, `Interview Coder-${nextVersion}-mac.zip`),
+      path.join(updateServerDir, macFileName),
+      'Mock update file'
+    );
+    
+    // Also create the file in the version subdirectory for compatibility
+    fs.writeFileSync(
+      path.join(versionDir, macFileName),
       'Mock update file'
     );
     
@@ -84,17 +105,20 @@ function createMockUpdateFiles() {
   }
   
   if (isWindows) {
+    // Create a filename without spaces for better URL handling
+    const winFileName = `InterviewCoder-Setup-${nextVersion}.exe`;
+    
     // Mock Windows update files
     const latestWinYml = {
       version: nextVersion,
       files: [
         {
-          url: `Interview Coder Setup ${nextVersion}.exe`,
+          url: winFileName,
           sha512: 'mock-sha512-hash-win',
           size: 12345678,
         }
       ],
-      path: `Interview Coder Setup ${nextVersion}.exe`,
+      path: winFileName,
       sha512: 'mock-sha512-hash-win',
       releaseDate: new Date().toISOString()
     };
@@ -106,7 +130,7 @@ function createMockUpdateFiles() {
     
     // Create empty exe file for mock
     fs.writeFileSync(
-      path.join(versionDir, `Interview Coder Setup ${nextVersion}.exe`),
+      path.join(updateServerDir, winFileName),
       'Mock update file'
     );
     
@@ -114,17 +138,20 @@ function createMockUpdateFiles() {
   }
   
   if (isLinux) {
+    // Create a filename without spaces for better URL handling
+    const linuxFileName = `interview-coder-${nextVersion}.AppImage`;
+    
     // Mock Linux update files
     const latestLinuxYml = {
       version: nextVersion,
       files: [
         {
-          url: `interview-coder-${nextVersion}.AppImage`,
+          url: linuxFileName,
           sha512: 'mock-sha512-hash-linux',
           size: 12345678,
         }
       ],
-      path: `interview-coder-${nextVersion}.AppImage`,
+      path: linuxFileName,
       sha512: 'mock-sha512-hash-linux',
       releaseDate: new Date().toISOString()
     };
@@ -136,7 +163,7 @@ function createMockUpdateFiles() {
     
     // Create empty AppImage file for mock
     fs.writeFileSync(
-      path.join(versionDir, `interview-coder-${nextVersion}.AppImage`),
+      path.join(updateServerDir, linuxFileName),
       'Mock update file'
     );
     
@@ -214,4 +241,4 @@ console.log('Reset dev-app-update.yml to use GitHub provider');
 
 // Run everything
 startServer();
-createResetScript(); 
+createResetScript();

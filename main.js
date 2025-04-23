@@ -151,7 +151,8 @@ app.whenReady().then(async () => {
     allowPrerelease: false,    // Set to true to allow prerelease versions
     autoCheck: true,           // Auto-check for updates periodically
     checkInterval: 60,         // Check for updates every 60 minutes
-    forceMajorUpdate: true     // Add option to force update on major version changes
+    forceMajorUpdate: true,    // Add option to force update on major version changes
+    preferZip: process.platform === 'darwin'  // Prefer ZIP format for macOS updates
   });
 
   // Initialize AI clients from saved config

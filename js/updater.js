@@ -16,6 +16,7 @@ let isCheckingForUpdates = false;
 let updateAvailable = false;
 let updateDownloaded = false;
 let forceMajorUpdate = false;
+let preferZip = false;
 
 /**
  * Configure the auto-updater with options
@@ -25,6 +26,7 @@ let forceMajorUpdate = false;
  * @param {boolean} options.autoCheck - Whether to periodically check for updates
  * @param {number} options.checkInterval - Interval in minutes for checking updates
  * @param {boolean} options.forceMajorUpdate - Whether to force update on major version changes
+ * @param {boolean} options.preferZip - Whether to prefer zip format for updates on macOS
  */
 function configure(options = {}) {
   const {
@@ -32,7 +34,8 @@ function configure(options = {}) {
     forceUpdate = false,
     autoCheck = true,
     checkInterval = 60,
-    forceMajorUpdate = true
+    forceMajorUpdate = true,
+    preferZip = false
   } = options;
 
   // Configure autoUpdater settings
@@ -41,8 +44,20 @@ function configure(options = {}) {
   autoUpdater.allowPrerelease = allowPrerelease;
   autoUpdater.forceDevUpdateConfig = process.env.NODE_ENV === 'development';
   
-  // Store the forceMajorUpdate option
+  // Store the options
   this.forceMajorUpdate = forceMajorUpdate;
+  this.preferZip = preferZip;
+
+  // Configure ZIP format for macOS if preferred
+  if (preferZip && process.platform === 'darwin') {
+    log.info('Configuring updater to prefer ZIP format');
+    try {
+      // Set provider options for using zip files
+      autoUpdater.addAuthHeader('Updater-Preference: zip');
+    } catch (error) {
+      log.error('Error configuring ZIP format for updates:', error);
+    }
+  }
 
   // If in development mode, point to the dev-app-update.yml file
   if (process.env.NODE_ENV === 'development') {
@@ -75,8 +90,18 @@ function configure(options = {}) {
 function init(window, options = {}) {
   mainWindow = window;
   
-  // Configure updater
-  configure(options);
+  // Set default options
+  const defaultOptions = {
+    forceUpdate: false,
+    allowPrerelease: false,
+    autoCheck: true,
+    checkInterval: 60,
+    forceMajorUpdate: true,
+    preferZip: process.platform === 'darwin' // Default to true for macOS
+  };
+  
+  // Configure updater with merged options
+  configure({ ...defaultOptions, ...options });
   
   // Register event handlers
   setupAutoUpdateEvents();
@@ -263,10 +288,36 @@ async function checkForUpdates() {
     await autoUpdater.checkForUpdates();
   } catch (error) {
     log.error('Error checking for updates with electron-updater:', error);
-    isCheckingForUpdates = false;
     
-    // Try fallback method to check for updates
-    tryFallbackUpdateCheck();
+    // If using zip and it fails, try dmg format
+    if (this.preferZip && process.platform === 'darwin') {
+      log.info('Trying fallback to DMG format...');
+      try {
+        // Temporarily disable zip preference
+        const originalPref = this.preferZip;
+        this.preferZip = false;
+        
+        // Reset auth header
+        autoUpdater.addAuthHeader('Updater-Preference: dmg');
+        
+        // Try check again
+        await autoUpdater.checkForUpdates();
+        
+        // Restore original preference
+        this.preferZip = originalPref;
+      } catch (fallbackError) {
+        log.error('Fallback to DMG format failed:', fallbackError);
+        isCheckingForUpdates = false;
+        
+        // Try fallback method to check for updates
+        tryFallbackUpdateCheck();
+      }
+    } else {
+      isCheckingForUpdates = false;
+      
+      // Try fallback method to check for updates
+      tryFallbackUpdateCheck();
+    }
   }
 }
 
