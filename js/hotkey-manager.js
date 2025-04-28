@@ -113,6 +113,11 @@ const SHORTCUTS = {
     handler: null,
     description: "Move screenshot context to chat mode",
   },
+  TOGGLE_AUDIO_TRANSCRIPTION: {
+    key: `${modifierKey}+S`,
+    handler: null,
+    description: "Toggle audio transcription to text",
+  },
 };
 
 // Wrap original handlers to log hotkey press

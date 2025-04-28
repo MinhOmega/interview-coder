@@ -38,6 +38,12 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
   - Local Ollama compatibility
   - Real-time streaming responses
 
+- 🎙️ **Real-time Audio Transcription**
+  - Capture and transcribe system audio in real-time
+  - Perfect for interviews, meetings, and presentations
+  - Powered by Google Gemini AI
+  - Toggled with a simple keyboard shortcut
+
 - 📎 **File Attachments**
   - Support for images, documents, and code files
   - Send files directly to AI for analysis
@@ -158,6 +164,7 @@ This removes quarantine attributes that might prevent the app from running prope
 | `⌘ + P`            | Toggle system prompt                              |
 | `⌘ + Q`            | Quit application                                  |
 | `⌘ + M`            | Process current screenshot into chat mode         |
+| `⌘ + S`            | Toggle audio transcription                        |
 | `⌘ + Shift + ↑↓←→` | Move window                                       |
 | `Shift + ↑↓`       | Scroll up/down (working in split view)            |
 | `⌘ + Shift + =`    | Increase window size                              |
@@ -180,6 +187,7 @@ This removes quarantine attributes that might prevent the app from running prope
 | `Ctrl + P`            | Toggle system prompt                              |
 | `Ctrl + Q`            | Quit application                                  |
 | `Ctrl + M`            | Process current screenshot into chat mode         |
+| `Ctrl + S`            | Toggle audio transcription                        |
 | `Ctrl + Shift + ↑↓←→` | Move window                                       |
 | `Shift + ↑↓`          | Scroll up/down (working in split view)            |
 | `Ctrl + Shift + =`    | Increase window size                              |
@@ -199,7 +207,18 @@ You can attach various file types to your conversations:
 4. Type your message or send directly to let the AI analyze the file
 5. For images, you can click on them to view in full size
 
-When sending a file without text, the app will automatically generate an appropriate prompt based on the file type.
+## 🎙️ Audio Transcription
+
+Interview Coder can transcribe audio in real-time, making it perfect for interviews, meetings, and presentations:
+
+1. Make sure you have a Google Gemini API key configured
+2. Press `⌘ + S` (Mac) or `Ctrl + S` (Windows/Linux) to start audio transcription
+3. When prompted, allow access to your microphone and system audio
+4. A transcription window will appear showing the captured text in real-time
+5. Press the same shortcut again to stop transcription
+6. The transcription window will remain open until manually closed
+
+**Note:** For system audio transcription, you may need to select a display or window to share when prompted. This allows the app to capture both microphone and system audio simultaneously.
 
 ## 🤖 Supported AI Models
 

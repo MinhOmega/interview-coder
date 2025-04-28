@@ -607,8 +607,18 @@ async function generateWithGemini(messages, model, streaming = false) {
   }
 }
 
+/**
+ * Gets the Gemini AI instance
+ * 
+ * @returns {Object|null} The Gemini AI instance or null if not initialized
+ */
+function getGeminiAI() {
+  return geminiAI;
+}
+
 // Export functions
 module.exports = {
+  initializeFromConfig,
   updateAIClients,
   setOllamaBaseURL,
   getOllamaModels,
@@ -616,6 +626,5 @@ module.exports = {
   generateWithOllama,
   generateWithGemini,
   getOpenAI: () => openai,
-  getGeminiAI: () => geminiAI,
-  initializeFromConfig,
+  getGeminiAI,
 };

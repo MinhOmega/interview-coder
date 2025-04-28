@@ -53,6 +53,15 @@ const IPC_CHANNELS = {
   FILE_ATTACHMENT_UPLOAD: "file-attachment-upload",
   FILE_ATTACHMENT_PROCESS: "file-attachment-process",
   FILE_ATTACHMENT_ERROR: "file-attachment-error",
+  // Audio transcription channels
+  START_AUDIO_TRANSCRIPTION: "start-audio-transcription",
+  STOP_AUDIO_TRANSCRIPTION: "stop-audio-transcription",
+  AUDIO_DATA: "audio-data",
+  TRANSCRIPTION_STARTED: "transcription-started",
+  TRANSCRIPTION_STOPPED: "transcription-stopped",
+  TRANSCRIPTION_RESULT: "transcription-result",
+  TRANSCRIPTION_ERROR: "transcription-error",
+  TOGGLE_AUDIO_TRANSCRIPTION: "toggle-audio-transcription",
 };
 
 module.exports = {

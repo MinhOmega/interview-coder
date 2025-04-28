@@ -18,6 +18,7 @@ const toastManager = require("./js/toast-manager");
 const macOSPermissions = isMac ? require("./js/macos-permissions") : null;
 const ChatHandler = require("./js/chat-handler");
 const UpdateManager = require("./js/update-manager");
+const audioTranscription = require("./js/audio-transcription");
 
 // Set up hot reload for development
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -158,6 +159,9 @@ app.whenReady().then(async () => {
   // Initialize ChatHandler
   chatHandler = new ChatHandler(aiProviders, configManager);
 
+  // Initialize audio transcription
+  audioTranscription.initialize(aiProviders);
+
   // Initialize update manager
   updateManager = new UpdateManager(mainWindow);
   updateManager.startUpdateChecking();
@@ -227,6 +231,7 @@ app.whenReady().then(async () => {
     INCREASE_WINDOW_SIZE: () => windowManager.resizeWindow("increase"),
     DECREASE_WINDOW_SIZE: () => windowManager.resizeWindow("decrease"),
     TOGGLE_DEVTOOLS: () => windowManager.toggleDevTools(),
+    TOGGLE_AUDIO_TRANSCRIPTION: () => toggleAudioTranscription(),
     TAKE_SCREENSHOT: async () => {
       try {
         resetProcess();
@@ -570,3 +575,18 @@ app.on("before-quit", () => {
   // Stop update checking when app is about to quit
   updateManager.stopUpdateChecking();
 });
+
+// Function to toggle audio transcription
+function toggleAudioTranscription() {
+  const mainWindow = windowManager.getMainWindow();
+  if (!mainWindow) return;
+
+  // Check if transcription is already active
+  if (audioTranscription.isTranscriptionActive()) {
+    // Stop transcription
+    audioTranscription.stopTranscription();
+  } else {
+    // Start transcription
+    mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_AUDIO_TRANSCRIPTION);
+  }
+}

@@ -29,6 +29,16 @@ let isChatMode = false;
 let streamingMessageElement = null;
 let splitViewRatio = 0.4;
 
+// Variables for audio transcription
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecordingAudio = false;
+let transcriptionContainer = null;
+let transcriptionText = "";
+let audioContext = null;
+let audioAnalyser = null;
+let isMicAccessGranted = false;
+
 // Add a utility function for logging errors
 function logError(message, extraData = {}) {
   log.error(`[ERROR] ${message}`, extraData);
@@ -1609,6 +1619,403 @@ function sendMessageWithAttachment(inputElement) {
   }
 }
 
+// Event handler for toggling audio transcription
+const onToggleAudioTranscription = async () => {
+  try {
+    if (isRecordingAudio) {
+      stopAudioRecording();
+    } else {
+      await startAudioRecording();
+    }
+  } catch (error) {
+    logError("Error toggling audio transcription:", error);
+    // Don't show error toasts as per requirements
+  }
+};
+
+// Handler for transcription started event
+const onTranscriptionStarted = () => {
+  // Create or show transcription container
+  createTranscriptionContainer();
+  
+  // Ensure transcription container is visible
+  if (transcriptionContainer) {
+    transcriptionContainer.style.display = "block";
+  }
+};
+
+// Handler for transcription stopped event
+const onTranscriptionStopped = () => {
+  if (transcriptionContainer) {
+    // Update status indicator
+    const statusIndicator = transcriptionContainer.querySelector(".transcription-status");
+    if (statusIndicator) {
+      statusIndicator.classList.remove("recording");
+      statusIndicator.textContent = "Transcription stopped";
+    }
+  }
+};
+
+// Handler for transcription result event
+const onTranscriptionResult = (_, result) => {
+  if (!transcriptionContainer) {
+    createTranscriptionContainer();
+  }
+  
+  const transcriptionContent = transcriptionContainer.querySelector(".transcription-content");
+  if (!transcriptionContent) return;
+  
+  // Update the transcription text
+  transcriptionText += result + " ";
+  transcriptionContent.textContent = transcriptionText;
+  
+  // Auto-scroll to the bottom
+  transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+  
+  // Update status to show transcription is active without distracting indicators
+  const statusIndicator = transcriptionContainer.querySelector(".transcription-status");
+  if (statusIndicator) {
+    statusIndicator.textContent = "Transcription active";
+  }
+};
+
+// Handler for transcription error event
+const onTranscriptionError = (_, error) => {
+  // Just log the error to console without showing toasts
+  console.log("Transcription error:", error);
+  stopAudioRecording();
+};
+
+// Function to start audio recording
+async function startAudioRecording() {
+  if (isRecordingAudio) return;
+  
+  try {
+    // Create or show the transcription container first so users see feedback immediately
+    createTranscriptionContainer();
+    
+    let micStream;
+    
+    // Only request microphone access if we haven't already
+    if (!isMicAccessGranted) {
+      // Request microphone audio stream
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000, // 16kHz sample rate works well for speech recognition
+        }
+      });
+      
+      isMicAccessGranted = true;
+    } else {
+      // Re-request microphone to ensure we have a fresh stream
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000,
+        }
+      });
+    }
+    
+    // Use webm format which is most widely supported
+    const mimeType = 'audio/webm';
+    
+    // Create audio context for audio processing and visualization
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    }
+    
+    // Create media recorder with appropriate settings
+    // Use lower bitrate for faster transmission and processing
+    mediaRecorder = new MediaRecorder(micStream, {
+      mimeType: mimeType,
+      audioBitsPerSecond: 16000
+    });
+    
+    // Clear audio chunks
+    audioChunks = [];
+    
+    // Set up audio activity detection
+    const audioSource = audioContext.createMediaStreamSource(micStream);
+    audioAnalyser = audioContext.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    audioSource.connect(audioAnalyser);
+    
+    // Monitor audio to ensure we're capturing something (but don't show notifications)
+    const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+    
+    // Handle recorded data
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+        
+        // Read the audio data and send it to the main process immediately
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // Get the buffer from the FileReader
+          const audioBuffer = new Uint8Array(reader.result);
+          
+          // Send the audio data to the main process
+          ipcRenderer.send(IPC_CHANNELS.AUDIO_DATA, {
+            buffer: audioBuffer,
+            mimeType: mimeType,
+            timestamp: Date.now()
+          });
+        };
+        
+        // Start reading the audio data
+        reader.readAsArrayBuffer(event.data);
+      }
+    };
+    
+    // Update UI when recording starts
+    mediaRecorder.onstart = () => {
+      // Update status in container
+      if (transcriptionContainer) {
+        const statusIndicator = transcriptionContainer.querySelector(".transcription-status");
+        if (statusIndicator) {
+          statusIndicator.classList.add("recording");
+          statusIndicator.textContent = "Recording";
+        }
+      }
+    };
+    
+    // Start recording with smaller chunks for more real-time transcription
+    mediaRecorder.start(1000);  // 1-second chunks for more real-time feeling
+    isRecordingAudio = true;
+    
+    // Notify main process to start transcription
+    ipcRenderer.send(IPC_CHANNELS.START_AUDIO_TRANSCRIPTION, mimeType);
+    
+    return true;
+  } catch (error) {
+    logError("Error starting audio recording:", error);
+    
+    // Update UI to show the error
+    if (transcriptionContainer) {
+      const statusIndicator = transcriptionContainer.querySelector(".transcription-status");
+      if (statusIndicator) {
+        statusIndicator.textContent = "Microphone access denied";
+        statusIndicator.style.color = "#f55";
+      }
+    }
+    
+    return false;
+  }
+}
+
+// Function to stop audio recording
+function stopAudioRecording() {
+  if (!isRecordingAudio || !mediaRecorder) return;
+  
+  try {
+    mediaRecorder.stop();
+    
+    // Stop all tracks in the stream
+    if (mediaRecorder.stream) {
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+    
+    // Reset state
+    mediaRecorder = null;
+    audioChunks = [];
+    isRecordingAudio = false;
+    
+    // Notify main process to stop transcription
+    ipcRenderer.send(IPC_CHANNELS.STOP_AUDIO_TRANSCRIPTION);
+    
+    // Update UI
+    if (transcriptionContainer) {
+      const statusIndicator = transcriptionContainer.querySelector(".transcription-status");
+      if (statusIndicator) {
+        statusIndicator.classList.remove("recording");
+        statusIndicator.textContent = "Transcription stopped";
+      }
+    }
+    
+  } catch (error) {
+    logError("Error stopping audio recording:", error);
+  }
+}
+
+// Function to create transcription container
+function createTranscriptionContainer() {
+  // If container already exists, just show it
+  if (transcriptionContainer) {
+    transcriptionContainer.style.display = "block";
+    
+    // Update status indicator
+    const statusIndicator = transcriptionContainer.querySelector(".transcription-status");
+    if (statusIndicator) {
+      if (isRecordingAudio) {
+        statusIndicator.classList.add("recording");
+        statusIndicator.textContent = "Recording";
+      } else {
+        statusIndicator.classList.remove("recording");
+        statusIndicator.textContent = "Waiting for transcription...";
+      }
+    }
+    
+    return;
+  }
+  
+  // Create container
+  transcriptionContainer = document.createElement("div");
+  transcriptionContainer.className = "transcription-container";
+  
+  // Create header
+  const header = document.createElement("div");
+  header.className = "transcription-header";
+  
+  // Create title
+  const title = document.createElement("div");
+  title.className = "transcription-title";
+  title.textContent = "Audio Transcription";
+  
+  // Create status indicator
+  const statusIndicator = document.createElement("div");
+  statusIndicator.className = "transcription-status";
+  if (isRecordingAudio) {
+    statusIndicator.classList.add("recording");
+    statusIndicator.textContent = "Recording";
+  } else {
+    statusIndicator.textContent = "Waiting for transcription...";
+  }
+  
+  // Create controls
+  const controls = document.createElement("div");
+  controls.className = "transcription-controls";
+  
+  // Create close button
+  const closeButton = document.createElement("button");
+  closeButton.className = "transcription-close";
+  closeButton.textContent = "×";
+  closeButton.title = "Close transcription";
+  closeButton.addEventListener("click", () => {
+    // Stop recording if still active
+    if (isRecordingAudio) {
+      stopAudioRecording();
+    }
+    
+    // Hide container
+    transcriptionContainer.style.display = "none";
+    
+    // Clear transcription text
+    transcriptionText = "";
+  });
+  
+  // Create content area
+  const content = document.createElement("div");
+  content.className = "transcription-content";
+  content.textContent = transcriptionText;
+  
+  // Assemble components
+  header.appendChild(title);
+  header.appendChild(statusIndicator);
+  controls.appendChild(closeButton);
+  header.appendChild(controls);
+  
+  transcriptionContainer.appendChild(header);
+  transcriptionContainer.appendChild(content);
+  
+  // Add to body
+  document.body.appendChild(transcriptionContainer);
+  
+  // Add styles
+  const style = document.createElement("style");
+  style.textContent = `
+    .transcription-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 400px;
+      height: 300px;
+      background-color: rgba(30, 30, 30, 0.95);
+      border-radius: 8px;
+      border: 1px solid #444;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      z-index: 9999;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    .transcription-header {
+      display: flex;
+      padding: 10px;
+      background-color: rgba(50, 50, 50, 0.8);
+      border-bottom: 1px solid #444;
+      align-items: center;
+    }
+    
+    .transcription-title {
+      flex: 1;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    .transcription-status {
+      margin: 0 10px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    
+    .transcription-status.recording {
+      color: #f55;
+      position: relative;
+      padding-left: 15px;
+    }
+    
+    .transcription-status.recording:before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 8px;
+      background-color: #f55;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    
+    .transcription-controls {
+      display: flex;
+    }
+    
+    .transcription-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 5px;
+    }
+    
+    .transcription-content {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      word-wrap: break-word;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+  `;
+  
+  document.head.appendChild(style);
+}
+
 document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 document.addEventListener("contextmenu", onEventContextMenu);
 document.addEventListener("keydown", onEventKeyDown);
@@ -1619,3 +2026,15 @@ document.querySelectorAll(".shortcut").forEach((el) => {
 });
 
 updateModelBadge();
+
+// Set up event listeners for the renderer process
+document.addEventListener("DOMContentLoaded", () => {
+  // ... existing code ...
+  
+  // Set up audio transcription event listeners
+  ipcRenderer.on(IPC_CHANNELS.TOGGLE_AUDIO_TRANSCRIPTION, onToggleAudioTranscription);
+  ipcRenderer.on(IPC_CHANNELS.TRANSCRIPTION_STARTED, onTranscriptionStarted);
+  ipcRenderer.on(IPC_CHANNELS.TRANSCRIPTION_STOPPED, onTranscriptionStopped);
+  ipcRenderer.on(IPC_CHANNELS.TRANSCRIPTION_RESULT, onTranscriptionResult);
+  ipcRenderer.on(IPC_CHANNELS.TRANSCRIPTION_ERROR, onTranscriptionError);
+});
