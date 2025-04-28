@@ -6,6 +6,7 @@ const toastManager = require("./js/toast-manager");
 const hotkeysModal = require("./js/hotkeys-modal");
 const UpdateManager = require("./js/update-manager");
 const log = require("electron-log");
+const path = require("path");
 
 // Initialize update notification handler for renderer
 const updateNotification = UpdateManager.createNotificationHandler();
@@ -19,13 +20,14 @@ let isSystemPromptVisible = false;
 
 // Message history for the chat
 let messageHistory = [];
-// Make messageHistory available to window for streaming module
+let currentAttachment = null; // Track current attachment
 window.messageHistory = messageHistory;
 
 let isSplitView = false;
 let isChatMode = false;
 
 let streamingMessageElement = null;
+let splitViewRatio = 0.4;
 
 // Add a utility function for logging errors
 function logError(message, extraData = {}) {
@@ -321,9 +323,6 @@ function toggleSplitView(event) {
     standardView.style.display = "block";
     splitView.style.display = "none";
   }
-
-  // Notify about toggle
-  toastManager.success("Split view " + (isSplitView ? "enabled" : "disabled"));
 }
 
 // Load conversation from main process
@@ -508,6 +507,9 @@ async function addMessage(text, sender) {
 
     // Setup code copy buttons if needed
     setupCodeCopyButtons(messageDiv);
+
+    // Refresh image listeners for any images in the message
+    refreshMessageImageListeners();
   } catch (error) {
     log.error("Error processing markdown:", error);
     // Fallback to basic formatting if markdown processing fails
@@ -547,6 +549,9 @@ async function addAIMessage(text) {
 
     // Setup code copy buttons if needed
     setupCodeCopyButtons(messageDiv);
+
+    // Refresh image listeners for any images in the AI response
+    refreshMessageImageListeners();
   } catch (error) {
     log.error("Error processing markdown:", error);
     messageDiv.textContent = text;
@@ -928,10 +933,18 @@ const onEventDOMContentLoaded = async () => {
   const splitSendBtn = document.getElementById("split-send-btn");
   const splitChatInput = document.getElementById("split-chat-input");
   const toggleSystemPromptBtn = document.getElementById("toggle-system-prompt-btn");
+  const attachmentBtn = document.getElementById("attachment-btn");
 
   // Send message for split view chat interface
   if (splitSendBtn && splitChatInput) {
-    splitSendBtn.addEventListener("click", () => sendMessage(splitChatInput));
+    splitSendBtn.addEventListener("click", () => {
+      // If there's an attachment, use the attachment-specific sending function
+      if (currentAttachment) {
+        sendMessageWithAttachment(splitChatInput);
+      } else {
+        sendMessage(splitChatInput);
+      }
+    });
 
     // Auto-resize textarea as user types
     splitChatInput.addEventListener("input", () => {
@@ -943,13 +956,29 @@ const onEventDOMContentLoaded = async () => {
     splitChatInput.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        sendMessage(splitChatInput);
+        if (currentAttachment) {
+          sendMessageWithAttachment(splitChatInput);
+        } else {
+          sendMessage(splitChatInput);
+        }
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        sendMessage(splitChatInput);
+        if (currentAttachment) {
+          sendMessageWithAttachment(splitChatInput);
+        } else {
+          sendMessage(splitChatInput);
+        }
       }
     });
   }
+
+  // Add event listener for attachment button
+  if (attachmentBtn) {
+    attachmentBtn.addEventListener("click", uploadAttachment);
+  }
+
+  // Add event listeners for image preview in messages
+  setupMessageImagePreviewListeners();
 
   // System prompt button functionality
   const updateSystemPromptBtn = document.getElementById("update-system-prompt");
@@ -979,6 +1008,27 @@ const onEventDOMContentLoaded = async () => {
   // Initialize the hotkeys modal
   hotkeysModal.initHotkeysModal();
 };
+
+// Function to set up click listeners for images in messages
+function setupMessageImagePreviewListeners() {
+  // Set up listeners for existing images
+  const messageImages = document.querySelectorAll(".message-image-attachment");
+  messageImages.forEach((img) => {
+    if (!img.getAttribute("data-has-listener")) {
+      img.addEventListener("click", () => {
+        showImagePreviewModal(img.src, img.alt || "Image");
+      });
+      img.setAttribute("data-has-listener", "true");
+    }
+  });
+}
+
+// Add this function to be called after adding new messages
+function refreshMessageImageListeners() {
+  setTimeout(() => {
+    setupMessageImagePreviewListeners();
+  }, 100);
+}
 
 // Handle the start of a chat message stream
 const onChatMessageStreamStart = () => {
@@ -1079,6 +1129,9 @@ const onChatMessageStreamEnd = async (_, response) => {
         const html = await processMarkdown(content);
         streamingMessageElement.innerHTML = html;
         setupCodeCopyButtons(streamingMessageElement);
+
+        // Refresh image listeners for any images in the response
+        refreshMessageImageListeners();
       } catch (error) {
         log.error("Error processing final markdown:", error);
         streamingMessageElement.textContent = content;
@@ -1173,6 +1226,388 @@ ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START, onChatMessageStreamStart)
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk);
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, onChatMessageStreamEnd);
 ipcRenderer.on(IPC_CHANNELS.SHOW_UPDATE_TOOLBAR_BUTTON, onShowUpdateToolbarButton);
+
+// Handle transferring content from screenshot analysis to chat
+ipcRenderer.on(IPC_CHANNELS.TRANSFER_CONTENT_TO_CHAT, () => {
+  try {
+    // Get the content from result
+    const resultContent = document.getElementById("result-content");
+    if (!resultContent) return;
+
+    // Extract the text content
+    const analysisText = resultContent.innerText || resultContent.textContent;
+
+    if (!analysisText || analysisText.trim() === "") {
+      toastManager.warning("No content to transfer to chat");
+      return;
+    }
+
+    // Make sure split view is active
+    if (!isSplitView) {
+      // This will be activated by the main process, but we set the flag here as well
+      isSplitView = true;
+    }
+
+    // Prepare a chat message with the analysis
+    const systemMsg = "The following is the analysis of a screenshot. Please help me understand or improve this:";
+    const message = `Screenshot Analysis:\n\n${analysisText}`;
+
+    // Add message to conversation in split view
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (!messagesContainer) return;
+
+    // Add user message with the content
+    const userMessage = document.createElement("div");
+    userMessage.classList.add("message", "user-message");
+    userMessage.textContent = message;
+    messagesContainer.appendChild(userMessage);
+
+    // Add to message history
+    messageHistory.push({
+      role: "system",
+      content: systemMsg,
+    });
+
+    messageHistory.push({
+      role: "user",
+      content: message,
+    });
+
+    // Send message to AI for response
+    ipcRenderer.send(IPC_CHANNELS.SEND_CHAT_MESSAGE, messageHistory);
+
+    // Scroll to bottom of chat
+    scrollToBottom(messagesContainer);
+
+    // Focus the chat input
+    setTimeout(() => {
+      const chatInput = document.getElementById("split-chat-input");
+      if (chatInput) {
+        chatInput.focus();
+      }
+    }, 300);
+
+    toastManager.success("Transferred screenshot analysis to chat");
+  } catch (error) {
+    log.error("Error transferring content to chat:", error);
+    toastManager.error("Failed to transfer content: " + error.message);
+  }
+});
+
+// Function to handle attachment uploads
+function uploadAttachment() {
+  try {
+    // Use Electron's remote dialog to select a file
+    ipcRenderer
+      .invoke("SHOW_OPEN_DIALOG", {
+        properties: ["openFile"],
+        filters: [
+          { name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] },
+          { name: "Documents", extensions: ["pdf", "txt", "md", "csv", "json"] },
+          { name: "Code Files", extensions: ["js", "py", "html", "css", "xml"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      })
+      .then((result) => {
+        if (!result.canceled && result.filePaths.length > 0) {
+          const filePath = result.filePaths[0];
+
+          // Show upload indicator
+          toastManager.info(`Uploading file: ${path.basename(filePath)}...`);
+
+          // Process the attachment
+          processAttachment(filePath);
+        }
+      })
+      .catch((err) => {
+        log.error("Error selecting file:", err);
+        toastManager.error("Failed to select file: " + (err.message || "Unknown error"));
+      });
+  } catch (error) {
+    log.error("Error uploading attachment:", error);
+    toastManager.error("Failed to upload attachment: " + (error.message || "Unknown error"));
+  }
+}
+
+// Process the selected attachment
+async function processAttachment(filePath) {
+  try {
+    // Process the attachment on the main process
+    const result = await ipcRenderer.invoke(IPC_CHANNELS.FILE_ATTACHMENT_UPLOAD, filePath);
+
+    if (result.success) {
+      // Store the attachment info
+      currentAttachment = result.attachmentInfo;
+
+      // Update UI to show attachment
+      showAttachmentPreview(currentAttachment);
+
+      toastManager.success(`File attached: ${currentAttachment.fileName}`);
+    } else {
+      toastManager.error(`Failed to attach file: ${result.error}`);
+    }
+  } catch (error) {
+    log.error("Error processing attachment:", error);
+    toastManager.error("Failed to process attachment: " + (error.message || "Unknown error"));
+    currentAttachment = null;
+  }
+}
+
+// Show attachment preview in the UI
+function showAttachmentPreview(attachmentInfo) {
+  try {
+    const previewContainer = document.getElementById("attachment-preview");
+    if (!previewContainer) return;
+
+    // Clear any existing preview
+    previewContainer.innerHTML = "";
+    previewContainer.style.display = "flex";
+
+    // Create attachment preview
+    const preview = document.createElement("div");
+    preview.className = "attachment-preview-item";
+
+    // Add file icon or thumbnail based on type
+    if (attachmentInfo.isImage) {
+      const img = document.createElement("img");
+      img.src = attachmentInfo.base64Data;
+      img.className = "attachment-thumbnail";
+      img.alt = attachmentInfo.fileName;
+      img.addEventListener("click", () => {
+        // Create a modal to show the full image
+        showImagePreviewModal(attachmentInfo.base64Data, attachmentInfo.fileName);
+      });
+      preview.appendChild(img);
+    } else {
+      const icon = document.createElement("div");
+      icon.className = "attachment-file-icon";
+      // Use first 3 letters of file extension for better readability
+      const fileExt = attachmentInfo.fileType.substring(1).toUpperCase();
+      icon.textContent = fileExt.length > 3 ? fileExt.substring(0, 3) : fileExt;
+      preview.appendChild(icon);
+    }
+
+    // Add file info
+    const info = document.createElement("div");
+    info.className = "attachment-info";
+
+    const fileName = document.createElement("div");
+    fileName.className = "attachment-filename";
+    fileName.textContent = attachmentInfo.fileName;
+
+    const fileSize = document.createElement("div");
+    fileSize.className = "attachment-filesize";
+    fileSize.textContent = formatFileSize(attachmentInfo.fileSize);
+
+    info.appendChild(fileName);
+    info.appendChild(fileSize);
+    preview.appendChild(info);
+
+    // Add remove button
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "attachment-remove-btn";
+    removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>`;
+    removeBtn.title = "Remove attachment";
+    removeBtn.onclick = () => {
+      previewContainer.style.display = "none";
+      currentAttachment = null;
+      previewContainer.innerHTML = "";
+
+      // Focus back on the input field
+      const chatInput = document.getElementById("split-chat-input");
+      if (chatInput) chatInput.focus();
+
+      toastManager.info("Attachment removed");
+    };
+    preview.appendChild(removeBtn);
+
+    // Add the preview to the container
+    previewContainer.appendChild(preview);
+
+    // Focus on the chat input after adding attachment
+    setTimeout(() => {
+      const chatInput = document.getElementById("split-chat-input");
+      if (chatInput) chatInput.focus();
+    }, 100);
+  } catch (error) {
+    log.error("Error showing attachment preview:", error);
+    toastManager.error("Failed to show attachment preview");
+  }
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + " bytes";
+  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  else return (bytes / 1048576).toFixed(1) + " MB";
+}
+
+// Function to show full image preview in a modal
+function showImagePreviewModal(imageData, fileName) {
+  try {
+    // Create modal container
+    const modal = document.createElement("div");
+    modal.className = "image-preview-modal";
+
+    // Create modal content
+    const modalContent = document.createElement("div");
+    modalContent.className = "image-preview-modal-content";
+
+    // Add image
+    const img = document.createElement("img");
+    img.src = imageData;
+    img.alt = fileName;
+    modalContent.appendChild(img);
+
+    // Add file name
+    const fileNameElement = document.createElement("div");
+    fileNameElement.className = "image-preview-filename";
+    fileNameElement.textContent = fileName;
+    modalContent.appendChild(fileNameElement);
+
+    // Add close button
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "image-preview-close-btn";
+    closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>`;
+
+    // Add event listener to close modal
+    closeBtn.onclick = () => {
+      document.body.removeChild(modal);
+    };
+    modalContent.appendChild(closeBtn);
+
+    // Add click outside to close
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    };
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+  } catch (error) {
+    log.error("Error showing image preview modal:", error);
+    toastManager.error("Failed to show image preview");
+  }
+}
+
+// Send a message with the current attachment
+function sendMessageWithAttachment(inputElement) {
+  try {
+    if (!currentAttachment) {
+      // Just send a regular message if no attachment
+      sendMessage(inputElement);
+      return;
+    }
+
+    const content = inputElement.value.trim();
+
+    // Create a more descriptive message for the AI
+    let enhancedContent = content;
+    if (!enhancedContent) {
+      // If user didn't provide any text, add a default prompt based on file type
+      if (currentAttachment.isImage) {
+        enhancedContent = "Please analyze this image and describe what you see.";
+      } else {
+        const fileExt = currentAttachment.fileType.substring(1).toLowerCase();
+        if (["js", "ts", "py", "java", "c", "cpp", "cs", "go", "rb", "php"].includes(fileExt)) {
+          enhancedContent = "Please analyze this code file and explain what it does.";
+        } else if (["txt", "md", "doc", "docx", "pdf"].includes(fileExt)) {
+          enhancedContent = "Please analyze the content of this document.";
+        } else if (["csv", "json", "xml"].includes(fileExt)) {
+          enhancedContent = "Please analyze the data in this file.";
+        } else {
+          enhancedContent = "Please analyze this file.";
+        }
+      }
+    }
+
+    // Create a message with the attachment
+    const message = {
+      role: "user",
+      content: enhancedContent,
+      attachmentId: currentAttachment.id,
+    };
+
+    // Add to message history
+    messageHistory.push(message);
+
+    // Clear input
+    inputElement.value = "";
+    inputElement.style.height = "auto";
+
+    // Reset attachment UI
+    const previewContainer = document.getElementById("attachment-preview");
+    if (previewContainer) {
+      previewContainer.style.display = "none";
+      previewContainer.innerHTML = "";
+    }
+
+    // Add message to the UI
+    const messagesContainer = document.getElementById("split-messages-container");
+    if (messagesContainer) {
+      const messageElement = document.createElement("div");
+      messageElement.classList.add("message", "user-message");
+
+      // Create message content with attachment info
+      const textContent = document.createElement("div");
+      textContent.className = "message-text";
+      textContent.textContent = enhancedContent;
+      messageElement.appendChild(textContent);
+
+      // Add attachment indicator
+      const attachmentIndicator = document.createElement("div");
+      attachmentIndicator.className = "message-attachment-indicator";
+
+      // Different indicator based on file type
+      if (currentAttachment.isImage) {
+        // For images, display a thumbnail
+        const imgElement = document.createElement("img");
+        imgElement.src = currentAttachment.base64Data;
+        imgElement.className = "message-image-attachment";
+        imgElement.alt = currentAttachment.fileName;
+        attachmentIndicator.appendChild(imgElement);
+      } else {
+        // For other files, just show file info
+        attachmentIndicator.innerHTML = `
+          <div class="attachment-file-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+              <polyline points="13 2 13 9 20 9"></polyline>
+            </svg>
+            <span>${currentAttachment.fileName}</span>
+          </div>
+        `;
+      }
+
+      messageElement.appendChild(attachmentIndicator);
+      messagesContainer.appendChild(messageElement);
+      scrollToBottom(messagesContainer);
+
+      // Show typing indicator
+      const typingIndicator = document.getElementById("split-typing-indicator");
+      if (typingIndicator) {
+        typingIndicator.classList.add("visible");
+      }
+
+      // Send the message with attachment to the main process
+      const attachmentId = currentAttachment.id;
+      ipcRenderer.send(IPC_CHANNELS.FILE_ATTACHMENT_PROCESS, messageHistory, attachmentId, enhancedContent);
+
+      // Reset current attachment
+      currentAttachment = null;
+    }
+  } catch (error) {
+    log.error("Error sending message with attachment:", error);
+    toastManager.error("Failed to send attachment: " + (error.message || "Unknown error"));
+  }
+}
 
 document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 document.addEventListener("contextmenu", onEventContextMenu);

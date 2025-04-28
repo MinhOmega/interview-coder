@@ -49,6 +49,10 @@ const IPC_CHANNELS = {
   UPDATE_ACTION: "update-action",
   SHOW_UPDATE_DIALOG: "show-update-dialog",
   SHOW_UPDATE_TOOLBAR_BUTTON: "show-update-toolbar-button",
+  TRANSFER_CONTENT_TO_CHAT: "transfer-content-to-chat",
+  FILE_ATTACHMENT_UPLOAD: "file-attachment-upload",
+  FILE_ATTACHMENT_PROCESS: "file-attachment-process",
+  FILE_ATTACHMENT_ERROR: "file-attachment-error",
 };
 
 module.exports = {

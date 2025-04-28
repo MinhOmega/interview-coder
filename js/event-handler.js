@@ -195,7 +195,7 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
           // Signal streaming completion to the renderer
           event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, {
             role: "assistant",
-            content: typeof fullText === 'string' ? fullText : chunk.content || '',
+            content: typeof fullText === "string" ? fullText : chunk.content || "",
           });
         } else if (type === "error") {
           // Signal error to the renderer
@@ -212,17 +212,23 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
       const existingConversation = chatHandler.getConversation(windowId);
       if (existingConversation && existingConversation.length > 0) {
         console.log(`Found existing conversation for window ${windowId} with ${existingConversation.length} messages`);
-        
+
         // Only add the new user message from the current messages array
         const lastUserMessage = messages[messages.length - 1];
-        
+
         // Combine existing conversation with new message
         const combinedMessages = [...existingConversation, lastUserMessage];
         console.log(`Combined ${combinedMessages.length} messages for processing`);
-        
+
         // Process the message with system prompt if provided, with streaming enabled
-        const response = await chatHandler.processMessage(combinedMessages, windowId, systemPrompt, useStreaming, streamCallback);
-        
+        const response = await chatHandler.processMessage(
+          combinedMessages,
+          windowId,
+          systemPrompt,
+          useStreaming,
+          streamCallback,
+        );
+
         // For non-streaming responses send them directly
         if (!useStreaming) {
           event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
@@ -230,10 +236,16 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
       } else {
         // No existing conversation, just use the messages as provided
         console.log(`No existing conversation for window ${windowId}, using ${messages.length} messages`);
-        
+
         // Process the message with system prompt if provided, with streaming enabled
-        const response = await chatHandler.processMessage(messages, windowId, systemPrompt, useStreaming, streamCallback);
-        
+        const response = await chatHandler.processMessage(
+          messages,
+          windowId,
+          systemPrompt,
+          useStreaming,
+          streamCallback,
+        );
+
         // For non-streaming responses send them directly
         if (!useStreaming) {
           event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, response);
@@ -352,11 +364,116 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
           return conversation;
         }
       }
-      
+
       return []; // Return empty array if no conversation found
     } catch (error) {
       log.error("Error retrieving conversation:", error);
       return [];
+    }
+  });
+
+  // Handle clearing conversation for a window
+  ipcMain.on(IPC_CHANNELS.CLEAR_CONVERSATION, (event) => {
+    try {
+      // Get the window ID from the sender
+      const windowId = event.sender.id;
+
+      // Clear the conversation for this window
+      if (chatHandler) {
+        chatHandler.clearConversation(windowId);
+        log.info(`Cleared conversation for window ${windowId}`);
+      }
+    } catch (error) {
+      log.error("Error clearing conversation:", error);
+    }
+  });
+
+  // Handle file attachment uploads
+  ipcMain.handle(IPC_CHANNELS.FILE_ATTACHMENT_UPLOAD, async (event, filePath) => {
+    try {
+      // Get the window ID from the sender
+      const windowId = event.sender.id;
+
+      // Make sure chatHandler is initialized
+      if (!chatHandler) {
+        log.info("Creating new chat handler instance for file attachment");
+        chatHandler = new ChatHandler(aiProviders, configManager);
+      }
+
+      // Process the attachment
+      const attachmentInfo = await chatHandler.processAttachment(filePath, windowId);
+      log.info(`Processed file attachment: ${attachmentInfo.fileName} (${attachmentInfo.id})`);
+
+      return {
+        success: true,
+        attachmentInfo,
+      };
+    } catch (error) {
+      log.error("Error processing file attachment:", error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  // Handle processing a message with file attachment
+  ipcMain.on(IPC_CHANNELS.FILE_ATTACHMENT_PROCESS, async (event, messages, attachmentId, prompt) => {
+    try {
+      // Get the window ID from the sender
+      const windowId = event.sender.id;
+
+      // Make sure chatHandler is initialized
+      if (!chatHandler) {
+        log.info("Creating new chat handler instance for attachment processing");
+        chatHandler = new ChatHandler(aiProviders, configManager);
+      }
+
+      // Get the attachment from the cache
+      const attachment = chatHandler.getAttachment(attachmentId);
+      if (!attachment) {
+        throw new Error("Attachment not found or expired");
+      }
+
+      // Enable streaming for both Gemini and Ollama
+      const provider = configManager.getAiProvider();
+      const useStreaming = provider === AI_PROVIDERS.GEMINI || provider === AI_PROVIDERS.OLLAMA;
+
+      // Set up streaming callback, identical to the chat message handler
+      const streamCallback = (type, chunk, fullText) => {
+        if (type === "start") {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_START);
+        } else if (type === "chunk") {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, chunk, fullText);
+        } else if (type === "complete") {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, {
+            role: "assistant",
+            content: typeof fullText === "string" ? fullText : chunk.content || "",
+          });
+        } else if (type === "error") {
+          event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
+            role: "assistant",
+            content: `Error: ${
+              chunk.message || "Failed to process your message with attachment"
+            }. Please check your settings or try again later.`,
+          });
+        }
+      };
+
+      // Process the message with the attachment
+      await chatHandler.processMessageWithAttachment(messages, attachment, windowId, useStreaming, streamCallback);
+
+      // For non-streaming responses we would send directly, but we're using streaming
+    } catch (error) {
+      log.error("Error processing message with attachment:", error);
+
+      // Send error response
+      event.sender.send(IPC_CHANNELS.CHAT_MESSAGE_RESPONSE, {
+        role: "assistant",
+        content: `Error: ${
+          error.message || "Failed to process your attachment"
+        }. Please check if the file format is supported.`,
+      });
     }
   });
 

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, Menu, MenuItem, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage, Menu, MenuItem, shell, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
@@ -116,6 +116,17 @@ async function processScreenshotsWithAI() {
     );
   }
 }
+
+// Handle opening file dialog for attachments
+ipcMain.handle("SHOW_OPEN_DIALOG", async (event, options) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!senderWindow) {
+    return { canceled: true };
+  }
+
+  const result = await dialog.showOpenDialog(senderWindow, options);
+  return result;
+});
 
 app.whenReady().then(async () => {
   // For macOS, ensure screen capture permissions are requested at startup
@@ -320,6 +331,23 @@ app.whenReady().then(async () => {
     QUIT: () => app.quit(),
     TOGGLE_SPLIT_VIEW: () => windowManager.toggleSplitView(),
     SHOW_HOTKEYS: () => windowManager.showHotkeys(),
+    MOVE_CONTEXT_TO_CHAT: () => {
+      try {
+        const mainWindow = windowManager.getMainWindow();
+        if (!mainWindow) return;
+
+        // First, get the current analysis result from the result section
+        mainWindow.webContents.send(IPC_CHANNELS.TRANSFER_CONTENT_TO_CHAT);
+
+        // Toggle split view to show chat interface
+        windowManager.toggleSplitView(true);
+
+        log.info("Transferred context from screenshot to chat mode");
+      } catch (error) {
+        log.error(`${hotkeyManager.getModifierKey()}+M error:`, error);
+        toastManager.error(`Error transferring context to chat: ${error.message}`);
+      }
+    },
     CREATE_NEW_CHAT: () => {
       // First toggle split view off if it's on
       const mainWindow = windowManager.getMainWindow();

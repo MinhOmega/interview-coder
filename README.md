@@ -15,7 +15,7 @@
 ![Platform - Windows, macOS, Linux](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 ![Electron Version](https://img.shields.io/badge/electron-v35.1.2-blue)
-![Version](https://img.shields.io/badge/version-v1.5.11-green)
+![Version](https://img.shields.io/badge/version-v1.5.12-green)
 
 </div>
 
@@ -37,6 +37,12 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
   - Google Gemini support
   - Local Ollama compatibility
   - Real-time streaming responses
+
+- 📎 **File Attachments**
+  - Support for images, documents, and code files
+  - Send files directly to AI for analysis
+  - Preview and view attached images
+  - Intelligent context-based prompts based on file type
 
 - 🌐 **Multilingual Support**
   - Responses in 8 different languages
@@ -140,6 +146,7 @@ This removes quarantine attributes that might prevent the app from running prope
 ### macOS
 | Shortcut           | Action                                            |
 | ------------------ | ------------------------------------------------- |
+| `⌘ + ,`            | Open settings                                     |
 | `⌘ + B`            | Toggle window visibility                          |
 | `⌘ + H`            | Capture window screenshot                         |
 | `⌘ + D`            | Capture selected area                             |
@@ -148,8 +155,9 @@ This removes quarantine attributes that might prevent the app from running prope
 | `⌘ + R`            | Reset current process or reset chat in split view |
 | `⌘ + N`            | Create new chat                                   |
 | `⌘ + T`            | Toggle split view                                 |
-| `⌘ + ,`            | Open settings                                     |
+| `⌘ + P`            | Toggle system prompt                              |
 | `⌘ + Q`            | Quit application                                  |
+| `⌘ + M`            | Process current screenshot into chat mode         |
 | `⌘ + Shift + ↑↓←→` | Move window                                       |
 | `Shift + ↑↓`       | Scroll up/down (working in split view)            |
 | `⌘ + Shift + =`    | Increase window size                              |
@@ -160,6 +168,7 @@ This removes quarantine attributes that might prevent the app from running prope
 ### Windows/Linux
 | Shortcut              | Action                                            |
 | --------------------- | ------------------------------------------------- |
+| `Ctrl + ,`            | Open settings                                     |
 | `Ctrl + B`            | Toggle window visibility                          |
 | `Ctrl + H`            | Capture window screenshot                         |
 | `Ctrl + D`            | Capture selected area                             |
@@ -168,8 +177,9 @@ This removes quarantine attributes that might prevent the app from running prope
 | `Ctrl + R`            | Reset current process or reset chat in split view |
 | `Ctrl + N`            | Create new chat                                   |
 | `Ctrl + T`            | Toggle split view                                 |
-| `Ctrl + ,`            | Open settings                                     |
+| `Ctrl + P`            | Toggle system prompt                              |
 | `Ctrl + Q`            | Quit application                                  |
+| `Ctrl + M`            | Process current screenshot into chat mode         |
 | `Ctrl + Shift + ↑↓←→` | Move window                                       |
 | `Shift + ↑↓`          | Scroll up/down (working in split view)            |
 | `Ctrl + Shift + =`    | Increase window size                              |
@@ -178,6 +188,18 @@ This removes quarantine attributes that might prevent the app from running prope
 | `Ctrl + /`            | Show hotkeys                                      |
 
 > **Note for Linux users:** Alternative key bindings may be used automatically if the primary shortcuts cannot be registered.
+
+## 📎 Using File Attachments
+
+You can attach various file types to your conversations:
+
+1. Click the paperclip icon in the chat input area
+2. Select a file from your computer (supports images, documents, code files)
+3. The file will be previewed before sending
+4. Type your message or send directly to let the AI analyze the file
+5. For images, you can click on them to view in full size
+
+When sending a file without text, the app will automatically generate an appropriate prompt based on the file type.
 
 ## 🤖 Supported AI Models
 
@@ -222,6 +244,7 @@ npm run dev:windows
 
 - Reset Chat: You can reset the current chat to its initial state by pressing `⌘+R` (Mac) or `Ctrl+R` (Windows/Linux) while in split view.
 - New Chat: You can create a new chat session by pressing `⌘+N` (Mac) or `Ctrl+N` (Windows/Linux).
+- File Attachments: You can attach files to your messages by clicking the attachment button in the chat input area.
 
 <div align="center">
 <br/>

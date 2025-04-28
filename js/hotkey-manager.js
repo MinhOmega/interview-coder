@@ -108,6 +108,11 @@ const SHORTCUTS = {
     handler: null,
     description: "Show this hotkey information",
   },
+  MOVE_CONTEXT_TO_CHAT: {
+    key: `${modifierKey}+M`,
+    handler: null,
+    description: "Move screenshot context to chat mode",
+  },
 };
 
 // Wrap original handlers to log hotkey press
