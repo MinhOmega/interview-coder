@@ -2,6 +2,7 @@ const AI_PROVIDERS = {
   OPENAI: "openai",
   GEMINI: "gemini",
   OLLAMA: "ollama",
+  AZURE_FOUNDRY: "azure-foundry",
   DEFAULT: "AI",
 };
 
@@ -33,6 +34,7 @@ const IPC_CHANNELS = {
   QUIT_APP: "quit-app",
   SAVE_API_KEY: "save-api-key",
   GET_API_KEY: "get-api-key",
+  GET_ALL_API_KEYS: "get-all-api-keys",
   INITIALIZE_AI_CLIENT: "initialize-ai-client",
   SEND_CHAT_MESSAGE: "send-chat-message",
   CHAT_MESSAGE_RESPONSE: "chat-message-response",
@@ -49,6 +51,8 @@ const IPC_CHANNELS = {
   UPDATE_ACTION: "update-action",
   SHOW_UPDATE_DIALOG: "show-update-dialog",
   SHOW_UPDATE_TOOLBAR_BUTTON: "show-update-toolbar-button",
+  UI_IMPLEMENTATION_MODE: "ui-implementation-mode",
+  PROCESS_UI_SCREENSHOT: "process-ui-screenshot",
 };
 
 module.exports = {

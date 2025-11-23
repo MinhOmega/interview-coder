@@ -1,6 +1,6 @@
 {
   "name": "interview-coders",
-  "version": "1.5.11",
+  "version": "1.8.0",
   "main": "main.js",
   "description": "Interview Coder is an Electron application that captures and analyzes screenshots using AI (OpenAI, Google Gemini, or Ollama). It features global keyboard shortcuts, multi-page mode for complex questions, real-time streaming responses, and supports both cloud and local AI models. The app provides a customizable UI with transparent, always-on-top windows and markdown-rendered responses, making it ideal for processing coding questions, generating code, or providing detailed answers from screenshots.",
   "author": {
@@ -163,6 +163,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/foundry-sdk": "^0.2.0",
     "@google/generative-ai": "^0.24.0",
     "@mdx-js/mdx": "^3.1.0",
     "axios": "^1.8.4",

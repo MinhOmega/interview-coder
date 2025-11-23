@@ -45,14 +45,22 @@ function selectModelCard(provider, modelId) {
 
   switch (provider) {
     case AI_PROVIDERS.OPENAI:
+    case "openai":
       modelCards = document.getElementById("openai-model-cards");
       selectElement = document.getElementById("openai-model");
       break;
     case AI_PROVIDERS.GEMINI:
+    case "gemini":
       modelCards = document.getElementById("gemini-model-cards");
       selectElement = document.getElementById("gemini-model");
       break;
+    case AI_PROVIDERS.AZURE_FOUNDRY:
+    case "azure-foundry":
+      modelCards = document.getElementById("azure-foundry-model-cards");
+      selectElement = document.getElementById("azure-foundry-model");
+      break;
     case AI_PROVIDERS.OLLAMA:
+    case "ollama":
       modelCards = document.getElementById("ollama-model-cards");
       break;
     default:
@@ -86,12 +94,14 @@ function updateSectionVisibility(provider) {
   const openaiSection = document.getElementById("openai-section");
   const ollamaSection = document.getElementById("ollama-section");
   const geminiSection = document.getElementById("gemini-section");
+  const azureFoundrySection = document.getElementById("azure-foundry-section");
   const radioLabels = document.querySelectorAll(".radio-label");
 
   // Reset all sections
-  openaiSection.style.display = "none";
-  ollamaSection.style.display = "none";
-  geminiSection.style.display = "none";
+  if (openaiSection) openaiSection.style.display = "none";
+  if (ollamaSection) ollamaSection.style.display = "none";
+  if (geminiSection) geminiSection.style.display = "none";
+  if (azureFoundrySection) azureFoundrySection.style.display = "none";
 
   // If provider is not defined or is a default value, keep all sections hidden
   if (!provider || provider === "AI") {
@@ -108,11 +118,13 @@ function updateSectionVisibility(provider) {
   }
 
   // Show the selected provider's section
-  if (provider === "openai") {
+  if (provider === "openai" && openaiSection) {
     openaiSection.style.display = "block";
-  } else if (provider === "gemini") {
+  } else if (provider === "gemini" && geminiSection) {
     geminiSection.style.display = "block";
-  } else if (provider === "ollama") {
+  } else if (provider === "azure-foundry" && azureFoundrySection) {
+    azureFoundrySection.style.display = "block";
+  } else if (provider === "ollama" && ollamaSection) {
     ollamaSection.style.display = "block";
   }
 }

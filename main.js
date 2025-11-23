@@ -11,6 +11,7 @@ const hotkeyManager = require("./js/hotkey-manager");
 const aiProviders = require("./js/ai-providers");
 const aiProcessing = require("./js/ai-processing");
 const eventHandler = require("./js/event-handler");
+const uiModeManager = require("./js/ui-mode-manager");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
 const { getAppPath, isCommandAvailable } = require("./js/utils");
 const { isLinux, isMac, isWindows } = require("./js/config");
@@ -92,18 +93,41 @@ async function processScreenshotsWithAI() {
     return;
   }
 
-  try {
-    windowManager.updateInstruction("Processing screenshots with AI...");
+  if (!mainWindow) {
+    log.error("No main window available");
+    return;
+  }
 
-    await aiProcessing.processScreenshots(
-      mainWindow,
-      configManager.getAiProvider(),
-      configManager.getCurrentModel(),
-      aiProviders.verifyOllamaModel,
-      aiProviders.generateWithOllama,
-      aiProviders.generateWithGemini,
-      true,
-    );
+  const windowId = mainWindow.id;
+  const isUIMode = uiModeManager.getUIMode(windowId);
+
+  try {
+    // Use appropriate processing based on UI mode
+    if (isUIMode) {
+      windowManager.updateInstruction("Analyzing UI design for React/Next.js implementation...");
+
+      await aiProcessing.processScreenshotsForUI(
+        mainWindow,
+        configManager.getAiProvider(),
+        configManager.getCurrentModel(),
+        aiProviders.verifyOllamaModel,
+        aiProviders.generateWithOllama,
+        aiProviders.generateWithGemini,
+        true,
+      );
+    } else {
+      windowManager.updateInstruction("Processing screenshots with AI...");
+
+      await aiProcessing.processScreenshots(
+        mainWindow,
+        configManager.getAiProvider(),
+        configManager.getCurrentModel(),
+        aiProviders.verifyOllamaModel,
+        aiProviders.generateWithOllama,
+        aiProviders.generateWithGemini,
+        true,
+      );
+    }
   } catch (error) {
     log.error("Error processing screenshots:", error);
     toastManager.error("Failed to process screenshots: " + error.message);
@@ -114,6 +138,70 @@ async function processScreenshotsWithAI() {
         hotkeyManager.getModifierKey(),
       ),
     );
+  }
+}
+
+async function processScreenshotsForUI() {
+  const mainWindow = windowManager.getMainWindow();
+
+  if (!mainWindow) {
+    log.error("No main window available");
+    return;
+  }
+
+  const windowId = mainWindow.id;
+
+  // Toggle UI mode
+  const isNowUIMode = uiModeManager.toggleUIMode(windowId);
+
+  // Send UI mode status to renderer
+  uiModeManager.sendUIModeStatus(mainWindow);
+
+  // If we're now in UI mode, process screenshots
+  if (isNowUIMode) {
+    const screenshots = screenshotManager.getScreenshots();
+
+    if (screenshots.length === 0) {
+      toastManager.warning("No screenshots to process. Take a screenshot first for UI implementation.");
+      // Switch back to logic mode if no screenshots
+      uiModeManager.setUIMode(windowId, false);
+      uiModeManager.sendUIModeStatus(mainWindow);
+      return;
+    }
+
+    try {
+      windowManager.updateInstruction("Analyzing UI design for React/Next.js implementation...");
+
+      await aiProcessing.processScreenshotsForUI(
+        mainWindow,
+        configManager.getAiProvider(),
+        configManager.getCurrentModel(),
+        aiProviders.verifyOllamaModel,
+        aiProviders.generateWithOllama,
+        aiProviders.generateWithGemini,
+        true,
+      );
+    } catch (error) {
+      log.error("Error processing UI screenshots:", error);
+      toastManager.error("Failed to process UI screenshots: " + error.message);
+      windowManager.updateInstruction(
+        windowManager.getDefaultInstructions(
+          screenshotManager.getMultiPageMode(),
+          screenshotManager.getScreenshots().length,
+          hotkeyManager.getModifierKey(),
+        ),
+      );
+    }
+  } else {
+    // Switched back to logic mode
+    windowManager.updateInstruction(
+      windowManager.getDefaultInstructions(
+        screenshotManager.getMultiPageMode(),
+        screenshotManager.getScreenshots().length,
+        hotkeyManager.getModifierKey(),
+      ),
+    );
+    toastManager.info("Switched back to Logic/Problem Solving Mode");
   }
 }
 
@@ -152,14 +240,17 @@ app.whenReady().then(async () => {
   updateManager.startUpdateChecking();
 
   // Handle API key initialization from UI
-  ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey) => {
+  ipcMain.handle(IPC_CHANNELS.INITIALIZE_AI_CLIENT, async (_, provider, apiKey, endpoint) => {
     try {
       log.info(`Initializing ${provider} client with provided API key`);
-      const result = aiProviders.updateAIClients(provider, apiKey);
+      const result = aiProviders.updateAIClients(provider, apiKey, endpoint);
 
       if (provider === AI_PROVIDERS.OPENAI && result) {
         // Update the openai reference for use in processScreenshots
         openai = aiProviders.getOpenAI();
+      } else if (provider === AI_PROVIDERS.AZURE_FOUNDRY && result && endpoint) {
+        // Update the Azure Foundry endpoint if provided
+        aiProviders.setAzureFoundryEndpoint(endpoint);
       }
 
       return { success: result };
@@ -170,9 +261,9 @@ app.whenReady().then(async () => {
   });
 
   // Handle saving API key to settings file
-  ipcMain.handle(IPC_CHANNELS.SAVE_API_KEY, async (_, apiKey) => {
+  ipcMain.handle(IPC_CHANNELS.SAVE_API_KEY, async (_, apiKey, provider) => {
     try {
-      return configManager.saveApiKey(apiKey);
+      return configManager.saveApiKey(apiKey, provider);
     } catch (error) {
       log.error("Error saving API key:", error);
       return false;
@@ -186,6 +277,16 @@ app.whenReady().then(async () => {
     } catch (error) {
       log.error("Error getting API key:", error);
       return null;
+    }
+  });
+
+  // Handle getting all API keys from settings file
+  ipcMain.handle(IPC_CHANNELS.GET_ALL_API_KEYS, async (event) => {
+    try {
+      return configManager.getAllApiKeys();
+    } catch (error) {
+      log.error("Error getting all API keys:", error);
+      return {};
     }
   });
 
@@ -206,6 +307,7 @@ app.whenReady().then(async () => {
   hotkeyManager.registerHandlers({
     TOGGLE_VISIBILITY: () => windowManager.toggleWindowVisibility(),
     PROCESS_SCREENSHOTS: () => processScreenshotsWithAI(),
+    PROCESS_UI_IMPLEMENTATION: () => processScreenshotsForUI(),
     OPEN_SETTINGS: () => windowManager.createModelSelectionWindow(),
     MOVE_LEFT: () => windowManager.moveWindow("left"),
     MOVE_RIGHT: () => windowManager.moveWindow("right"),

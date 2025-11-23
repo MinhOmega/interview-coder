@@ -33,6 +33,31 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     // Update settings and get the result
     const updatedSettings = configManager.updateSettings(settings);
 
+    // Reinitialize AI providers after settings update
+    // This is crucial for Azure Foundry to work properly
+    if (settings.aiProvider === AI_PROVIDERS.AZURE_FOUNDRY) {
+      // Get the API key for Azure Foundry
+      const apiKey = configManager.getApiKey("azure-foundry");
+      const endpoint = settings.azureEndpoint || configManager.getAzureEndpoint();
+
+      if (apiKey && endpoint) {
+        // Initialize Azure Foundry client with the settings
+        aiProviders.updateAIClients(AI_PROVIDERS.AZURE_FOUNDRY, apiKey, endpoint);
+        console.log("Azure Foundry client reinitialized with updated settings");
+        console.log("API Key present:", !!apiKey);
+        console.log("Endpoint:", endpoint);
+      } else {
+        console.warn("Azure Foundry selected but missing API key or endpoint");
+        console.log("API Key present:", !!apiKey);
+        console.log("Endpoint:", endpoint);
+        // Try to initialize from config in case the key is stored
+        aiProviders.initializeFromConfig();
+      }
+    } else {
+      // Reinitialize from config for other providers
+      aiProviders.initializeFromConfig();
+    }
+
     // Notify main window only if settings were updated
     if (mainWindow && mainWindow.webContents) {
       mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);

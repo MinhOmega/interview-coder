@@ -22,6 +22,11 @@ const saveBtn = document.getElementById("save-settings");
 const cancelBtn = document.getElementById("cancel");
 const messageDiv = document.getElementById("message");
 
+// Azure Foundry elements
+const azureFoundryModelSelect = document.getElementById("azure-foundry-model");
+const azureFoundryModelCards = document.getElementById("azure-foundry-model-cards");
+const azureFoundryEndpointInput = document.getElementById("azure-foundry-endpoint");
+
 const pullModelModal = document.getElementById("pull-model-modal");
 const closeModalBtn = document.querySelector(".close-modal");
 const pullStatusDiv = document.getElementById("pull-status");
@@ -73,11 +78,18 @@ async function loadCurrentSettings() {
   const baseUrl = currentSettings.ollamaUrl || "http://127.0.0.1:11434";
   ollamaUrlInput.value = baseUrl.replace("localhost", "127.0.0.1");
 
+  // Set Azure Foundry endpoint
+  if (azureFoundryEndpointInput) {
+    azureFoundryEndpointInput.value = currentSettings.azureEndpoint || "";
+  }
+
   // Select the appropriate model in dropdown and card
   if (currentSettings.aiProvider === "openai") {
     utils.selectModelCard("openai", currentSettings.currentModel);
   } else if (currentSettings.aiProvider === "gemini") {
     geminiProvider.loadGeminiModels();
+  } else if (currentSettings.aiProvider === "azure-foundry") {
+    utils.selectModelCard("azure-foundry", currentSettings.currentModel);
   }
 
   // Set language selection based on settings
@@ -107,6 +119,22 @@ async function loadCurrentSettings() {
       // Select this card and update the hidden select
       card.classList.add("selected");
       openaiModelSelect.value = card.getAttribute("data-model");
+    });
+  });
+
+  // Set up Azure Foundry model card click handlers
+  document.querySelectorAll("#azure-foundry-model-cards .model-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      // Deselect all other cards
+      document.querySelectorAll("#azure-foundry-model-cards .model-card").forEach((c) => {
+        c.classList.remove("selected");
+      });
+
+      // Select this card and update the hidden select
+      card.classList.add("selected");
+      if (azureFoundryModelSelect) {
+        azureFoundryModelSelect.value = card.getAttribute("data-model");
+      }
     });
   });
 }
@@ -412,6 +440,34 @@ saveBtn.addEventListener("click", async () => {
       ? selectedCard.getAttribute("data-model")
       : document.getElementById("gemini-model").value;
     log.info("Selected Gemini model:", currentModel);
+  } else if (aiProvider === "azure-foundry") {
+    log.info("Processing Azure Foundry selection.");
+    // Ensure we have an API key for Azure Foundry
+    const azureFoundryKey = API_KEYS["azure-foundry"] ? API_KEYS["azure-foundry"].key : null;
+    if (!azureFoundryKey) {
+      log.warn("Azure Foundry selected, but API key is missing.");
+      messageDiv.textContent = "Please enter your Azure Foundry API key first";
+      messageDiv.className = "status error";
+      return;
+    }
+
+    // Get the endpoint URL
+    const azureEndpoint = azureFoundryEndpointInput ? azureFoundryEndpointInput.value : "";
+
+    // Initialize Azure Foundry client with the current key and endpoint
+    try {
+      await ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, "azure-foundry", azureFoundryKey, azureEndpoint);
+      log.info("Azure Foundry client initialized successfully.");
+    } catch (err) {
+      log.error("Failed to initialize Azure Foundry client:", err);
+      messageDiv.textContent = "Failed to initialize Azure Foundry client";
+      messageDiv.className = "status error";
+      return;
+    }
+
+    const selectedCard = azureFoundryModelCards ? azureFoundryModelCards.querySelector(".model-card.selected") : null;
+    currentModel = selectedCard ? selectedCard.getAttribute("data-model") : (azureFoundryModelSelect ? azureFoundryModelSelect.value : "claude-sonnet-4-5");
+    log.info("Selected Azure Foundry model:", currentModel);
   } else {
     // This block handles Ollama
     log.info("Processing Ollama selection.");
@@ -498,6 +554,11 @@ saveBtn.addEventListener("click", async () => {
     ollamaUrl, // Save the potentially modified URL
     responseLanguage,
   };
+
+  // Add Azure Foundry endpoint if using Azure Foundry
+  if (aiProvider === "azure-foundry" && azureFoundryEndpointInput) {
+    settings.azureEndpoint = azureFoundryEndpointInput.value;
+  }
   log.info("Settings object prepared:", settings);
 
   try {
@@ -672,6 +733,40 @@ function setupApiKeyInputs() {
     });
   }
 
+  // Setup API key input for Azure Foundry
+  const azureFoundryApiKeyInput = document.getElementById(API_KEYS["azure-foundry"].inputId);
+  if (azureFoundryApiKeyInput) {
+    azureFoundryApiKeyInput.addEventListener("input", (e) => {
+      const key = e.target.value.trim();
+      if (key) {
+        // Store the full key - Azure Foundry has its own separate key
+        API_KEYS["azure-foundry"].key = key;
+
+        // Mask the key in the input
+        const maskedKey = apiKeyManager.maskApiKey(key);
+        if (azureFoundryApiKeyInput.value !== maskedKey) {
+          azureFoundryApiKeyInput.value = maskedKey;
+        }
+
+        // Save the key
+        apiKeyManager.saveApiKey("azure-foundry", key);
+
+        // Get the endpoint URL
+        const endpoint = azureFoundryEndpointInput ? azureFoundryEndpointInput.value : "";
+
+        // Initialize Azure Foundry client with the new key and endpoint
+        ipcRenderer.invoke(IPC_CHANNELS.INITIALIZE_AI_CLIENT, "azure-foundry", key, endpoint);
+
+        // Update status
+        if (key.length >= 32) {
+          apiKeyManager.updateApiKeyStatus("azure-foundry", "API key saved", "success");
+        }
+      } else {
+        apiKeyManager.updateApiKeyStatus("azure-foundry", "API key is required", "error");
+      }
+    });
+  }
+
   // Modal API key input handler
   const modalApiKeyInput = document.getElementById("modal-api-key");
   if (modalApiKeyInput) {
@@ -714,6 +809,7 @@ function setupApiKeyInputs() {
   // Setup toggle buttons for all API key inputs
   setupPasswordToggle("toggle-openai-key", "openai-api-key");
   setupPasswordToggle("toggle-gemini-key", "gemini-api-key");
+  setupPasswordToggle("toggle-azure-foundry-key", "azure-foundry-api-key");
   setupPasswordToggle("toggle-modal-key", "modal-api-key");
 }
 

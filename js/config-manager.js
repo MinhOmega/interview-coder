@@ -4,6 +4,7 @@ const { app } = require("electron");
 const { getUserDataPath } = require("./utils");
 
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+let AZURE_FOUNDRY_ENDPOINT = "";
 let aiProvider = AI_PROVIDERS.DEFAULT;
 let currentModel = "";
 let responseLanguage = "en"; // en = English
@@ -42,6 +43,7 @@ function loadSettingsFromFile() {
       if (settings.aiProvider) aiProvider = settings.aiProvider;
       if (settings.currentModel) currentModel = settings.currentModel;
       if (settings.ollamaUrl) OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+      if (settings.azureEndpoint) AZURE_FOUNDRY_ENDPOINT = settings.azureEndpoint;
       if (settings.responseLanguage) responseLanguage = settings.responseLanguage;
 
       return true;
@@ -89,10 +91,11 @@ function saveSettingsToFile(settings) {
 
 /**
  * Saves API key to settings file
- * @param {string} apiKey - The API key to save
+ * @param {string} apiKey - The API key to save (for backward compatibility)
+ * @param {string} provider - Optional provider name for provider-specific keys
  * @returns {boolean} True if API key was saved successfully, false otherwise
  */
-function saveApiKey(apiKey) {
+function saveApiKey(apiKey, provider = null) {
   try {
     if (!app) return false;
 
@@ -108,7 +111,19 @@ function saveApiKey(apiKey) {
       }
     }
 
-    settings.apiKey = apiKey;
+    // Initialize apiKeys object if it doesn't exist
+    if (!settings.apiKeys) {
+      settings.apiKeys = {};
+    }
+
+    // Save provider-specific API key if provider is specified
+    if (provider) {
+      settings.apiKeys[provider] = apiKey;
+    } else {
+      // For backward compatibility, also save as general apiKey
+      settings.apiKey = apiKey;
+    }
+
     fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), "utf8");
     return true;
   } catch (error) {
@@ -119,9 +134,10 @@ function saveApiKey(apiKey) {
 
 /**
  * Gets API key from settings
+ * @param {string} provider - Optional provider name for provider-specific keys
  * @returns {string|null} The API key or null if it doesn't exist
  */
-function getApiKey() {
+function getApiKey(provider = null) {
   try {
     if (!app) return null;
 
@@ -130,6 +146,13 @@ function getApiKey() {
     if (fs.existsSync(settingsFilePath)) {
       const settingsData = fs.readFileSync(settingsFilePath, "utf8");
       const settings = JSON.parse(settingsData);
+
+      // If provider is specified, try to get provider-specific key
+      if (provider && settings.apiKeys && settings.apiKeys[provider]) {
+        return settings.apiKeys[provider];
+      }
+
+      // Fall back to general apiKey for backward compatibility
       return settings.apiKey || null;
     }
 
@@ -137,6 +160,29 @@ function getApiKey() {
   } catch (error) {
     console.error("Error getting API key from settings:", error);
     return null;
+  }
+}
+
+/**
+ * Gets all API keys from settings
+ * @returns {Object} Object containing all API keys
+ */
+function getAllApiKeys() {
+  try {
+    if (!app) return {};
+
+    const settingsFilePath = getSettingsFilePath();
+
+    if (fs.existsSync(settingsFilePath)) {
+      const settingsData = fs.readFileSync(settingsFilePath, "utf8");
+      const settings = JSON.parse(settingsData);
+      return settings.apiKeys || {};
+    }
+
+    return {};
+  } catch (error) {
+    console.error("Error getting all API keys from settings:", error);
+    return {};
   }
 }
 
@@ -171,12 +217,22 @@ function getAvailableLanguages() {
   return LANGUAGES;
 }
 
+function getAzureEndpoint() {
+  return AZURE_FOUNDRY_ENDPOINT;
+}
+
+function setAzureEndpoint(endpoint) {
+  AZURE_FOUNDRY_ENDPOINT = endpoint;
+  return AZURE_FOUNDRY_ENDPOINT;
+}
+
 // Get current settings
 function getCurrentSettings() {
   return {
     aiProvider,
     currentModel,
     ollamaUrl: OLLAMA_BASE_URL,
+    azureEndpoint: AZURE_FOUNDRY_ENDPOINT,
     responseLanguage,
   };
 }
@@ -202,6 +258,11 @@ function updateSettings(settings) {
     }
   }
 
+  if (settings.azureEndpoint && settings.azureEndpoint !== AZURE_FOUNDRY_ENDPOINT) {
+    AZURE_FOUNDRY_ENDPOINT = settings.azureEndpoint;
+    hasChanges = true;
+  }
+
   if (settings.responseLanguage && settings.responseLanguage !== responseLanguage) {
     responseLanguage = settings.responseLanguage;
     hasChanges = true;
@@ -224,6 +285,8 @@ module.exports = {
   getResponseLanguage,
   setResponseLanguage,
   getAvailableLanguages,
+  getAzureEndpoint,
+  setAzureEndpoint,
   getCurrentSettings,
   updateSettings,
   loadSettingsFromFile,
@@ -231,4 +294,5 @@ module.exports = {
   getSettingsFilePath,
   saveApiKey,
   getApiKey,
+  getAllApiKeys,
 };
