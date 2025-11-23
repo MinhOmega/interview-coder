@@ -21,9 +21,9 @@ function updateApiKeyStatus(provider, message, type = "info") {
 function saveApiKey(provider, key) {
   API_KEYS[provider].key = key;
 
-  // Save to settings file via IPC
+  // Save to settings file via IPC with provider information
   ipcRenderer
-    .invoke(IPC_CHANNELS.SAVE_API_KEY, key)
+    .invoke(IPC_CHANNELS.SAVE_API_KEY, key, provider)
     .then((success) => {
       if (success) {
         updateApiKeyStatus(provider, "API key saved successfully", "success");
@@ -38,24 +38,48 @@ function saveApiKey(provider, key) {
 }
 
 function loadApiKeys() {
-  // Request the API key from the main process
+  // Request all provider-specific API keys from the main process
   ipcRenderer
-    .invoke(IPC_CHANNELS.GET_API_KEY)
-    .then((apiKey) => {
-      if (apiKey) {
-        // Set the key for all providers
+    .invoke(IPC_CHANNELS.GET_ALL_API_KEYS)
+    .then((apiKeys) => {
+      if (apiKeys && typeof apiKeys === 'object') {
+        // Load provider-specific keys
         Object.keys(API_KEYS).forEach((provider) => {
-          API_KEYS[provider].key = apiKey;
-          const input = document.getElementById(API_KEYS[provider].inputId);
-          if (input) {
-            input.value = maskApiKey(apiKey);
-            updateApiKeyStatus(provider, "API key loaded successfully", "success");
+          if (apiKeys[provider]) {
+            API_KEYS[provider].key = apiKeys[provider];
+            const input = document.getElementById(API_KEYS[provider].inputId);
+            if (input) {
+              input.value = maskApiKey(apiKeys[provider]);
+              updateApiKeyStatus(provider, "API key loaded successfully", "success");
+            }
           }
         });
+      } else {
+        // Fallback: Try to load single API key for backward compatibility
+        ipcRenderer
+          .invoke(IPC_CHANNELS.GET_API_KEY)
+          .then((apiKey) => {
+            if (apiKey) {
+              // Only set for OpenAI and Gemini for backward compatibility
+              ["openai", "gemini"].forEach((provider) => {
+                if (API_KEYS[provider]) {
+                  API_KEYS[provider].key = apiKey;
+                  const input = document.getElementById(API_KEYS[provider].inputId);
+                  if (input) {
+                    input.value = maskApiKey(apiKey);
+                    updateApiKeyStatus(provider, "API key loaded successfully", "success");
+                  }
+                }
+              });
+            }
+          })
+          .catch((err) => {
+            console.error("Error loading legacy API key:", err);
+          });
       }
     })
     .catch((err) => {
-      console.error("Error loading API key:", err);
+      console.error("Error loading API keys:", err);
     });
 }
 

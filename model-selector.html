@@ -37,6 +37,11 @@
           <span>Gemini</span>
           <span class="provider-badge gemini">Google AI, Requires API Key</span>
         </label>
+        <label class="radio-label" id="azure-foundry-radio-label">
+          <input type="radio" name="aiProvider" value="azure-foundry">
+          <span>Azure Foundry</span>
+          <span class="provider-badge azure-foundry">Claude Models, Requires API Key</span>
+        </label>
       </div>
     </div>
   </div>
@@ -118,6 +123,57 @@
         <option value="loading">Loading models...</option>
       </select>
       <div class="helper-text mt-2">All Gemini models have excellent vision and streaming capabilities.</div>
+    </div>
+  </div>
+
+  <div class="section" id="azure-foundry-section" style="display: none;">
+    <div class="section-header">
+      <h2>Azure Foundry Claude Models</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    </div>
+    <div class="section-content">
+      <div class="api-key-section">
+        <h3>Azure Foundry API Key</h3>
+        <div class="api-key-input-container">
+          <input type="password" id="azure-foundry-api-key" placeholder="Enter your Azure Foundry API key" class="api-key-input">
+        </div>
+        <div class="api-key-status" id="azure-foundry-key-status"></div>
+        <div class="helper-text">Your API key is stored locally and never sent to our servers</div>
+      </div>
+
+      <div class="endpoint-section mt-4">
+        <h3>Azure Endpoint URL</h3>
+        <input type="text" id="azure-foundry-endpoint" placeholder="https://your-resource.services.ai.azure.com/anthropic/" value="" class="endpoint-input">
+        <div class="helper-text">Enter your Azure Foundry endpoint URL</div>
+      </div>
+
+      <div class="model-cards mt-4" id="azure-foundry-model-cards">
+        <div class="model-card" data-model="claude-sonnet-4-5">
+          <div class="model-card-title">Claude Sonnet 4.5</div>
+          <div class="model-card-description">Most intelligent model, best for complex tasks</div>
+          <div class="model-card-badge vision">Vision</div>
+        </div>
+        <div class="model-card" data-model="claude-opus-4-1">
+          <div class="model-card-title">Claude Opus 4.1</div>
+          <div class="model-card-description">Powerful model for demanding tasks</div>
+          <div class="model-card-badge vision">Vision</div>
+        </div>
+        <div class="model-card" data-model="claude-haiku-4-5">
+          <div class="model-card-title">Claude Haiku 4.5</div>
+          <div class="model-card-description">Fast and efficient for simple tasks</div>
+          <div class="model-card-badge vision">Vision</div>
+        </div>
+      </div>
+      <select id="azure-foundry-model" style="display: none;">
+        <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
+        <option value="claude-opus-4-1">claude-opus-4-1</option>
+        <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+      </select>
+      <div class="helper-text mt-2">All Claude models support vision and streaming capabilities.</div>
     </div>
   </div>
 

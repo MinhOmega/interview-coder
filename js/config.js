@@ -17,6 +17,15 @@ const API_KEYS = {
     modalTitle: "Gemini API Key Required",
     modalMessage: "Please enter your Gemini API key to use Gemini models.",
   },
+  "azure-foundry": {
+    key: "",
+    storageKey: "azure_foundry_api_key",
+    inputId: "azure-foundry-api-key",
+    statusId: "azure-foundry-key-status",
+    toggleId: "toggle-azure-foundry-key",
+    modalTitle: "Azure Foundry API Key Required",
+    modalMessage: "Please enter your Azure Foundry API key to use Claude models.",
+  },
 };
 
 const isMac = process.platform === "darwin";

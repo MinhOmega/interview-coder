@@ -18,6 +18,11 @@ const SHORTCUTS = {
     handler: null,
     description: "Process existing screenshots with AI",
   },
+  PROCESS_UI_IMPLEMENTATION: {
+    key: `${modifierKey}+U`,
+    handler: null,
+    description: "Process screenshots for UI implementation",
+  },
   OPEN_SETTINGS: {
     key: `${modifierKey}+,`,
     handler: null,

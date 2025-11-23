@@ -1,16 +1,20 @@
 const axios = require("axios");
 const { OpenAI } = require("openai");
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
+const AnthropicFoundry = require("@anthropic-ai/foundry-sdk");
 const EventEmitter = require("events");
 const { AI_PROVIDERS } = require("./constants");
 const { getSettingsFilePath, saveApiKey } = require("./config-manager");
+const { generateWithAzureFoundry, getAzureFoundryModels, validateAzureFoundryConfig } = require("./azure-foundry-provider");
 const fs = require("fs");
 
 axios.defaults.family = 4;
 
 let openai = null;
 let geminiAI = null;
+let azureFoundryClient = null;
 let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+let AZURE_FOUNDRY_ENDPOINT = "";
 
 // Add a flag to track initialization status
 let isInitialized = false;
@@ -23,7 +27,7 @@ let isInitialized = false;
  */
 function initializeFromConfig() {
   if (isInitialized) {
-    return { openai: !!openai, gemini: !!geminiAI };
+    return { openai: !!openai, gemini: !!geminiAI, azureFoundry: !!azureFoundryClient };
   }
 
   try {
@@ -36,30 +40,54 @@ function initializeFromConfig() {
         const settingsData = fs.readFileSync(settingsFilePath, "utf8");
         const settings = JSON.parse(settingsData);
 
-        // Check for API key
-        if (settings.apiKey) {
-          try {
-            // Initialize based on current AI provider
-            if (settings.aiProvider === AI_PROVIDERS.OPENAI) {
-              openai = new OpenAI({ apiKey: settings.apiKey });
+        // Check for provider-specific API keys first, then fall back to general apiKey
+        const apiKeys = settings.apiKeys || {};
+
+        try {
+          // Initialize based on current AI provider
+          if (settings.aiProvider === AI_PROVIDERS.OPENAI) {
+            const apiKey = apiKeys.openai || settings.apiKey;
+            if (apiKey) {
+              openai = new OpenAI({ apiKey });
               console.log("OpenAI client initialized automatically from saved settings");
-            } else if (settings.aiProvider === AI_PROVIDERS.GEMINI) {
-              geminiAI = new GoogleGenerativeAI(settings.apiKey);
-              console.log("Gemini AI client initialized automatically from saved settings");
-            } else {
-              // Initialize both by default
-              openai = new OpenAI({ apiKey: settings.apiKey });
-              geminiAI = new GoogleGenerativeAI(settings.apiKey);
-              console.log("Both AI clients initialized with the same API key");
             }
-          } catch (err) {
-            console.error("Error initializing AI clients from saved settings:", err);
+          } else if (settings.aiProvider === AI_PROVIDERS.GEMINI) {
+            const apiKey = apiKeys.gemini || settings.apiKey;
+            if (apiKey) {
+              geminiAI = new GoogleGenerativeAI(apiKey);
+              console.log("Gemini AI client initialized automatically from saved settings");
+            }
+          } else if (settings.aiProvider === AI_PROVIDERS.AZURE_FOUNDRY) {
+            const apiKey = apiKeys["azure-foundry"];
+            if (apiKey) {
+              // Initialize Azure Foundry with saved endpoint if available
+              const endpoint = settings.azureEndpoint || AZURE_FOUNDRY_ENDPOINT;
+              azureFoundryClient = new AnthropicFoundry({
+                apiKey: apiKey,
+                baseURL: endpoint,
+                apiVersion: "2023-06-01",
+              });
+              AZURE_FOUNDRY_ENDPOINT = endpoint;
+              console.log("Azure Foundry client initialized automatically from saved settings");
+            }
+          } else if (settings.apiKey) {
+            // Initialize both by default with legacy apiKey for backward compatibility
+            openai = new OpenAI({ apiKey: settings.apiKey });
+            geminiAI = new GoogleGenerativeAI(settings.apiKey);
+            console.log("Both AI clients initialized with the same API key");
           }
+        } catch (err) {
+          console.error("Error initializing AI clients from saved settings:", err);
         }
 
         // Update Ollama URL if available
         if (settings.ollamaUrl) {
           OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+        }
+
+        // Update Azure Foundry endpoint if available
+        if (settings.azureEndpoint) {
+          AZURE_FOUNDRY_ENDPOINT = settings.azureEndpoint;
         }
       } catch (parseError) {
         console.error("Error parsing settings file:", parseError);
@@ -67,10 +95,10 @@ function initializeFromConfig() {
     }
 
     isInitialized = true;
-    return { openai: !!openai, gemini: !!geminiAI };
+    return { openai: !!openai, gemini: !!geminiAI, azureFoundry: !!azureFoundryClient };
   } catch (error) {
     console.error("Error in initializeFromConfig:", error);
-    return { openai: false, gemini: false };
+    return { openai: false, gemini: false, azureFoundry: false };
   }
 }
 
@@ -79,24 +107,39 @@ function initializeFromConfig() {
  *
  * @param {string} provider - The provider to update
  * @param {string} apiKey - The new API key
+ * @param {string} endpoint - Optional endpoint URL for Azure Foundry
  * @returns {boolean} True if the client was updated, false otherwise
  */
-function updateAIClients(provider, apiKey) {
+function updateAIClients(provider, apiKey, endpoint = null) {
   try {
     if (provider === AI_PROVIDERS.OPENAI && apiKey) {
       openai = new OpenAI({ apiKey });
       console.log("OpenAI client initialized successfully");
 
-      // Save API key to settings file
-      saveApiKey(apiKey);
+      // Save API key to settings file with provider
+      saveApiKey(apiKey, "openai");
 
       return true;
     } else if (provider === AI_PROVIDERS.GEMINI && apiKey) {
       geminiAI = new GoogleGenerativeAI(apiKey);
       console.log("Gemini AI client initialized successfully");
 
-      // Save API key to settings file
-      saveApiKey(apiKey);
+      // Save API key to settings file with provider
+      saveApiKey(apiKey, "gemini");
+
+      return true;
+    } else if (provider === AI_PROVIDERS.AZURE_FOUNDRY && apiKey) {
+      const azureEndpoint = endpoint || AZURE_FOUNDRY_ENDPOINT;
+      azureFoundryClient = new AnthropicFoundry({
+        apiKey: apiKey,
+        baseURL: azureEndpoint,
+        apiVersion: "2023-06-01",
+      });
+      AZURE_FOUNDRY_ENDPOINT = azureEndpoint;
+      console.log("Azure Foundry client initialized successfully with endpoint:", azureEndpoint);
+
+      // Save API key to settings file with provider
+      saveApiKey(apiKey, "azure-foundry");
 
       return true;
     }
@@ -607,15 +650,46 @@ async function generateWithGemini(messages, model, streaming = false) {
   }
 }
 
+/**
+ * Sets the Azure Foundry endpoint URL
+ *
+ * @param {string} url - The new Azure Foundry endpoint URL
+ */
+function setAzureFoundryEndpoint(url) {
+  AZURE_FOUNDRY_ENDPOINT = url;
+}
+
+/**
+ * Wrapper function for Azure Foundry generation
+ *
+ * @param {Array} messages - Messages array
+ * @param {string} model - Model to use
+ * @param {boolean} streaming - Whether to stream the response
+ * @param {string} systemPrompt - Optional system prompt
+ * @returns {Promise} Response or streaming emitter
+ */
+async function generateWithAzureFoundryWrapper(messages, model, streaming = false, systemPrompt = null) {
+  if (!azureFoundryClient) {
+    throw new Error("Azure Foundry client is not initialized. Please go to Settings and enter your API key and endpoint.");
+  }
+  return generateWithAzureFoundry(azureFoundryClient, messages, model, streaming, systemPrompt);
+}
+
 // Export functions
 module.exports = {
   updateAIClients,
   setOllamaBaseURL,
+  setAzureFoundryEndpoint,
   getOllamaModels,
+  getAzureFoundryModels,
   verifyOllamaModel,
+  validateAzureFoundryConfig,
   generateWithOllama,
   generateWithGemini,
+  generateWithAzureFoundry: generateWithAzureFoundryWrapper,
   getOpenAI: () => openai,
   getGeminiAI: () => geminiAI,
+  getAzureFoundryClient: () => azureFoundryClient,
+  getAzureFoundryEndpoint: () => AZURE_FOUNDRY_ENDPOINT,
   initializeFromConfig,
 };

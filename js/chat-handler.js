@@ -38,6 +38,8 @@ class ChatHandler {
         console.warn("Gemini AI is configured but not initialized");
       } else if (currentProvider === AI_PROVIDERS.OPENAI && !this.aiProviders.getOpenAI()) {
         console.warn("OpenAI is configured but not initialized");
+      } else if (currentProvider === AI_PROVIDERS.AZURE_FOUNDRY && !this.aiProviders.getAzureFoundryClient()) {
+        console.warn("Azure Foundry is configured but not initialized");
       }
     } catch (error) {
       console.error("Failed to initialize AI providers:", error);
@@ -134,6 +136,15 @@ class ChatHandler {
             break;
           case AI_PROVIDERS.OPENAI:
             response = await this.generateWithOpenAI(
+              messagesWithSystem,
+              currentModel,
+              useStreaming,
+              streamCallback,
+              windowId,
+            );
+            break;
+          case AI_PROVIDERS.AZURE_FOUNDRY:
+            response = await this.generateWithAzureFoundry(
               messagesWithSystem,
               currentModel,
               useStreaming,
@@ -675,6 +686,114 @@ class ChatHandler {
       };
     } catch (error) {
       console.error("Error generating with OpenAI:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a response using Azure Foundry Claude
+   * @param {Array} messages The conversation history
+   * @param {string} model The Claude model to use
+   * @param {boolean} streaming Whether to use streaming (default: false)
+   * @param {function} streamCallback Optional callback function for handling streaming responses
+   * @param {number} windowId Optional window ID for managing conversations
+   * @returns {Promise<Object>} The response or streaming handler
+   */
+  async generateWithAzureFoundry(messages, model, streaming = false, streamCallback, windowId) {
+    try {
+      // Get the Azure Foundry generator function from ai-providers
+      const generateWithAzureFoundry = this.aiProviders.generateWithAzureFoundry;
+      if (!generateWithAzureFoundry) {
+        throw new Error("Azure Foundry client not initialized. Please go to Settings and enter your API key and endpoint.");
+      }
+
+      // Extract system prompt if present
+      const systemMessage = messages.find(msg => msg.role === "system");
+      const systemPrompt = systemMessage ? systemMessage.content : null;
+
+      // Format messages for Azure Foundry API
+      const formattedMessages = messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      // Use streaming if requested
+      if (streaming) {
+        // Generate with Azure Foundry in streaming mode
+        const result = await generateWithAzureFoundry(formattedMessages, model, true, systemPrompt);
+
+        if (result.streaming && result.emitter && streamCallback) {
+          let fullText = "";
+
+          // Signal that streaming has started
+          streamCallback("start");
+
+          // Handle streaming events
+          result.emitter.on("chunk", (chunk) => {
+            fullText += chunk;
+            streamCallback("chunk", chunk, fullText);
+          });
+
+          result.emitter.on("accumulated", (accumulated) => {
+            // Update full text with accumulated response
+            fullText = accumulated;
+          });
+
+          result.emitter.on("complete", (finalText) => {
+            // Signal that streaming is complete
+            streamCallback("complete", finalText);
+
+            // Save the conversation with the final response
+            if (windowId) {
+              this.saveConversation(
+                windowId,
+                messages.concat([
+                  {
+                    role: "assistant",
+                    content: finalText,
+                  },
+                ]),
+              );
+            }
+          });
+
+          result.emitter.on("error", (error) => {
+            console.error("Azure Foundry streaming error:", error);
+            streamCallback("error", error);
+          });
+
+          return {
+            streaming: true,
+            text: () => fullText,
+          };
+        } else {
+          // No streaming callback provided, return the emitter for external handling
+          return result;
+        }
+      }
+
+      // Non-streaming response
+      const response = await generateWithAzureFoundry(formattedMessages, model, false, systemPrompt);
+
+      // Save the conversation if window ID is provided
+      if (windowId) {
+        this.saveConversation(
+          windowId,
+          messages.concat([
+            {
+              role: "assistant",
+              content: response,
+            },
+          ]),
+        );
+      }
+
+      return {
+        role: "assistant",
+        content: response,
+      };
+    } catch (error) {
+      console.error("Error generating with Azure Foundry:", error);
       throw error;
     }
   }
