@@ -115,6 +115,13 @@ body {
   will-change: contents;
   backface-visibility: hidden;
   contain: layout style paint;
+  opacity: 0;  /* Start invisible */
+  transition: opacity 300ms ease-in-out;  /* Smooth fade in */
+}
+
+/* After window is ready, fade in content */
+body.loaded {
+  opacity: 1;
 }
 
 #instruction-banner {
@@ -1284,5 +1291,111 @@ textarea {
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+/* Mode Indicator Styles - Small transparent badge in top right */
+.mode-indicator {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  z-index: 9999;
+  cursor: default;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mode-indicator:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.mode-icon {
+  font-size: 14px;
+  animation: pulse-icon 3s infinite;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.mode-name {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.mode-hint {
+  display: none; /* Hidden for compact badge */
+}
+
+/* Mode-specific colors with subtle transparent backgrounds */
+.mode-indicator.analytics-mode {
+  background: rgba(74, 144, 226, 0.12);
+  border-color: rgba(74, 144, 226, 0.25);
+}
+
+.mode-indicator.ui-mode {
+  background: rgba(123, 104, 238, 0.12);
+  border-color: rgba(123, 104, 238, 0.25);
+}
+
+.mode-indicator.quick-mode {
+  background: rgba(80, 200, 120, 0.12);
+  border-color: rgba(80, 200, 120, 0.25);
+}
+
+@keyframes pulse-icon {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* Add a subtle animation when mode changes */
+.mode-indicator.mode-changing {
+  animation: mode-change 0.5s ease;
+}
+
+@keyframes mode-change {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.05) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .mode-indicator {
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    gap: 5px;
+  }
+
+  .mode-icon {
+    font-size: 12px;
+  }
+
+  .mode-name {
+    font-size: 9px;
   }
 }

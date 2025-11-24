@@ -53,13 +53,17 @@ function logError(message, extraData = {}) {
 
 const onUpdateInstruction = (_, instruction) => {
   const banner = document.getElementById("instruction-banner");
-  banner.innerHTML = instruction.replace(/\n/g, "<br>");
-  banner.style.display = "block";
+  if (banner && instruction) {
+    banner.innerHTML = instruction.replace(/\n/g, "<br>");
+    banner.style.display = "block";
+  }
 };
 
 const onHideInstruction = () => {
   const banner = document.getElementById("instruction-banner");
-  banner.style.display = "none";
+  if (banner) {
+    banner.style.display = "none";
+  }
 };
 
 const onUpdateVisibility = (_, isVisible) => {
@@ -90,6 +94,7 @@ const onNotification = (_, data) => {
 };
 
 const onLoading = (_, isLoading) => {
+  // console.log(`[RENDERER] onLoading called: isLoading=${isLoading}`);
   try {
     // Get the containers
     const loadingContent = document.getElementById("loading-content");
@@ -140,6 +145,7 @@ const onAnalysisResult = async (_, markdown) => {
 };
 
 const onStreamStart = () => {
+  // console.log(`[RENDERER] onStreamStart called`);
   try {
     // Clear the buffer
     streamBuffer = "";
@@ -152,6 +158,8 @@ const onStreamStart = () => {
 };
 
 const onStreamChunk = async (_, chunk) => {
+  // Don't log every chunk as it causes too many logs
+  // console.log(`[RENDERER] onStreamChunk called, chunk length: ${chunk.length}`);
   try {
     // Add chunk to buffer
     streamBuffer += chunk;
@@ -218,6 +226,7 @@ const onStreamUpdate = async (_, fullText) => {
 };
 
 const onStreamEnd = () => {
+  // console.log(`[RENDERER] onStreamEnd called`);
   try {
     // Streaming is complete, reset buffer
     streamBuffer = "";
@@ -640,6 +649,63 @@ async function loadSystemPrompt() {
   }
 }
 
+// Debounce timer for mode updates
+let modeUpdateTimer = null;
+
+// Update the mode indicator with current mode (debounced)
+function updateModeIndicator(event, data) {
+  // Clear any pending update
+  if (modeUpdateTimer) {
+    clearTimeout(modeUpdateTimer);
+  }
+
+  // Debounce updates to prevent rapid re-rendering
+  modeUpdateTimer = setTimeout(() => {
+    try {
+      const modeIndicator = document.getElementById("mode-indicator");
+      if (!modeIndicator) {
+        return;
+      }
+
+      const modeIcon = modeIndicator.querySelector(".mode-icon");
+      const modeName = modeIndicator.querySelector(".mode-name");
+      const modeHint = modeIndicator.querySelector(".mode-hint");
+
+      if (!data || !data.modeInfo) {
+        log.error("No mode data received");
+        return;
+      }
+
+      // Update the display
+      if (modeIcon) modeIcon.textContent = data.modeInfo.icon;
+      if (modeName) modeName.textContent = data.modeInfo.name;
+      if (modeHint) modeHint.textContent = `Press ${modifierKey}+K/L/U to switch modes`;
+
+      // Update the class for mode-specific styling
+      modeIndicator.className = "mode-indicator";
+      switch (data.mode) {
+        case "analytics":
+          modeIndicator.classList.add("analytics-mode");
+          break;
+        case "ui_implementation":
+          modeIndicator.classList.add("ui-mode");
+          break;
+        case "quick_answer":
+          modeIndicator.classList.add("quick-mode");
+          break;
+      }
+
+      // Add animation class
+      modeIndicator.classList.add("mode-changing");
+      setTimeout(() => {
+        modeIndicator.classList.remove("mode-changing");
+      }, 500);
+    } catch (error) {
+      log.error("Error updating mode indicator:", error);
+    }
+  }, 50); // 50ms debounce
+}
+
 // Update the model badge with current settings
 async function updateModelBadge() {
   try {
@@ -925,6 +991,11 @@ function resetChat() {
 }
 
 const onEventDOMContentLoaded = async () => {
+  // Add loaded class immediately for fade-in effect
+  setTimeout(() => {
+    document.body.classList.add('loaded');
+  }, 50);  // Small delay for smooth fade-in
+
   const splitSendBtn = document.getElementById("split-send-btn");
   const splitChatInput = document.getElementById("split-chat-input");
   const toggleSystemPromptBtn = document.getElementById("toggle-system-prompt-btn");
@@ -1165,6 +1236,7 @@ ipcRenderer.on(IPC_CHANNELS.STREAM_UPDATE, onStreamUpdate);
 ipcRenderer.on(IPC_CHANNELS.STREAM_END, onStreamEnd);
 ipcRenderer.on(IPC_CHANNELS.CLEAR_RESULT, cleanupResultContent);
 ipcRenderer.on(IPC_CHANNELS.MODEL_CHANGED, updateModelBadge);
+ipcRenderer.on(IPC_CHANNELS.MODE_CHANGED, updateModeIndicator);
 ipcRenderer.on(IPC_CHANNELS.SCREEN_SHARING_DETECTED, onScreenSharingDetected);
 ipcRenderer.on(IPC_CHANNELS.SCROLL_CONTENT, onScrollContent);
 ipcRenderer.on(IPC_CHANNELS.TOGGLE_SPLIT_VIEW, (_, data) => toggleSplitView(data));
@@ -1174,10 +1246,14 @@ ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_CHUNK, onChatMessageStreamChunk)
 ipcRenderer.on(IPC_CHANNELS.CHAT_MESSAGE_STREAM_END, onChatMessageStreamEnd);
 ipcRenderer.on(IPC_CHANNELS.SHOW_UPDATE_TOOLBAR_BUTTON, onShowUpdateToolbarButton);
 
+// Log renderer initialization
+// Add event listeners
 document.addEventListener("DOMContentLoaded", onEventDOMContentLoaded);
 document.addEventListener("contextmenu", onEventContextMenu);
 document.addEventListener("keydown", onEventKeyDown);
 window.addEventListener("message", onEventMessage);
+
+// Initial DOM manipulation
 document.querySelectorAll(".shortcut").forEach((el) => {
   const text = el.textContent;
   el.textContent = text.replace("⌘", isMac ? "⌘" : "Ctrl");

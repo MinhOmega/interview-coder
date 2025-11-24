@@ -33,11 +33,12 @@ function createMainWindow() {
         nodeIntegration: true,
         contextIsolation: false,
       },
+      show: false,  // Don't show window until ready
       frame: false,
       transparent: true,
-      backgroundColor: "#00000000",
+      backgroundColor: "#00000000",  // Transparent background
       alwaysOnTop: true,
-      paintWhenInitiallyHidden: true,
+      paintWhenInitiallyHidden: true,  // Paint when hidden to be ready
       movable: true,
       roundedCorners: true,
       titleBarStyle: "hidden",

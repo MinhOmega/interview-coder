@@ -6,6 +6,12 @@ const AI_PROVIDERS = {
   DEFAULT: "AI",
 };
 
+const PROCESSING_MODES = {
+  ANALYTICS: "analytics",
+  UI_IMPLEMENTATION: "ui_implementation",
+  QUICK_ANSWER: "quick_answer",
+};
+
 const IPC_CHANNELS = {
   UPDATE_INSTRUCTION: "update-instruction",
   HIDE_INSTRUCTION: "hide-instruction",
@@ -53,9 +59,15 @@ const IPC_CHANNELS = {
   SHOW_UPDATE_TOOLBAR_BUTTON: "show-update-toolbar-button",
   UI_IMPLEMENTATION_MODE: "ui-implementation-mode",
   PROCESS_UI_SCREENSHOT: "process-ui-screenshot",
+  DIRECT_ANSWER_MODE: "direct-answer-mode",
+  PROCESS_DIRECT_ANSWER: "process-direct-answer",
+  CANCEL_AI_REQUEST: "cancel-ai-request",
+  MODE_CHANGED: "mode-changed",
+  GET_CURRENT_MODE: "get-current-mode",
 };
 
 module.exports = {
   AI_PROVIDERS,
+  PROCESSING_MODES,
   IPC_CHANNELS,
 };

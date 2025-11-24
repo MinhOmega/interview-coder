@@ -8,6 +8,10 @@ const fs = require("fs");
 const toastManager = require("./toast-manager");
 const log = require("electron-log");
 const { createUIPrompt } = require("./ui-implementation-prompt");
+const { createDirectAnswerPrompt } = require("./direct-answer-prompt");
+
+// Store active request controllers for cancellation
+let activeRequestControllers = new Set();
 
 const basePrompt = `I need you to analyze this problem carefully and provide the best possible solution with excellent performance and readability.
 
@@ -614,10 +618,265 @@ async function processScreenshotsForUI(
   }
 }
 
+/**
+ * Processes screenshots for direct answers (quick solutions)
+ *
+ * @param {BrowserWindow} mainWindow - The main application window
+ * @param {string} aiProvider - The AI provider
+ * @param {string} currentModel - The current model
+ * @param {function} verifyOllamaModelFn - The function to verify the Ollama model
+ * @param {function} generateWithOllamaFn - The function to generate with Ollama
+ * @param {function} generateWithGeminiFn - The function to generate with Gemini
+ * @param {boolean} useStreaming - Whether to use streaming
+ */
+async function processScreenshotsForDirectAnswer(
+  mainWindow,
+  aiProvider,
+  currentModel,
+  verifyOllamaModelFn,
+  generateWithOllamaFn,
+  generateWithGeminiFn,
+  useStreaming = false,
+) {
+  // Create an abort controller for this request
+  const abortController = new AbortController();
+  activeRequestControllers.add(abortController);
+
+  try {
+    mainWindow.webContents.send("loading", true);
+    const screenshots = getScreenshots();
+
+    // Get the user's preferred response language
+    const responseLanguage = configManager.getResponseLanguage();
+
+    if (aiProvider === AI_PROVIDERS.OLLAMA) {
+      const modelVerification = await verifyOllamaModelFn(currentModel);
+
+      if (!modelVerification.exists) {
+        let errorMessage = `The selected model "${currentModel}" is not available: ${modelVerification.error}`;
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Use the direct answer prompt instead of base prompt
+    const promptText = createDirectAnswerPrompt(screenshots.length, responseLanguage);
+    log.info("Direct answer prompt created for", screenshots.length, "screenshots");
+
+    const messages = [{ type: "text", text: promptText }];
+
+    for (const img of screenshots) {
+      const imageData = img.startsWith("data:image/") ? img : `data:image/png;base64,${img}`;
+      messages.push({
+        type: "image_url",
+        image_url: { url: imageData },
+      });
+    }
+
+    let result;
+
+    if (aiProvider === AI_PROVIDERS.DEFAULT) {
+      // Create model selection window when the default provider is selected
+      windowManager.createModelSelectionWindow();
+
+      // Return early since we're opening the model selection window instead of processing
+      mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+      mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+      return;
+    }
+
+    if (aiProvider === AI_PROVIDERS.OPENAI) {
+      // Get OpenAI client from AI providers module
+      const openai = aiProviders.getOpenAI();
+
+      if (!openai) {
+        throw new Error("OpenAI client is not initialized. Please go to Settings and enter your API key.");
+      }
+
+      if (useStreaming) {
+        const stream = await openai.chat.completions.create({
+          model: currentModel,
+          messages: [{ role: "user", content: messages }],
+          max_tokens: 4000, // Shorter max tokens for direct answers
+          stream: true,
+          signal: abortController.signal,
+        });
+
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
+        mainWindow.webContents.send(IPC_CHANNELS.DIRECT_ANSWER_MODE, true);
+
+        for await (const chunk of stream) {
+          // Check if request was cancelled
+          if (abortController.signal.aborted) {
+            break;
+          }
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            mainWindow.webContents.send(IPC_CHANNELS.STREAM_CHUNK, content);
+          }
+        }
+
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+        mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+        return;
+      } else {
+        const response = await openai.chat.completions.create({
+          model: currentModel,
+          messages: [{ role: "user", content: messages }],
+          max_tokens: 4000,
+          signal: abortController.signal,
+        });
+
+        result = response.choices[0].message.content;
+      }
+    } else if (aiProvider === AI_PROVIDERS.OLLAMA) {
+      result = await generateWithOllamaFn(messages, currentModel);
+    } else if (aiProvider === AI_PROVIDERS.GEMINI) {
+      // Get Gemini client from AI providers module if not provided
+      const geminiAI = aiProviders.getGeminiAI();
+
+      if (!geminiAI) {
+        throw new Error("Gemini AI client is not initialized. Please go to Settings and enter your API key.");
+      }
+
+      if (useStreaming) {
+        const streamingResult = await generateWithGeminiFn(messages, currentModel, true);
+
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
+        mainWindow.webContents.send(IPC_CHANNELS.DIRECT_ANSWER_MODE, true);
+
+        let accumulatedText = "";
+
+        streamingResult.emitter.on("chunk", (chunk) => {
+          if (abortController.signal.aborted) {
+            streamingResult.emitter.removeAllListeners();
+            return;
+          }
+          accumulatedText += chunk;
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_UPDATE, accumulatedText);
+        });
+
+        streamingResult.emitter.on("complete", () => {
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+        });
+
+        streamingResult.emitter.on("error", (error) => {
+          if (!abortController.signal.aborted) {
+            toastManager.error(`${error.message}`);
+          }
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+        });
+
+        return;
+      } else {
+        result = await generateWithGeminiFn(messages, currentModel);
+      }
+    } else if (aiProvider === AI_PROVIDERS.AZURE_FOUNDRY) {
+      // Try to reinitialize Azure Foundry if not already initialized
+      let azureFoundryClient = aiProviders.getAzureFoundryClient();
+
+      if (!azureFoundryClient) {
+        // Try to initialize from config if not already initialized
+        console.log("Azure Foundry client not found, attempting to initialize from config...");
+        aiProviders.initializeFromConfig();
+        azureFoundryClient = aiProviders.getAzureFoundryClient();
+
+        if (!azureFoundryClient) {
+          throw new Error("Azure Foundry client is not initialized. Please go to Settings and enter your API key and endpoint.");
+        }
+      }
+
+      if (useStreaming) {
+        const streamingResult = await aiProviders.generateWithAzureFoundry(messages, currentModel, true);
+
+        mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+        mainWindow.webContents.send(IPC_CHANNELS.STREAM_START);
+        mainWindow.webContents.send(IPC_CHANNELS.DIRECT_ANSWER_MODE, true);
+
+        let accumulatedText = "";
+
+        streamingResult.emitter.on("chunk", (chunk) => {
+          if (abortController.signal.aborted) {
+            streamingResult.emitter.removeAllListeners();
+            return;
+          }
+          accumulatedText += chunk;
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_UPDATE, accumulatedText);
+        });
+
+        streamingResult.emitter.on("complete", () => {
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+        });
+
+        streamingResult.emitter.on("error", (error) => {
+          if (!abortController.signal.aborted) {
+            toastManager.error(`${error.message}`);
+          }
+          mainWindow.webContents.send(IPC_CHANNELS.STREAM_END);
+          mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+        });
+
+        return;
+      } else {
+        result = await aiProviders.generateWithAzureFoundry(messages, currentModel, false);
+      }
+    } else {
+      throw new Error(`Unknown AI provider: ${aiProvider}`);
+    }
+
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+    mainWindow.webContents.send(IPC_CHANNELS.DIRECT_ANSWER_MODE, true);
+    mainWindow.webContents.send(IPC_CHANNELS.ANALYSIS_RESULT, result);
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+  } catch (err) {
+    // Don't show error if request was cancelled
+    if (!abortController.signal.aborted) {
+      log.error("Error in processScreenshotsForDirectAnswer:", err);
+      log.error("Stack trace:", err.stack);
+
+      if (err.response) {
+        log.error("Response status:", err.response.status);
+        log.error("Response data:", JSON.stringify(err.response.data));
+      }
+
+      toastManager.error(`${err.message}`);
+    }
+
+    mainWindow.webContents.send(IPC_CHANNELS.LOADING, false);
+    mainWindow.webContents.send(IPC_CHANNELS.HIDE_INSTRUCTION);
+  } finally {
+    // Clean up the controller
+    activeRequestControllers.delete(abortController);
+  }
+}
+
+/**
+ * Cancels all active AI requests
+ */
+function cancelAllRequests() {
+  log.info(`Cancelling ${activeRequestControllers.size} active AI requests`);
+
+  activeRequestControllers.forEach(controller => {
+    try {
+      controller.abort();
+    } catch (error) {
+      log.error("Error aborting request:", error);
+    }
+  });
+
+  activeRequestControllers.clear();
+}
+
 module.exports = {
   createPrompt,
   processScreenshots,
   processScreenshotsForUI,
+  processScreenshotsForDirectAnswer,
   processChatMessage,
   getSystemPrompt,
+  cancelAllRequests,
 };

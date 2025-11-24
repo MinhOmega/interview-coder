@@ -18,10 +18,20 @@ const SHORTCUTS = {
     handler: null,
     description: "Process existing screenshots with AI",
   },
-  PROCESS_UI_IMPLEMENTATION: {
+  SET_UI_MODE: {
     key: `${modifierKey}+U`,
     handler: null,
-    description: "Process screenshots for UI implementation",
+    description: "Switch to UI Implementation Mode",
+  },
+  SET_QUICK_ANSWER_MODE: {
+    key: `${modifierKey}+L`,
+    handler: null,
+    description: "Switch to Quick Answer Mode",
+  },
+  SET_ANALYTICS_MODE: {
+    key: `${modifierKey}+K`,
+    handler: null,
+    description: "Switch to Analytics Mode (default)",
   },
   OPEN_SETTINGS: {
     key: `${modifierKey}+,`,
