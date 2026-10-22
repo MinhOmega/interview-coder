@@ -111,10 +111,6 @@ body {
   border-radius: 12px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transform: translateZ(0);
-  will-change: contents;
-  backface-visibility: hidden;
-  contain: layout style paint;
   opacity: 0;  /* Start invisible */
   transition: opacity 300ms ease-in-out;  /* Smooth fade in */
 }
@@ -143,10 +139,6 @@ body.loaded {
   width: 100%;
   height: calc(100vh - 120px);
   position: relative;
-  transform: translateZ(0);
-  will-change: contents;
-  backface-visibility: hidden;
-  contain: content;
   isolation: isolate;
   overflow-y: auto;
 }
@@ -161,13 +153,8 @@ body.loaded {
   overflow-y: visible;
   height: auto;
   min-height: calc(100% - 40px);
-  will-change: contents, transform, opacity;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  transform: translateZ(0);
   position: relative;
   transition: none;
-  contain: content;
   isolation: isolate;
   padding-bottom: 60px;
 }
@@ -249,18 +236,18 @@ pre:before {
   }
 }
 
-#result-content::-webkit-scrollbar {
+#result-content-wrapper::-webkit-scrollbar {
   width: 5px;
   background: var(--bg-scrollbar);
   border-radius: 5px;
 }
 
-#result-content::-webkit-scrollbar-thumb {
+#result-content-wrapper::-webkit-scrollbar-thumb {
   background: var(--bg-scrollbar-thumb);
   border-radius: 5px;
 }
 
-#result-content::-webkit-scrollbar-thumb:hover {
+#result-content-wrapper::-webkit-scrollbar-thumb:hover {
   background: var(--bg-scrollbar-thumb-hover);
 }
 
@@ -585,6 +572,7 @@ body.invisible-mode:hover {
   white-space: nowrap;
   -webkit-app-region: no-drag;
   border: 1px solid rgba(80, 80, 80, 0.3);
+  font-family: inherit;
 }
 
 .toolbar-button:hover {
@@ -692,6 +680,36 @@ code.inline-code {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.chat-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 8px 14px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #eaeaea;
+  background: #fff;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.new-chat-button {
+  padding: 6px 10px;
+  border: 1px solid #d7dce2;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.new-chat-button:hover {
+  border-color: var(--border-focused);
+  color: var(--bg-button-primary);
 }
 
 .messages-container {

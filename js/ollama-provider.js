@@ -444,7 +444,7 @@ function loadModelLibrary() {
         // Update the text to show it's installed, preserving the existing compatibility markers
         let originalText = option.textContent;
         // Remove any existing markers first
-        originalText = originalText.replace(/^[✅⚠️✓]\s*/, "");
+        originalText = originalText.replace(/^(?:✅|⚠️|✓)\s*/, "");
         option.textContent = `✓ ${originalText} (installed)`;
 
         // Set the installed data attribute
@@ -598,6 +598,8 @@ async function pullOllamaModel(modelName) {
   const progressBarFill = document.getElementById("progress-bar-fill");
   const progressPercentage = document.getElementById("progress-percentage");
   const progressDetails = document.getElementById("progress-details");
+  const cancelPullBtn = document.getElementById("cancel-pull");
+  const originalCancelAction = cancelPullBtn.onclick;
 
   // If no model name is provided, get it from the select
   if (!modelName) {
@@ -648,9 +650,6 @@ async function pullOllamaModel(modelName) {
     const signal = controller.signal;
 
     // Setup cancel button functionality
-    const cancelPullBtn = document.getElementById("cancel-pull");
-    const originalCancelAction = cancelPullBtn.onclick;
-
     cancelPullBtn.onclick = () => {
       controller.abort();
       progressDetails.textContent = "Download cancelled";
@@ -778,7 +777,6 @@ async function pullOllamaModel(modelName) {
 
     // Reset cancel button if it was an error (not a user cancellation)
     if (error.name !== "AbortError") {
-      const cancelPullBtn = document.getElementById("cancel-pull");
       cancelPullBtn.onclick = originalCancelAction;
     }
 

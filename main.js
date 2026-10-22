@@ -47,7 +47,7 @@ if (isDev) {
     require("electron-reload")(__dirname, {
       electron: path.join(__dirname, "node_modules", ".bin", "electron"),
       hardResetMethod: "exit",
-      ignored: [/node_modules/, /[\/\\]\./, /\.git/, /\.map$/, /package-lock\.json$/],
+      ignored: [/node_modules/, /[/\\]\./, /\.git/, /\.map$/, /package-lock\.json$/],
     });
     log.info("Hot reload enabled for development");
   } catch (err) {
@@ -214,11 +214,6 @@ app.whenReady().then(async () => {
       const permissionsStatus = await macOSPermissions.initializePermissions();
       log.info("macOS permissions initialized:", permissionsStatus);
 
-      // Force permission request in production as a fallback
-      if (!isDev && !permissionsStatus.screenCapturePermission) {
-        log.info("Initial permission check failed, forcing permission request...");
-        await macOSPermissions.forcePermissionRequest();
-      }
     } catch (error) {
       log.error("Error initializing macOS permissions:", error);
     }
@@ -273,9 +268,6 @@ app.whenReady().then(async () => {
   // Initialize AI clients from saved config
   const initStatus = aiProviders.initializeFromConfig();
   log.info("AI clients initialization status:", initStatus);
-  if (initStatus.openai) {
-    openai = aiProviders.getOpenAI();
-  }
 
   // Initialize ChatHandler
   chatHandler = new ChatHandler(aiProviders, configManager);
@@ -290,10 +282,7 @@ app.whenReady().then(async () => {
       log.info(`Initializing ${provider} client with provided API key`);
       const result = aiProviders.updateAIClients(provider, apiKey, endpoint);
 
-      if (provider === AI_PROVIDERS.OPENAI && result) {
-        // Update the openai reference for use in processScreenshots
-        openai = aiProviders.getOpenAI();
-      } else if (provider === AI_PROVIDERS.AZURE_FOUNDRY && result && endpoint) {
+      if (provider === AI_PROVIDERS.AZURE_FOUNDRY && result && endpoint) {
         // Update the Azure Foundry endpoint if provided
         aiProviders.setAzureFoundryEndpoint(endpoint);
       }

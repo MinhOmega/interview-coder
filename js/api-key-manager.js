@@ -39,44 +39,37 @@ function saveApiKey(provider, key) {
 
 function loadApiKeys() {
   // Request all provider-specific API keys from the main process
-  ipcRenderer
+  return ipcRenderer
     .invoke(IPC_CHANNELS.GET_ALL_API_KEYS)
     .then((apiKeys) => {
-      if (apiKeys && typeof apiKeys === 'object') {
-        // Load provider-specific keys
-        Object.keys(API_KEYS).forEach((provider) => {
-          if (apiKeys[provider]) {
-            API_KEYS[provider].key = apiKeys[provider];
-            const input = document.getElementById(API_KEYS[provider].inputId);
-            if (input) {
-              input.value = maskApiKey(apiKeys[provider]);
-              updateApiKeyStatus(provider, "API key loaded successfully", "success");
-            }
+      const providerKeys = apiKeys && typeof apiKeys === "object" ? apiKeys : {};
+      Object.keys(API_KEYS).forEach((provider) => {
+        if (providerKeys[provider]) {
+          API_KEYS[provider].key = providerKeys[provider];
+          const input = document.getElementById(API_KEYS[provider].inputId);
+          if (input) {
+            input.value = maskApiKey(providerKeys[provider]);
+            updateApiKeyStatus(provider, "API key loaded successfully", "success");
+          }
+        }
+      });
+
+      const legacyProviders = ["openai", "gemini"].filter((provider) => !providerKeys[provider]);
+      if (legacyProviders.length === 0) return;
+
+      return ipcRenderer.invoke(IPC_CHANNELS.GET_API_KEY).then((apiKey) => {
+        if (!apiKey) return;
+        legacyProviders.forEach((provider) => {
+          API_KEYS[provider].key = apiKey;
+          const input = document.getElementById(API_KEYS[provider].inputId);
+          if (input) {
+            input.value = maskApiKey(apiKey);
+            updateApiKeyStatus(provider, "API key loaded successfully", "success");
           }
         });
-      } else {
-        // Fallback: Try to load single API key for backward compatibility
-        ipcRenderer
-          .invoke(IPC_CHANNELS.GET_API_KEY)
-          .then((apiKey) => {
-            if (apiKey) {
-              // Only set for OpenAI and Gemini for backward compatibility
-              ["openai", "gemini"].forEach((provider) => {
-                if (API_KEYS[provider]) {
-                  API_KEYS[provider].key = apiKey;
-                  const input = document.getElementById(API_KEYS[provider].inputId);
-                  if (input) {
-                    input.value = maskApiKey(apiKey);
-                    updateApiKeyStatus(provider, "API key loaded successfully", "success");
-                  }
-                }
-              });
-            }
-          })
-          .catch((err) => {
-            console.error("Error loading legacy API key:", err);
-          });
-      }
+      }).catch((err) => {
+        console.error("Error loading legacy API key:", err);
+      });
     })
     .catch((err) => {
       console.error("Error loading API keys:", err);
@@ -106,9 +99,18 @@ async function validateAndFetchModels(provider, key, loadModelsCallback) {
         updateApiKeyStatus(provider, "Invalid API key", "error");
       }
     } else if (provider === "gemini") {
-      updateApiKeyStatus(provider, "API key is valid", "success");
-      if (loadModelsCallback) {
-        loadModelsCallback();
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
+      );
+      if (response.ok) {
+        updateApiKeyStatus(provider, "API key is valid", "success");
+        if (loadModelsCallback) loadModelsCallback();
+      } else if (response.status === 429) {
+        updateApiKeyStatus(provider, "API quota or rate limit exceeded", "error");
+      } else if (response.status === 400 || response.status === 401 || response.status === 403) {
+        updateApiKeyStatus(provider, "Invalid or unauthorized API key", "error");
+      } else {
+        updateApiKeyStatus(provider, `Gemini validation failed (${response.status})`, "error");
       }
     }
   } catch (error) {

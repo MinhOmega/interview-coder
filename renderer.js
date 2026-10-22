@@ -1,7 +1,12 @@
 const { ipcRenderer } = require("electron");
 const { processMarkdown } = require("./js/markdown-processor");
+const {
+  captureScrollState,
+  createRenderController,
+  restoreScrollState,
+} = require("./js/render-controller");
 const { IPC_CHANNELS, AI_PROVIDERS } = require("./js/constants");
-const { isMac, isLinux, modifierKey } = require("./js/config");
+const { isMac, isLinux, isWindows, modifierKey } = require("./js/config");
 const toastManager = require("./js/toast-manager");
 const hotkeysModal = require("./js/hotkeys-modal");
 const UpdateManager = require("./js/update-manager");
@@ -26,6 +31,29 @@ let isSplitView = false;
 let isChatMode = false;
 
 let streamingMessageElement = null;
+let resizeHandleInitialized = false;
+
+const standardRenderController = createRenderController({
+  getContainer: () => document.getElementById("result-content-wrapper"),
+  getTarget: () => document.getElementById("result-content"),
+  renderMarkdown: processMarkdown,
+  afterApply: (target) => setupCodeCopyButtons(target),
+});
+
+const chatRenderController = createRenderController({
+  getContainer: () => document.getElementById("split-messages-container"),
+  getTarget: () => streamingMessageElement,
+  renderMarkdown: processMarkdown,
+  afterApply: (target) => setupCodeCopyButtons(target),
+});
+
+function showRenderError(target, message) {
+  if (!target) return;
+  const errorElement = document.createElement("p");
+  errorElement.className = "error-message";
+  errorElement.textContent = message;
+  target.replaceChildren(errorElement);
+}
 
 // Add a utility function for logging errors
 function logError(message, extraData = {}) {
@@ -136,8 +164,8 @@ const onAnalysisResult = async (_, markdown) => {
     // Setup code copy buttons
     setupCodeCopyButtons();
 
-    // Scroll to top
-    window.scrollTo(0, 0);
+    const resultContentWrapper = document.getElementById("result-content-wrapper");
+    if (resultContentWrapper) resultContentWrapper.scrollTop = 0;
   } catch (error) {
     log.error("Error in ANALYSIS_RESULT handler:", error);
     toastManager.error("Error rendering content: " + error.message);
@@ -149,6 +177,7 @@ const onStreamStart = () => {
   try {
     // Clear the buffer
     streamBuffer = "";
+    standardRenderController.reset();
 
     // Clean up the DOM
     cleanupResultContent();
@@ -157,39 +186,21 @@ const onStreamStart = () => {
   }
 };
 
-const onStreamChunk = async (_, chunk) => {
+const onStreamChunk = (_, chunk) => {
   // Don't log every chunk as it causes too many logs
   // console.log(`[RENDERER] onStreamChunk called, chunk length: ${chunk.length}`);
   try {
     // Add chunk to buffer
     streamBuffer += chunk;
 
-    // Process the full accumulated text to ensure proper markdown rendering
-    const html = await processMarkdown(streamBuffer);
-
-    // Get the content element
-    const resultContent = document.getElementById("result-content");
-    if (resultContent) {
-      resultContent.innerHTML = html;
-    }
-
-    // Setup code copy buttons
-    setupCodeCopyButtons();
-
-    // Auto-scroll to the bottom if user is already at the bottom
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
-      window.scrollTo(0, document.body.scrollHeight);
-    }
+    standardRenderController.update(streamBuffer);
   } catch (error) {
     log.error("Error processing stream chunk:", error);
-    // Display error but continue operation
-    document.getElementById(
-      "result-content",
-    ).innerHTML += `<p class="error-message">Error rendering chunk: ${error.message}</p>`;
+    showRenderError(document.getElementById("result-content"), `Error rendering chunk: ${error.message}`);
   }
 };
 
-const onStreamUpdate = async (_, fullText) => {
+const onStreamUpdate = (_, fullText) => {
   try {
     // Update the stream buffer
     streamBuffer = fullText;
@@ -199,29 +210,10 @@ const onStreamUpdate = async (_, fullText) => {
       return;
     }
 
-    // Process the markdown
-    const html = await processMarkdown(fullText);
-
-    // Get the content element
-    const resultContent = document.getElementById("result-content");
-    if (resultContent) {
-      resultContent.innerHTML = html;
-    }
-
-    // Setup code copy buttons
-    setupCodeCopyButtons();
-
-    // Auto-scroll to the bottom if user is already at the bottom
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
-      window.scrollTo(0, document.body.scrollHeight);
-    }
+    standardRenderController.update(fullText);
   } catch (error) {
     log.error("Error processing stream update:", error);
-    // Provide better error visualization
-    document.getElementById("result-content").innerHTML = `
-      <p class="error-message">Error rendering content: ${error.message}</p>
-      <pre>${fullText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-    `;
+    showRenderError(document.getElementById("result-content"), `Error rendering content: ${error.message}`);
   }
 };
 
@@ -240,11 +232,6 @@ const onStreamEnd = () => {
     const banner = document.getElementById("instruction-banner");
     banner.style.display = "none";
 
-    // Add a small scroll to ensure visible buttons if needed
-    const resultContent = document.getElementById("result-content");
-    if (resultContent && resultContent.scrollHeight > resultContent.clientHeight) {
-      resultContent.scrollBy({ top: 1, behavior: "smooth" });
-    }
   } catch (error) {
     log.error("Error in STREAM_END handler:", error);
   }
@@ -263,7 +250,7 @@ const onScrollContent = (_, scrollAmount) => {
     if (messagesContainer) {
       messagesContainer.scrollBy({
         top: scrollAmount,
-        behavior: "smooth",
+        behavior: "auto",
       });
       return;
     }
@@ -272,7 +259,7 @@ const onScrollContent = (_, scrollAmount) => {
   if (resultContentWrapper) {
     resultContentWrapper.scrollBy({
       top: scrollAmount,
-      behavior: "smooth",
+      behavior: "auto",
     });
   }
 };
@@ -284,7 +271,10 @@ function toggleSplitView(event) {
   let newState;
   if (event && event.forceState !== undefined) {
     newState = event.forceState;
-    if (isSplitView === newState) return;
+    if (isSplitView === newState) {
+      if (newState) document.getElementById("split-chat-input")?.focus();
+      return;
+    }
   } else {
     newState = !isSplitView;
   }
@@ -455,8 +445,6 @@ const onChatMessageResponse = async (_, response) => {
   messageHistory.push(response);
   window.messageHistory = messageHistory;
 
-  // Scroll to bottom
-  scrollToBottom(document.getElementById("split-messages-container"));
 };
 
 // Function to send message
@@ -519,9 +507,8 @@ async function addMessage(text, sender) {
     setupCodeCopyButtons(messageDiv);
   } catch (error) {
     log.error("Error processing markdown:", error);
-    // Fallback to basic formatting if markdown processing fails
-    const formattedText = text.replace(/\n/g, "<br>");
-    messageDiv.innerHTML = formattedText;
+    messageDiv.textContent = text;
+    messageDiv.style.whiteSpace = "pre-wrap";
   }
 
   messagesContainer.appendChild(messageDiv);
@@ -545,6 +532,7 @@ async function addMessage(text, sender) {
 // Add an AI message with proper markdown processing
 async function addAIMessage(text) {
   const messagesContainer = document.getElementById("split-messages-container");
+  const scrollState = captureScrollState(messagesContainer);
 
   const messageDiv = document.createElement("div");
   messageDiv.classList.add("message", "ai-message");
@@ -562,7 +550,7 @@ async function addAIMessage(text) {
   }
 
   messagesContainer.appendChild(messageDiv);
-  scrollToBottom(messagesContainer);
+  restoreScrollState(messagesContainer, scrollState);
 }
 
 // Scroll to the bottom of the messages container
@@ -827,9 +815,12 @@ window.setupCodeCopyButtons = setupCodeCopyButtons;
 
 // Setup resize handle for split view
 function setupResizeHandle() {
+  if (resizeHandleInitialized) return;
   const handle = document.getElementById("resize-handle");
   const container = document.getElementById("split-view");
   const leftPane = document.querySelector(".split-pane.left");
+  if (!handle || !container || !leftPane) return;
+  resizeHandleInitialized = true;
   let isResizing = false;
 
   handle.addEventListener("mousedown", (e) => {
@@ -850,7 +841,6 @@ function setupResizeHandle() {
     // Limit the resize ratio
     if (newRatio < 0.2 || newRatio > 0.8) return;
 
-    splitViewRatio = newRatio;
     leftPane.style.flex = `0 0 ${newRatio * 100}%`;
   });
 
@@ -999,6 +989,14 @@ const onEventDOMContentLoaded = async () => {
   const splitSendBtn = document.getElementById("split-send-btn");
   const splitChatInput = document.getElementById("split-chat-input");
   const toggleSystemPromptBtn = document.getElementById("toggle-system-prompt-btn");
+  const chatToolbarButton = document.getElementById("chat-toolbar-button");
+  const newChatButton = document.getElementById("new-chat-button");
+
+  chatToolbarButton?.addEventListener("click", () => toggleSplitView({ forceState: true }));
+  newChatButton?.addEventListener("click", () => {
+    resetChat();
+    splitChatInput?.focus();
+  });
 
   // Send message for split view chat interface
   if (splitSendBtn && splitChatInput) {
@@ -1065,19 +1063,15 @@ const onChatMessageStreamStart = () => {
     // Reset stream buffer and message element
     streamBuffer = "";
     streamingMessageElement = null;
+    chatRenderController.reset();
 
-    // Scroll to show typing indicator
-    const messagesContainer = document.getElementById("split-messages-container");
-    if (messagesContainer) {
-      scrollToBottom(messagesContainer);
-    }
   } catch (error) {
     log.error("Error in chat stream start handler:", error);
   }
 };
 
 // Handle a chunk of the chat message stream
-const onChatMessageStreamChunk = async (_, chunk, fullText) => {
+const onChatMessageStreamChunk = (_, chunk, fullText) => {
   try {
     // Update the stream buffer with new content
     if (fullText && fullText.length > 0) {
@@ -1108,22 +1102,7 @@ const onChatMessageStreamChunk = async (_, chunk, fullText) => {
       messagesContainer.appendChild(streamingMessageElement);
     }
 
-    // Update content in streaming message
-    try {
-      const html = await processMarkdown(streamBuffer);
-      streamingMessageElement.innerHTML = html;
-
-      // Setup code copy buttons
-      setupCodeCopyButtons(streamingMessageElement);
-    } catch (error) {
-      log.error("Error processing markdown:", error);
-      streamingMessageElement.textContent = streamBuffer;
-    }
-
-    // Auto-scroll if near bottom
-    if (messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 50) {
-      scrollToBottom(messagesContainer);
-    }
+    chatRenderController.update(streamBuffer);
   } catch (error) {
     log.error("Error processing chat stream chunk:", error);
   }
@@ -1145,11 +1124,8 @@ const onChatMessageStreamEnd = async (_, response) => {
 
     // If we have a streaming message element, finalize it
     if (streamingMessageElement) {
-      // Final update to the message content
       try {
-        const html = await processMarkdown(content);
-        streamingMessageElement.innerHTML = html;
-        setupCodeCopyButtons(streamingMessageElement);
+        await chatRenderController.renderNow(content);
       } catch (error) {
         log.error("Error processing final markdown:", error);
         streamingMessageElement.textContent = content;
@@ -1171,11 +1147,6 @@ const onChatMessageStreamEnd = async (_, response) => {
     streamBuffer = "";
     streamingMessageElement = null;
 
-    // Final scroll
-    const messagesContainer = document.getElementById("split-messages-container");
-    if (messagesContainer) {
-      scrollToBottom(messagesContainer);
-    }
   } catch (error) {
     log.error("Error finalizing chat stream:", error);
 

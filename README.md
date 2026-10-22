@@ -39,8 +39,8 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
   - Real-time streaming responses
 
 - 🌐 **Multilingual Support**
-  - Responses in 8 different languages
-  - English, Vietnamese, Spanish, French, German, Japanese, Korean, and Chinese
+  - Responses in 9 different languages
+  - English, Vietnamese, Spanish, French, German, Japanese, Korean, Chinese, and Russian
   - Language preferences persist across sessions
 
 - 🎯 **User-Friendly Interface**
@@ -52,7 +52,7 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
 
 ## 🛠️ Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or later recommended)
+- [Node.js](https://nodejs.org/) (v22.12.0 or later)
 - [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
 - For AI functionality (one of the following):
   - OpenAI API key
@@ -63,7 +63,7 @@ Interview Coder is an advanced Electron application that leverages AI to analyze
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/MinhOmega/interview-coder.git
+   git clone https://github.com/lavochkaa/interview-coder.git
    cd interview-coder
    ```
 
@@ -88,6 +88,14 @@ No environment configuration is required to get started. API keys can be entered
 5. Select your preferred model
 6. Choose your preferred response language
 7. Save settings and start using!
+
+Settings and provider-specific API keys are saved in `interview-coder.config.json`.
+When running from source, the file is in the launch directory (normally the project root)
+and is ignored by Git. In an installed app, it is in Electron's per-user `userData`
+directory, regardless of the launch directory. The app creates or updates the file
+when settings are saved; you can also edit it manually. If you used an older installed
+version, re-enter your API keys after upgrading; the old file in its previous launch
+directory is left untouched.
 
 ## 🔧 Using with Ollama
 
@@ -119,9 +127,21 @@ Choose your preferred language for AI responses:
    - Japanese (日本語)
    - Korean (한국어)
    - Chinese (中文)
+   - Russian (Русский)
 4. Save settings to apply your language preference
 
 The application will generate all AI responses in your selected language, with solution approaches tailored to your language preference.
+
+## 📏 Response Size
+
+The Response Size section in Settings applies a hard output-token limit to screenshots and chat:
+
+- Easy (default): 256 tokens for direct answers and small fixes
+- Medium: 768 tokens for junior-interview explanations and minimal patches
+- Hard: 2048 tokens for complex solutions
+- Custom: any integer from 128 to 8192 tokens
+
+The prompt also asks the model to avoid repeated analysis, full files, and unnecessary theory. The limit controls output tokens; screenshots and conversation history still use input tokens.
 
 ## 🔧 Troubleshooting
 
@@ -188,7 +208,8 @@ This removes quarantine attributes that might prevent the app from running prope
 - gpt-4-turbo
 
 ### Google Gemini
-- gemini-2.0-flash
+- gemini-2.5-flash
+- Other currently available Gemini models returned by the API
 
 ### Ollama
 - deepseek-r1:14b (recommended)
@@ -220,8 +241,9 @@ npm run dev:windows
 
 ## Chat Features
 
+- Open Chat: Click the Chat button in the toolbar or press `⌘+T` (Mac) / `Ctrl+T` (Windows/Linux).
 - Reset Chat: You can reset the current chat to its initial state by pressing `⌘+R` (Mac) or `Ctrl+R` (Windows/Linux) while in split view.
-- New Chat: You can create a new chat session by pressing `⌘+N` (Mac) or `Ctrl+N` (Windows/Linux).
+- New Chat: Click New Chat inside the chat pane or press `⌘+N` (Mac) / `Ctrl+N` (Windows/Linux).
 
 <div align="center">
 <br/>

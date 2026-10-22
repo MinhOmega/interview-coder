@@ -1,17 +1,19 @@
 const fs = require("fs");
 const path = require("path");
 const screenshot = require("screenshot-desktop");
-const { nativeImage, desktopCapturer, systemPreferences, app } = require("electron");
+const { nativeImage, desktopCapturer, app } = require("electron");
 const Screenshots = require("electron-screenshots");
 const { getAppPath, isCommandAvailable } = require("./utils");
 const { isLinux, isMac } = require("./config");
 const toastManager = require("./toast-manager");
 const { v4: uuidv4 } = require("uuid");
+const log = require("electron-log");
+const macOSPermissions = isMac ? require("./macos-permissions") : null;
+const { isManagedScreenshot } = require("./screenshot-files");
 
 let screenshots = [];
 let multiPageMode = false;
 let screenshotInstance;
-let hasRequestedPermission = false;
 
 // Check if we're in production mode
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -37,7 +39,7 @@ function cleanupOldScreenshots() {
     let deletedCount = 0;
     
     files.forEach(file => {
-      if (file.endsWith('.png')) {
+      if (isManagedScreenshot(file)) {
         const filePath = path.join(picturesPath, file);
         try {
           fs.unlinkSync(filePath);
@@ -60,12 +62,6 @@ function initScreenshotCapture() {
   // Clean up old screenshots when starting the app
   cleanupOldScreenshots();
   
-  // Ensure we request permissions early in the app lifecycle
-  if (isMac && !hasRequestedPermission) {
-    hasRequestedPermission = true;
-    requestScreenCapturePermission();
-  }
-
   screenshotInstance = new Screenshots({
     singleWindow: true,
     lang: "en",
@@ -139,17 +135,7 @@ const saveScreenshotFromBuffer = async (buffer, filenamePrefix, mainWindow) => {
  * @returns {boolean} - true if permission is granted or not on macOS
  */
 function hasScreenCapturePermission() {
-  if (!isMac) return true; // Only macOS needs explicit screen recording permission
-
-  try {
-    // Try to get the status
-    const status = systemPreferences.getMediaAccessStatus("screen");
-    console.log(`[${isDev ? "DEV" : "PROD"}] Current screen recording permission status:`, status);
-    return status === "granted";
-  } catch (error) {
-    console.error("Error checking screen recording permission:", error);
-    return false;
-  }
+  return !isMac || macOSPermissions.hasScreenCapturePermission();
 }
 
 /**
@@ -157,72 +143,14 @@ function hasScreenCapturePermission() {
  * @returns {Promise<boolean>} - Promise resolving to permission status
  */
 async function requestScreenCapturePermission() {
-  if (!isMac) return true; // Only relevant for macOS
-
-  try {
-    console.log(`[${isDev ? "DEV" : "PROD"}] Checking screen recording permission`);
-
-    // First check current status
-    if (hasScreenCapturePermission()) {
-      console.log("Screen recording permission already granted");
-      return true;
-    }
-
-    // Log when permission requested
-    console.log("Requesting screen recording permission...");
-
-    // Force permission request in more aggressive way for production
-    try {
-      // Try multiple approaches to ensure permission dialog appears
-
-      // 1. Use systemPreferences API
-      const granted = await systemPreferences.askForMediaAccess("screen");
-      console.log("askForMediaAccess result:", granted);
-
-      // 2. Use desktopCapturer regardless of result to force the permission prompt
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-        thumbnailSize: { width: 1, height: 1 },
-      });
-      console.log(`Found ${sources.length} screen sources`);
-
-      // 3. Try to take a test screenshot using the desktopCapturer
-      if (sources.length > 0) {
-        const testImg = sources[0].thumbnail;
-        if (testImg) {
-          console.log("Successfully captured test screenshot thumbnail");
-        }
-      }
-
-      // 4. Check permission again
-      const newStatus = systemPreferences.getMediaAccessStatus("screen");
-      console.log("Screen recording permission after request:", newStatus);
-
-      if (newStatus !== "granted") {
-        // In production, show a more urgent notification
-        if (!isDev) {
-          toastManager.warning(
-            "Screen recording permission is required for this app to function properly. Please grant permission in System Preferences > Security & Privacy > Privacy > Screen Recording, then restart the app.",
-          );
-        } else {
-          toastManager.warning("Screen recording permission not granted. Please check your system preferences.");
-        }
-      }
-
-      return newStatus === "granted";
-    } catch (permError) {
-      console.error("Error during permission request:", permError);
-
-      // Still provide feedback to the user
-      toastManager.error(
-        "Unable to request screen recording permission. Please enable it manually in System Preferences.",
-      );
-      return false;
-    }
-  } catch (error) {
-    console.error("Error in requestScreenCapturePermission:", error);
-    return false;
+  if (!isMac) return true;
+  const granted = await macOSPermissions.requestScreenCapturePermission();
+  if (!granted) {
+    toastManager.warning(
+      "Enable Screen Recording for Interview Coder (or Electron/Terminal in development), then restart the app.",
+    );
   }
+  return granted;
 }
 
 /**
@@ -295,6 +223,7 @@ const captureElectronScreenshot = async (imagePath) => {
  * with enhanced error handling and permission management
  */
 async function captureScreenshot(mainWindow) {
+  let wasVisible = false;
   try {
     console.log(`[${isDev ? "DEV" : "PROD"}] Capturing screenshot...`);
 
@@ -310,13 +239,7 @@ async function captureScreenshot(mainWindow) {
         const permissionRequested = await requestScreenCapturePermission();
         console.log(`Permission request result: ${permissionRequested}`);
 
-        // If still no permission after requesting, try to guide the user
-        if (!permissionRequested && !isDev) {
-          toastManager.error(
-            "Screenshot failed: Please grant screen recording permission in System Preferences > Security & Privacy > Privacy > Screen Recording",
-          );
-          // Don't return here, still try to capture in case the permission check is wrong
-        }
+        if (!permissionRequested) throw new Error("Screen recording permission is required");
       }
     }
 
@@ -327,14 +250,14 @@ async function captureScreenshot(mainWindow) {
     console.log(`Screenshot will be saved to: ${imagePath}`);
 
     // Hide the window before capturing
-    const wasVisible = await autoHideWindow(mainWindow);
+    wasVisible = await autoHideWindow(mainWindow);
     console.log(`Window was visible: ${wasVisible}`);
 
     let base64Image = "";
     let success = false;
 
     // Always try the Electron built-in method first in production for consistency
-    if (!isDev || (isLinux && !isCommandAvailable("import"))) {
+    if (isMac || !isDev || (isLinux && !isCommandAvailable("import"))) {
       console.log("Using Electron's desktopCapturer for screenshot");
       try {
         base64Image = await captureElectronScreenshot(imagePath);
@@ -364,8 +287,9 @@ async function captureScreenshot(mainWindow) {
       console.log("Trying screenshot-desktop library");
       try {
         await screenshot({ filename: imagePath });
-        const imageBuffer = fs.readFileSync(imagePath);
-        base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+        const pngBuffer = nativeImage.createFromPath(imagePath).toPNG();
+        fs.writeFileSync(imagePath, pngBuffer);
+        base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
         success = true;
         console.log("screenshot-desktop capture successful");
       } catch (fallbackError) {
@@ -416,19 +340,22 @@ async function captureScreenshot(mainWindow) {
   } catch (error) {
     console.error("Screenshot capture failed:", error);
 
+    if (wasVisible && mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+
     // Handle permission errors specially
     if (
       isMac &&
       error.message &&
-      (error.message.includes("permission") || error.message.includes("denied") || error.message.includes("access"))
+      (error.message.toLowerCase().includes("permission") ||
+        error.message.toLowerCase().includes("denied") ||
+        error.message.toLowerCase().includes("access") ||
+        error.message.toLowerCase().includes("could not create image"))
     ) {
       // More specific error message for permission issues
       toastManager.error(
         "Permission error: Please grant screen recording permission in System Preferences > Security & Privacy > Privacy > Screen Recording, then restart the app.",
       );
 
-      // Try to request permission again for next time
-      await requestScreenCapturePermission();
     } else {
       // Generic error for other issues
       toastManager.error(`Screenshot failed: ${error.message}`);
@@ -440,11 +367,8 @@ async function captureScreenshot(mainWindow) {
 
 const captureFullScreenFallback = async () => {
   try {
-    if (isMac) {
-      const status = systemPreferences.getMediaAccessStatus("screen");
-      if (status !== "granted") {
-        await systemPreferences.askForMediaAccess("screen");
-      }
+    if (isMac && !(await requestScreenCapturePermission())) {
+      throw new Error("Screen recording permission is required");
     }
 
     // Generate unique filename using UUID
@@ -518,5 +442,6 @@ module.exports = {
   getMultiPageMode,
   autoHideWindow,
   captureFullScreenFallback,
+  isManagedScreenshot,
   cleanupOldScreenshots,
 };

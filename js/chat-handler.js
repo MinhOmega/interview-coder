@@ -1,5 +1,13 @@
 const axios = require("axios");
 const { AI_PROVIDERS } = require("./constants");
+const { getResponseLanguageInstruction } = require("./language-instructions");
+const { getResponseProfileInstruction } = require("./response-profiles");
+const {
+  getGeminiOutputOptions,
+  getOllamaOutputOptions,
+  getOpenAIOutputOptions,
+} = require("./provider-output-options");
+const { logGeminiResponseDiagnostics } = require("./gemini-response-diagnostics");
 const { getUserDataPath } = require("./utils");
 const fs = require("fs");
 const { HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
@@ -71,6 +79,20 @@ class ChatHandler {
         }
       }
 
+      const languageInstruction = getResponseLanguageInstruction(
+        this.configManager.getResponseLanguage(),
+      );
+      const responseProfile = this.configManager.getResponseProfile();
+      const customMaxOutputTokens = this.configManager.getCustomMaxOutputTokens();
+      const maxOutputTokens = this.configManager.getMaxOutputTokens();
+      const profileInstruction = getResponseProfileInstruction(
+        responseProfile,
+        customMaxOutputTokens,
+      );
+      currentSystemPrompt = [currentSystemPrompt, languageInstruction, profileInstruction]
+        .filter(Boolean)
+        .join("\n\n");
+
       // Get the current AI provider and model from config
       const provider = this.configManager.getAiProvider();
       const currentModel = this.configManager.getCurrentModel();
@@ -123,6 +145,7 @@ class ChatHandler {
               useStreaming,
               streamCallback,
               windowId,
+              maxOutputTokens,
             );
             break;
           case AI_PROVIDERS.OLLAMA:
@@ -132,6 +155,7 @@ class ChatHandler {
               useStreaming,
               streamCallback,
               windowId,
+              maxOutputTokens,
             );
             break;
           case AI_PROVIDERS.OPENAI:
@@ -141,6 +165,7 @@ class ChatHandler {
               useStreaming,
               streamCallback,
               windowId,
+              maxOutputTokens,
             );
             break;
           case AI_PROVIDERS.AZURE_FOUNDRY:
@@ -150,6 +175,7 @@ class ChatHandler {
               useStreaming,
               streamCallback,
               windowId,
+              maxOutputTokens,
             );
             break;
           default:
@@ -161,6 +187,7 @@ class ChatHandler {
                 useStreaming,
                 streamCallback,
                 windowId,
+                maxOutputTokens,
               );
             } else if (this.aiProviders.getOpenAI()) {
               response = await this.generateWithOpenAI(
@@ -169,9 +196,17 @@ class ChatHandler {
                 useStreaming,
                 streamCallback,
                 windowId,
+                maxOutputTokens,
               );
             } else if (this.configManager.getOllamaUrl) {
-              response = await this.generateWithOllama(messagesWithSystem, "llama2", useStreaming, streamCallback, windowId);
+              response = await this.generateWithOllama(
+                messagesWithSystem,
+                "llama2",
+                useStreaming,
+                streamCallback,
+                windowId,
+                maxOutputTokens,
+              );
             } else {
               throw new Error(`No AI providers are configured. Please go to Settings and configure an AI provider.`);
             }
@@ -188,6 +223,7 @@ class ChatHandler {
             useStreaming,
             streamCallback,
             windowId,
+            maxOutputTokens,
           );
         } else if (provider !== AI_PROVIDERS.OPENAI && this.aiProviders.getOpenAI()) {
           console.log("Trying fallback with OpenAI...");
@@ -197,10 +233,18 @@ class ChatHandler {
             useStreaming,
             streamCallback,
             windowId,
+            maxOutputTokens,
           );
         } else if (provider !== AI_PROVIDERS.OLLAMA) {
           console.log("Trying fallback with Ollama...");
-          response = await this.generateWithOllama(messagesWithSystem, "llama2", useStreaming, streamCallback, windowId);
+          response = await this.generateWithOllama(
+            messagesWithSystem,
+            "llama2",
+            useStreaming,
+            streamCallback,
+            windowId,
+            maxOutputTokens,
+          );
         } else {
           // If we've tried all options, rethrow the original error
           throw providerError;
@@ -257,7 +301,14 @@ class ChatHandler {
    * @param {number} windowId Optional window ID for managing conversations
    * @returns {Promise<Object>} The response or streaming handler
    */
-  async generateWithGemini(messages, model, streaming = true, streamCallback, windowId) {
+  async generateWithGemini(
+    messages,
+    model,
+    streaming = true,
+    streamCallback,
+    windowId,
+    maxOutputTokens = 2048,
+  ) {
     try {
       // Ensure Gemini client is available
       const geminiClient = this.aiProviders.getGeminiAI();
@@ -323,7 +374,7 @@ class ChatHandler {
           model: model || "gemini-pro",
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 8192,
+            ...getGeminiOutputOptions(maxOutputTokens, model),
           },
           safetySettings
         });
@@ -334,7 +385,7 @@ class ChatHandler {
             history: geminiMessages.slice(0, -1), // All but the last message
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 8192,
+              ...getGeminiOutputOptions(maxOutputTokens, model),
             },
             safetySettings
           });
@@ -355,6 +406,9 @@ class ChatHandler {
             // Send the chunk to the callback
             streamCallback("chunk", chunkText, fullResponse);
           }
+
+          const completedResponse = await streamingResponse.response;
+          logGeminiResponseDiagnostics(completedResponse);
           
           // Create the final response
           const finalResponse = {
@@ -427,12 +481,13 @@ class ChatHandler {
           contents: geminiMessages,
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 8192,
+            ...getGeminiOutputOptions(maxOutputTokens, model),
           },
           safetySettings,
         });
 
         const response = result.response;
+        logGeminiResponseDiagnostics(response);
         const text = response.text();
 
         const finalResponse = {
@@ -464,7 +519,14 @@ class ChatHandler {
    * @param {number} windowId Optional window ID for managing conversations
    * @returns {Promise<Object>} The response or streaming handler
    */
-  async generateWithOllama(messages, model, streaming = false, streamCallback, windowId) {
+  async generateWithOllama(
+    messages,
+    model,
+    streaming = false,
+    streamCallback,
+    windowId,
+    maxOutputTokens = 2048,
+  ) {
     try {
       // Get Ollama URL from config
       const ollamaUrl = this.configManager.getCurrentSettings().ollamaUrl;
@@ -502,6 +564,7 @@ class ChatHandler {
             stream: true,
             options: {
               temperature: 0.7,
+              ...getOllamaOutputOptions(maxOutputTokens),
             },
           }, {
             responseType: 'stream'
@@ -560,6 +623,7 @@ class ChatHandler {
           stream: false,
           options: {
             temperature: 0.7,
+            ...getOllamaOutputOptions(maxOutputTokens),
           },
         });
 
@@ -596,7 +660,14 @@ class ChatHandler {
    * @param {number} windowId Optional window ID for managing conversations
    * @returns {Promise<Object>} The response or streaming handler
    */
-  async generateWithOpenAI(messages, model, streaming = false, streamCallback, windowId) {
+  async generateWithOpenAI(
+    messages,
+    model,
+    streaming = false,
+    streamCallback,
+    windowId,
+    maxOutputTokens = 2048,
+  ) {
     try {
       // Ensure OpenAI client is available
       const openaiClient = this.aiProviders.getOpenAI();
@@ -616,7 +687,7 @@ class ChatHandler {
           model: model || "gpt-3.5-turbo",
           messages: formattedMessages,
           temperature: 0.7,
-          max_tokens: 2048,
+          ...getOpenAIOutputOptions(maxOutputTokens),
           stream: true,
         });
 
@@ -673,7 +744,7 @@ class ChatHandler {
         model: model || "gpt-3.5-turbo",
         messages: formattedMessages,
         temperature: 0.7,
-        max_tokens: 2048,
+        ...getOpenAIOutputOptions(maxOutputTokens),
       });
 
       if (!response.choices || !response.choices[0] || !response.choices[0].message) {
@@ -699,7 +770,14 @@ class ChatHandler {
    * @param {number} windowId Optional window ID for managing conversations
    * @returns {Promise<Object>} The response or streaming handler
    */
-  async generateWithAzureFoundry(messages, model, streaming = false, streamCallback, windowId) {
+  async generateWithAzureFoundry(
+    messages,
+    model,
+    streaming = false,
+    streamCallback,
+    windowId,
+    maxOutputTokens = 2048,
+  ) {
     try {
       // Get the Azure Foundry generator function from ai-providers
       const generateWithAzureFoundry = this.aiProviders.generateWithAzureFoundry;
@@ -720,7 +798,13 @@ class ChatHandler {
       // Use streaming if requested
       if (streaming) {
         // Generate with Azure Foundry in streaming mode
-        const result = await generateWithAzureFoundry(formattedMessages, model, true, systemPrompt);
+        const result = await generateWithAzureFoundry(
+          formattedMessages,
+          model,
+          true,
+          systemPrompt,
+          maxOutputTokens,
+        );
 
         if (result.streaming && result.emitter && streamCallback) {
           let fullText = "";
@@ -773,7 +857,13 @@ class ChatHandler {
       }
 
       // Non-streaming response
-      const response = await generateWithAzureFoundry(formattedMessages, model, false, systemPrompt);
+      const response = await generateWithAzureFoundry(
+        formattedMessages,
+        model,
+        false,
+        systemPrompt,
+        maxOutputTokens,
+      );
 
       // Save the conversation if window ID is provided
       if (windowId) {

@@ -1,15 +1,30 @@
-const { AI_PROVIDERS } = require("./constants");
 const fs = require("fs");
 const { app } = require("electron");
-const { getUserDataPath } = require("./utils");
+const { AI_PROVIDERS } = require("./constants");
+const { getAppPath, getUserDataPath } = require("./utils");
+const {
+  getConfigPath,
+  mergeConfigs,
+  readProjectConfig,
+  writeProjectConfigAtomic,
+} = require("./project-config");
+const {
+  DEFAULT_RESPONSE_PROFILE,
+  DEFAULT_CUSTOM_MAX_OUTPUT_TOKENS,
+  getEffectiveMaxOutputTokens,
+} = require("./response-profiles");
 
-let OLLAMA_BASE_URL = "http://127.0.0.1:11434";
-let AZURE_FOUNDRY_ENDPOINT = "";
-let aiProvider = AI_PROVIDERS.DEFAULT;
-let currentModel = "";
-let responseLanguage = "en"; // en = English
+const DEFAULT_SETTINGS = {
+  aiProvider: AI_PROVIDERS.DEFAULT,
+  currentModel: "",
+  ollamaUrl: "http://127.0.0.1:11434",
+  azureEndpoint: "",
+  responseLanguage: "en",
+  responseProfile: DEFAULT_RESPONSE_PROFILE,
+  customMaxOutputTokens: DEFAULT_CUSTOM_MAX_OUTPUT_TOKENS,
+  apiKeys: {},
+};
 
-// Available language options
 const LANGUAGES = {
   en: { code: "en", name: "English", nativeName: "English" },
   vi: { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt" },
@@ -19,198 +34,127 @@ const LANGUAGES = {
   ja: { code: "ja", name: "Japanese", nativeName: "日本語" },
   ko: { code: "ko", name: "Korean", nativeName: "한국어" },
   zh: { code: "zh", name: "Chinese", nativeName: "中文" },
+  ru: { code: "ru", name: "Russian", nativeName: "Русский" },
 };
 
-// Get user data directory for settings file
-const getSettingsFilePath = () => {
-  return getUserDataPath("interview-coder-settings.json");
-};
+let settings = { ...DEFAULT_SETTINGS, apiKeys: {} };
+let lastConfigError = null;
 
-/**
- * Loads settings from file
- * @returns {boolean} True if settings were loaded successfully, false otherwise
- */
-function loadSettingsFromFile() {
+const getSettingsFilePath = () => getUserDataPath("interview-coder-settings.json");
+const getProjectSettingsFilePath = () => getConfigPath(
+  Boolean(app && app.isPackaged),
+  getAppPath("userData", ""),
+  process.cwd(),
+);
+
+function readLegacySettings() {
+  const settingsFilePath = getSettingsFilePath();
+  if (!settingsFilePath || !fs.existsSync(settingsFilePath)) return {};
+
   try {
-    if (!app) return false;
-
-    const settingsFilePath = getSettingsFilePath();
-
-    if (fs.existsSync(settingsFilePath)) {
-      const settingsData = fs.readFileSync(settingsFilePath, "utf8");
-      const settings = JSON.parse(settingsData);
-
-      if (settings.aiProvider) aiProvider = settings.aiProvider;
-      if (settings.currentModel) currentModel = settings.currentModel;
-      if (settings.ollamaUrl) OLLAMA_BASE_URL = settings.ollamaUrl.replace("localhost", "127.0.0.1");
-      if (settings.azureEndpoint) AZURE_FOUNDRY_ENDPOINT = settings.azureEndpoint;
-      if (settings.responseLanguage) responseLanguage = settings.responseLanguage;
-
-      return true;
-    }
+    return JSON.parse(fs.readFileSync(settingsFilePath, "utf8"));
   } catch (error) {
-    console.error("Error loading settings from file:", error);
+    console.error("Error loading legacy settings:", error.message);
+    return {};
   }
-
-  return false;
 }
 
-/**
- * Saves settings to file
- * @param {Object} settings - The settings to save
- * @returns {boolean} True if settings were saved successfully, false otherwise
- */
-function saveSettingsToFile(settings) {
+function loadSettingsFromFile() {
+  const legacySettings = readLegacySettings();
+  let projectSettings = {};
+
   try {
-    if (!app) return false;
-
-    const settingsFilePath = getSettingsFilePath();
-
-    let existingSettings = {};
-    if (fs.existsSync(settingsFilePath)) {
-      try {
-        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
-        existingSettings = JSON.parse(settingsData);
-      } catch (parseError) {
-        console.error("Error parsing existing settings file:", parseError);
-      }
-    }
-
-    const settingsToSave = {
-      ...settings,
-      apiKey: existingSettings.apiKey,
-    };
-
-    fs.writeFileSync(settingsFilePath, JSON.stringify(settingsToSave, null, 2), "utf8");
-    return true;
+    projectSettings = readProjectConfig(getProjectSettingsFilePath()) || {};
+    lastConfigError = null;
   } catch (error) {
-    console.error("Error saving settings to file:", error);
+    lastConfigError = error;
+    console.error(error.message);
+  }
+
+  settings = mergeConfigs(DEFAULT_SETTINGS, legacySettings, projectSettings);
+  if (settings.ollamaUrl) settings.ollamaUrl = settings.ollamaUrl.replace("localhost", "127.0.0.1");
+  return !lastConfigError;
+}
+
+function saveProjectSettings(updates) {
+  const filePath = getProjectSettingsFilePath();
+  const existing = readProjectConfig(filePath) || {};
+  const next = mergeConfigs(existing, updates);
+  writeProjectConfigAtomic(filePath, next);
+  settings = mergeConfigs(settings, next);
+  lastConfigError = null;
+  return true;
+}
+
+function saveSettingsToFile(updates) {
+  try {
+    return saveProjectSettings(updates);
+  } catch (error) {
+    lastConfigError = error;
+    console.error(error.message);
     return false;
   }
 }
 
-/**
- * Saves API key to settings file
- * @param {string} apiKey - The API key to save (for backward compatibility)
- * @param {string} provider - Optional provider name for provider-specific keys
- * @returns {boolean} True if API key was saved successfully, false otherwise
- */
 function saveApiKey(apiKey, provider = null) {
   try {
-    if (!app) return false;
-
-    const settingsFilePath = getSettingsFilePath();
-
-    let settings = {};
-    if (fs.existsSync(settingsFilePath)) {
-      try {
-        const settingsData = fs.readFileSync(settingsFilePath, "utf8");
-        settings = JSON.parse(settingsData);
-      } catch (parseError) {
-        console.error("Error parsing settings file:", parseError);
-      }
-    }
-
-    // Initialize apiKeys object if it doesn't exist
-    if (!settings.apiKeys) {
-      settings.apiKeys = {};
-    }
-
-    // Save provider-specific API key if provider is specified
-    if (provider) {
-      settings.apiKeys[provider] = apiKey;
-    } else {
-      // For backward compatibility, also save as general apiKey
-      settings.apiKey = apiKey;
-    }
-
-    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), "utf8");
-    return true;
+    const keyUpdates = provider
+      ? { apiKeys: { ...settings.apiKeys, [provider]: apiKey } }
+      : { apiKey };
+    return saveProjectSettings(keyUpdates);
   } catch (error) {
-    console.error("Error saving API key to settings:", error);
+    lastConfigError = error;
+    console.error(error.message);
     return false;
   }
 }
 
-/**
- * Gets API key from settings
- * @param {string} provider - Optional provider name for provider-specific keys
- * @returns {string|null} The API key or null if it doesn't exist
- */
 function getApiKey(provider = null) {
-  try {
-    if (!app) return null;
-
-    const settingsFilePath = getSettingsFilePath();
-
-    if (fs.existsSync(settingsFilePath)) {
-      const settingsData = fs.readFileSync(settingsFilePath, "utf8");
-      const settings = JSON.parse(settingsData);
-
-      // If provider is specified, try to get provider-specific key
-      if (provider && settings.apiKeys && settings.apiKeys[provider]) {
-        return settings.apiKeys[provider];
-      }
-
-      // Fall back to general apiKey for backward compatibility
-      return settings.apiKey || null;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error getting API key from settings:", error);
-    return null;
-  }
+  if (provider && settings.apiKeys && settings.apiKeys[provider]) return settings.apiKeys[provider];
+  return settings.apiKey || null;
 }
 
-/**
- * Gets all API keys from settings
- * @returns {Object} Object containing all API keys
- */
 function getAllApiKeys() {
-  try {
-    if (!app) return {};
-
-    const settingsFilePath = getSettingsFilePath();
-
-    if (fs.existsSync(settingsFilePath)) {
-      const settingsData = fs.readFileSync(settingsFilePath, "utf8");
-      const settings = JSON.parse(settingsData);
-      return settings.apiKeys || {};
-    }
-
-    return {};
-  } catch (error) {
-    console.error("Error getting all API keys from settings:", error);
-    return {};
-  }
+  return { ...(settings.apiKeys || {}) };
 }
 
 function getAiProvider() {
-  return aiProvider;
+  return settings.aiProvider;
 }
 
 function setAiProvider(provider) {
-  aiProvider = provider;
-  return aiProvider;
+  settings.aiProvider = provider;
+  return provider;
 }
 
 function getCurrentModel() {
-  return currentModel;
+  return settings.currentModel;
 }
 
 function setCurrentModel(model) {
-  currentModel = model;
-  return currentModel;
+  settings.currentModel = model;
+  return model;
 }
 
 function getResponseLanguage() {
-  return responseLanguage;
+  return settings.responseLanguage;
 }
 
 function setResponseLanguage(language) {
-  responseLanguage = language;
-  return responseLanguage;
+  settings.responseLanguage = language;
+  return language;
+}
+
+function getResponseProfile() {
+  return settings.responseProfile || DEFAULT_RESPONSE_PROFILE;
+}
+
+function getCustomMaxOutputTokens() {
+  return settings.customMaxOutputTokens ?? DEFAULT_CUSTOM_MAX_OUTPUT_TOKENS;
+}
+
+function getMaxOutputTokens() {
+  return getEffectiveMaxOutputTokens(getResponseProfile(), getCustomMaxOutputTokens());
 }
 
 function getAvailableLanguages() {
@@ -218,60 +162,38 @@ function getAvailableLanguages() {
 }
 
 function getAzureEndpoint() {
-  return AZURE_FOUNDRY_ENDPOINT;
+  return settings.azureEndpoint;
 }
 
 function setAzureEndpoint(endpoint) {
-  AZURE_FOUNDRY_ENDPOINT = endpoint;
-  return AZURE_FOUNDRY_ENDPOINT;
+  settings.azureEndpoint = endpoint;
+  return endpoint;
 }
 
-// Get current settings
 function getCurrentSettings() {
+  const { apiKeys, apiKey, ...publicSettings } = settings;
   return {
-    aiProvider,
-    currentModel,
-    ollamaUrl: OLLAMA_BASE_URL,
-    azureEndpoint: AZURE_FOUNDRY_ENDPOINT,
-    responseLanguage,
+    ...publicSettings,
+    effectiveMaxOutputTokens: getMaxOutputTokens(),
+    configError: lastConfigError ? lastConfigError.message : null,
   };
 }
 
-function updateSettings(settings) {
-  let hasChanges = false;
+function getMergedSettings() {
+  return mergeConfigs(settings);
+}
 
-  if (settings.aiProvider && settings.aiProvider !== aiProvider) {
-    aiProvider = settings.aiProvider;
-    hasChanges = true;
+function getLastConfigError() {
+  return lastConfigError;
+}
+
+function updateSettings(updates) {
+  const normalizedUpdates = { ...updates };
+  if (normalizedUpdates.ollamaUrl) {
+    normalizedUpdates.ollamaUrl = normalizedUpdates.ollamaUrl.replace("localhost", "127.0.0.1");
   }
 
-  if (settings.currentModel && settings.currentModel !== currentModel) {
-    currentModel = settings.currentModel;
-    hasChanges = true;
-  }
-
-  if (settings.ollamaUrl) {
-    const normalizedUrl = settings.ollamaUrl.replace("localhost", "127.0.0.1");
-    if (normalizedUrl !== OLLAMA_BASE_URL) {
-      OLLAMA_BASE_URL = normalizedUrl;
-      hasChanges = true;
-    }
-  }
-
-  if (settings.azureEndpoint && settings.azureEndpoint !== AZURE_FOUNDRY_ENDPOINT) {
-    AZURE_FOUNDRY_ENDPOINT = settings.azureEndpoint;
-    hasChanges = true;
-  }
-
-  if (settings.responseLanguage && settings.responseLanguage !== responseLanguage) {
-    responseLanguage = settings.responseLanguage;
-    hasChanges = true;
-  }
-
-  if (hasChanges) {
-    saveSettingsToFile(getCurrentSettings());
-  }
-
+  saveProjectSettings(normalizedUpdates);
   return getCurrentSettings();
 }
 
@@ -284,14 +206,20 @@ module.exports = {
   setCurrentModel,
   getResponseLanguage,
   setResponseLanguage,
+  getResponseProfile,
+  getCustomMaxOutputTokens,
+  getMaxOutputTokens,
   getAvailableLanguages,
   getAzureEndpoint,
   setAzureEndpoint,
   getCurrentSettings,
+  getMergedSettings,
+  getLastConfigError,
   updateSettings,
   loadSettingsFromFile,
   saveSettingsToFile,
   getSettingsFilePath,
+  getProjectSettingsFilePath,
   saveApiKey,
   getApiKey,
   getAllApiKeys,

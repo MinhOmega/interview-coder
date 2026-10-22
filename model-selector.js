@@ -8,6 +8,12 @@ const ollamaProvider = require("./js/ollama-provider");
 const utils = require("./js/utils");
 const modalManager = require("./js/modal-manager");
 const configManager = require("./js/config-manager");
+const {
+  DEFAULT_RESPONSE_PROFILE,
+  DEFAULT_CUSTOM_MAX_OUTPUT_TOKENS,
+  getResponseProfiles,
+  validateCustomMaxOutputTokens,
+} = require("./js/response-profiles");
 const log = require("electron-log");
 
 const aiProviderRadios = document.querySelectorAll('input[name="aiProvider"]');
@@ -35,6 +41,9 @@ const cancelPullBtn = document.getElementById("cancel-pull");
 
 // Language selector elements
 const languageCardsContainer = document.getElementById("language-cards");
+const responseProfileCardsContainer = document.getElementById("response-profile-cards");
+const customTokenLimitContainer = document.getElementById("custom-token-limit-container");
+const customMaxOutputTokensInput = document.getElementById("custom-max-output-tokens");
 const sectionToggles = document.querySelectorAll(".section-toggle");
 
 let currentSettings = {};
@@ -46,6 +55,11 @@ window.ipcRenderer = ipcRenderer;
 async function loadCurrentSettings() {
   try {
     currentSettings = await ipcRenderer.invoke(IPC_CHANNELS.GET_CURRENT_SETTINGS);
+    window.currentSettings = currentSettings;
+    if (currentSettings.configError) {
+      messageDiv.textContent = currentSettings.configError;
+      messageDiv.className = "status error";
+    }
   } catch (error) {
     log.error("Error getting current settings:", error.message);
     // Set default settings if handler is not registered
@@ -55,6 +69,7 @@ async function loadCurrentSettings() {
     messageDiv.textContent = "Settings system not fully initialized. Using default configuration.";
     messageDiv.className = "status warning";
   }
+  window.currentSettings = currentSettings;
 
   // Set UI based on current settings
   // Update radio buttons and label styling
@@ -99,6 +114,13 @@ async function loadCurrentSettings() {
     // Default to English
     selectLanguageCard("en");
   }
+
+  if (customMaxOutputTokensInput) {
+    customMaxOutputTokensInput.value = String(
+      currentSettings.customMaxOutputTokens ?? DEFAULT_CUSTOM_MAX_OUTPUT_TOKENS,
+    );
+  }
+  selectResponseProfile(currentSettings.responseProfile || DEFAULT_RESPONSE_PROFILE);
 
   // Update visibility based on provider
   utils.updateSectionVisibility(currentSettings.aiProvider);
@@ -318,6 +340,38 @@ function populateLanguageOptions() {
 
     languageCardsContainer.appendChild(card);
   }
+}
+
+function selectResponseProfile(profile) {
+  if (!responseProfileCardsContainer) return;
+  const selectedProfile = getResponseProfiles()[profile] ? profile : DEFAULT_RESPONSE_PROFILE;
+  responseProfileCardsContainer.querySelectorAll(".response-profile-card").forEach((card) => {
+    const isSelected = card.dataset.profile === selectedProfile;
+    card.classList.toggle("selected", isSelected);
+    card.setAttribute("aria-pressed", String(isSelected));
+  });
+  if (customTokenLimitContainer) customTokenLimitContainer.hidden = selectedProfile !== "custom";
+}
+
+function populateResponseProfileOptions() {
+  if (!responseProfileCardsContainer) return;
+  responseProfileCardsContainer.innerHTML = "";
+  Object.values(getResponseProfiles()).forEach((profile) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "response-profile-card";
+    card.dataset.profile = profile.id;
+    card.setAttribute("aria-pressed", "false");
+
+    const tokenLabel = profile.id === "custom" ? "128–8192 tokens" : `${profile.maxOutputTokens} tokens`;
+    card.innerHTML = `
+      <span class="response-profile-title">${profile.name}</span>
+      <span class="response-profile-tokens">${tokenLabel}</span>
+      <span class="response-profile-description">${profile.description}</span>
+    `;
+    card.addEventListener("click", () => selectResponseProfile(profile.id));
+    responseProfileCardsContainer.appendChild(card);
+  });
 }
 
 // Set up section toggle functionality
@@ -543,6 +597,23 @@ saveBtn.addEventListener("click", async () => {
   const responseLanguage = selectedLanguageCard ? selectedLanguageCard.getAttribute("data-language") : "en"; // Default to 'en' if somehow none selected
   log.info("Selected response language:", responseLanguage);
 
+  const selectedResponseProfileCard = responseProfileCardsContainer
+    ? responseProfileCardsContainer.querySelector(".response-profile-card.selected")
+    : null;
+  const responseProfile = selectedResponseProfileCard?.dataset.profile || DEFAULT_RESPONSE_PROFILE;
+  let customMaxOutputTokens = Number(customMaxOutputTokensInput?.value || Number.NaN);
+  try {
+    validateCustomMaxOutputTokens(customMaxOutputTokens);
+  } catch (error) {
+    if (responseProfile === "custom") {
+      messageDiv.textContent = error.message;
+      messageDiv.className = "status error";
+      customMaxOutputTokensInput?.focus();
+      return;
+    }
+    customMaxOutputTokens = DEFAULT_CUSTOM_MAX_OUTPUT_TOKENS;
+  }
+
   // Disable the save button to prevent multiple clicks
   saveBtn.disabled = true;
   log.info("Save button disabled.");
@@ -553,6 +624,8 @@ saveBtn.addEventListener("click", async () => {
     currentModel,
     ollamaUrl, // Save the potentially modified URL
     responseLanguage,
+    responseProfile,
+    customMaxOutputTokens,
   };
 
   // Add Azure Foundry endpoint if using Azure Foundry
@@ -564,8 +637,11 @@ saveBtn.addEventListener("click", async () => {
   try {
     // Update settings through the IPC channel to be persisted in the main process
     log.info("Sending UPDATE_MODEL_SETTINGS IPC message...");
-    ipcRenderer.send(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, settings);
-    log.info("IPC message sent successfully.");
+    const saveResult = await ipcRenderer.invoke(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, settings);
+    if (!saveResult || !saveResult.success) {
+      throw new Error(saveResult?.error || "Unknown configuration error");
+    }
+    log.info("Settings saved successfully.");
 
     // Show success message
     messageDiv.textContent = "Settings saved!";
@@ -651,28 +727,33 @@ function setupKeyboardShortcuts() {
 
 // Setup API key input handlers
 function setupApiKeyInputs() {
+  const validationTimers = new Map();
+  const scheduleValidation = (provider, key, callback) => {
+    clearTimeout(validationTimers.get(provider));
+    validationTimers.set(
+      provider,
+      setTimeout(() => apiKeyManager.validateAndFetchModels(provider, key, callback), 600),
+    );
+  };
+
+  const prepareKeyInput = (input, provider) => {
+    input.addEventListener("focus", () => {
+      if (input.value === apiKeyManager.maskApiKey(API_KEYS[provider].key)) input.value = "";
+    });
+    input.addEventListener("blur", () => {
+      if (API_KEYS[provider].key) input.value = apiKeyManager.maskApiKey(API_KEYS[provider].key);
+    });
+  };
+
   // Setup API key input for OpenAI
   const openaiApiKeyInput = document.getElementById(API_KEYS.openai.inputId);
   if (openaiApiKeyInput) {
+    prepareKeyInput(openaiApiKeyInput, "openai");
     openaiApiKeyInput.addEventListener("input", (e) => {
       const key = e.target.value.trim();
       if (key) {
         // Store the full key
         API_KEYS.openai.key = key;
-        // Also update gemini key with the same value for consistency
-        API_KEYS.gemini.key = key;
-
-        // Mask the key in the input
-        const maskedKey = apiKeyManager.maskApiKey(key);
-        if (openaiApiKeyInput.value !== maskedKey) {
-          openaiApiKeyInput.value = maskedKey;
-        }
-
-        // Update gemini input field if it exists
-        const geminiApiKeyInput = document.getElementById(API_KEYS.gemini.inputId);
-        if (geminiApiKeyInput) {
-          geminiApiKeyInput.value = maskedKey;
-        }
 
         // Save the key
         apiKeyManager.saveApiKey("openai", key);
@@ -683,7 +764,7 @@ function setupApiKeyInputs() {
         // Auto-fetch models if key is long enough
         if (key.length >= 32) {
           // Minimum length for API keys
-          apiKeyManager.validateAndFetchModels("openai", key, () => {
+          scheduleValidation("openai", key, () => {
             // Nothing to do for OpenAI model fetching
           });
         }
@@ -696,25 +777,12 @@ function setupApiKeyInputs() {
   // Setup API key input for Gemini
   const geminiApiKeyInput = document.getElementById(API_KEYS.gemini.inputId);
   if (geminiApiKeyInput) {
+    prepareKeyInput(geminiApiKeyInput, "gemini");
     geminiApiKeyInput.addEventListener("input", (e) => {
       const key = e.target.value.trim();
       if (key) {
         // Store the full key
         API_KEYS.gemini.key = key;
-        // Also update openai key with the same value for consistency
-        API_KEYS.openai.key = key;
-
-        // Mask the key in the input
-        const maskedKey = apiKeyManager.maskApiKey(key);
-        if (geminiApiKeyInput.value !== maskedKey) {
-          geminiApiKeyInput.value = maskedKey;
-        }
-
-        // Update openai input field if it exists
-        const openaiApiKeyInput = document.getElementById(API_KEYS.openai.inputId);
-        if (openaiApiKeyInput) {
-          openaiApiKeyInput.value = maskedKey;
-        }
 
         // Save the key
         apiKeyManager.saveApiKey("gemini", key);
@@ -725,7 +793,7 @@ function setupApiKeyInputs() {
         // Auto-fetch models if key is long enough
         if (key.length >= 32) {
           // Minimum length for API keys
-          apiKeyManager.validateAndFetchModels("gemini", key, geminiProvider.loadGeminiModels);
+          scheduleValidation("gemini", key, geminiProvider.loadGeminiModels);
         }
       } else {
         apiKeyManager.updateApiKeyStatus("gemini", "API key is required", "error");
@@ -736,17 +804,12 @@ function setupApiKeyInputs() {
   // Setup API key input for Azure Foundry
   const azureFoundryApiKeyInput = document.getElementById(API_KEYS["azure-foundry"].inputId);
   if (azureFoundryApiKeyInput) {
+    prepareKeyInput(azureFoundryApiKeyInput, "azure-foundry");
     azureFoundryApiKeyInput.addEventListener("input", (e) => {
       const key = e.target.value.trim();
       if (key) {
         // Store the full key - Azure Foundry has its own separate key
         API_KEYS["azure-foundry"].key = key;
-
-        // Mask the key in the input
-        const maskedKey = apiKeyManager.maskApiKey(key);
-        if (azureFoundryApiKeyInput.value !== maskedKey) {
-          azureFoundryApiKeyInput.value = maskedKey;
-        }
 
         // Save the key
         apiKeyManager.saveApiKey("azure-foundry", key);
@@ -829,6 +892,9 @@ function initialize() {
 
   // Populate language options
   populateLanguageOptions();
+
+  // Populate response-size profiles
+  populateResponseProfileOptions();
 
   // Set up section toggles
   setupSectionToggles();

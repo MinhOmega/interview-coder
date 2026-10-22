@@ -229,6 +229,26 @@
     </div>
   </div>
 
+  <div class="section" id="response-size-section">
+    <div class="section-header">
+      <h2>Response Size</h2>
+      <button class="section-toggle" aria-label="Toggle section">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    </div>
+    <div class="section-content">
+      <p class="helper-text mb-2">Set a hard output-token limit and keep routine answers concise.</p>
+      <div class="response-profile-cards" id="response-profile-cards"></div>
+      <label class="custom-token-limit" id="custom-token-limit-container" hidden>
+        <span>Custom maximum output tokens</span>
+        <input id="custom-max-output-tokens" type="number" min="128" max="8192" step="1" value="1024">
+        <small>Allowed range: 128–8192</small>
+      </label>
+    </div>
+  </div>
+
   <div class="section" id="language-section">
     <div class="section-header">
       <h2>Response Language</h2>

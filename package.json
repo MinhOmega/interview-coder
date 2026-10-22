@@ -17,7 +17,8 @@
     "build:win": "electron-builder build --win",
     "build:linux": "electron-builder build --linux",
     "clean": "rimraf dist dist-electron",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --test"
   },
   "build": {
     "appId": "com.interviewcoders.app",
@@ -31,6 +32,13 @@
       "!*.map",
       "!*.md",
       "!*.code-workspace",
+      "!**/.env*",
+      "!interview-coder.config.json*",
+      "!.agent{,/**/*}",
+      "!.claude{,/**/*}",
+      "!screenshots{,/**/*}",
+      "!tmp{,/**/*}",
+      "!temp{,/**/*}",
       "!node_modules/.cache/**/*"
     ],
     "mac": {
@@ -135,7 +143,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "minhomega",
+        "owner": "lavochkaa",
         "repo": "interview-coder",
         "private": false,
         "releaseType": "release"
@@ -165,8 +173,7 @@
   "dependencies": {
     "@anthropic-ai/foundry-sdk": "^0.2.0",
     "@google/generative-ai": "^0.24.0",
-    "@mdx-js/mdx": "^3.1.0",
-    "axios": "^1.8.4",
+    "axios": "^1.20.0",
     "electron-log": "^5.2.4",
     "electron-screenshots": "^0.5.27",
     "openai": "^4.90.0",
@@ -176,17 +183,18 @@
     "rehype-raw": "^5.1.0",
     "rehype-slug": "^4.0.1",
     "rehype-stringify": "^8.0.0",
-    "remark-parse": "^0.0.0",
+    "remark-parse": "^9.0.0",
     "remark-rehype": "^9.0.0",
-    "screenshot-desktop": "^1.15.0",
+    "sanitize-html": "2.18.1",
+    "screenshot-desktop": "^1.15.6",
     "semver": "^7.7.1",
     "toastify-js": "^1.12.0",
     "unified": "^9.2.2",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "chokidar": "^4.0.3",
-    "electron": "^35.1.2",
+    "electron": "^43.5.0",
     "electron-builder": "^26.0.12",
     "electron-reload": "^2.0.0-alpha.1",
     "eslint": "^8.57.1",

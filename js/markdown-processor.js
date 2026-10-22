@@ -1,5 +1,41 @@
 let unified, remarkParse, remarkRehype, rehypeRaw, rehypeStringify;
 let rehypeSlug, rehypeAutolinkHeadings, rehypePrismPlus, rehypeFormat;
+const sanitizeHtml = require("sanitize-html");
+
+const headingTags = ["h1", "h2", "h3", "h4", "h5", "h6"];
+const headingTransforms = Object.fromEntries(headingTags.map((tag) => [tag, (_, attributes) => ({
+  tagName: tag,
+  attribs: attributes.id
+    ? { id: attributes.id.startsWith("markdown-") ? attributes.id : `markdown-${attributes.id}` }
+    : {},
+})]));
+
+function sanitizeMarkdownHtml(html) {
+  return sanitizeHtml(html, {
+    allowedTags: sanitizeHtml.defaults.allowedTags,
+    allowedAttributes: {
+      a: ["href", "title", "aria-hidden", "tabindex"],
+      pre: ["class"],
+      code: ["class"],
+      span: ["class"],
+      ...Object.fromEntries(headingTags.map((tag) => [tag, ["id"]])),
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    allowProtocolRelative: false,
+    transformTags: {
+      ...headingTransforms,
+      a: (_, attributes) => ({
+        tagName: "a",
+        attribs: {
+          ...attributes,
+          href: attributes.href?.startsWith("#") && !attributes.href.startsWith("#markdown-")
+            ? `#markdown-${attributes.href.slice(1)}`
+            : attributes.href,
+        },
+      }),
+    },
+  });
+}
 
 // Helper function to safely import modules
 function safeImport(moduleName, exportName = 'default') {
@@ -79,7 +115,7 @@ async function processMarkdown(markdown) {
 
     // Post-process the HTML to add styling and interactivity
     const tempWrapper = document.createElement("div");
-    tempWrapper.innerHTML = html;
+    tempWrapper.innerHTML = sanitizeMarkdownHtml(html);
 
     // Add class to inline code elements if not already present
     tempWrapper.querySelectorAll("code:not([class])").forEach((codeEl) => {
@@ -154,7 +190,7 @@ async function processMarkdown(markdown) {
     return tempWrapper.innerHTML;
   } catch (err) {
     console.error("Error in markdown processing:", err);
-    return `<p class="error-message">Error processing markdown: ${err.message}</p>`;
+    return '<p class="error-message">Error processing markdown. The plain response remains available in logs.</p>';
   }
 }
 
@@ -178,9 +214,6 @@ function markdownProcess(markdown) {
     .replace(/`([^`]+)`/g, (_, code) => {
       return "`" + code.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "`";
     });
-
-  // Create a temp div to handle HTML strings safely
-  const tempDiv = document.createElement("div");
 
   // Process the markdown with HTML preserved
   let processedContent = safeMarkdown
@@ -246,8 +279,6 @@ function markdownProcess(markdown) {
     // Paragraphs
     .replace(/\n\n/g, "</p><p>");
 
-  tempDiv.innerHTML = processedContent;
-
   // Fix any broken HTML structure
   if (!processedContent.startsWith("<p>")) {
     processedContent = "<p>" + processedContent;
@@ -256,7 +287,7 @@ function markdownProcess(markdown) {
     processedContent = processedContent + "</p>";
   }
 
-  return processedContent;
+  return sanitizeMarkdownHtml(processedContent);
 }
 
 // Export the relevant functions and variables
@@ -276,4 +307,4 @@ module.exports = {
     rehypePrismPlus,
     rehypeFormat
   }
-}; 
+};

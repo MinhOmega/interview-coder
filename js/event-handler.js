@@ -29,9 +29,9 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     return configManager.getCurrentSettings();
   });
 
-  ipcMain.on(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, (_, settings) => {
-    // Update settings and get the result
-    const updatedSettings = configManager.updateSettings(settings);
+  ipcMain.handle(IPC_CHANNELS.UPDATE_MODEL_SETTINGS, async (_, settings) => {
+    try {
+      const updatedSettings = configManager.updateSettings(settings);
 
     // Reinitialize AI providers after settings update
     // This is crucial for Azure Foundry to work properly
@@ -59,8 +59,13 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
     }
 
     // Notify main window only if settings were updated
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send(IPC_CHANNELS.MODEL_CHANGED);
+      }
+      return { success: true, settings: updatedSettings };
+    } catch (error) {
+      log.error("Unable to update model settings:", error.message);
+      return { success: false, error: error.message };
     }
   });
 
@@ -188,8 +193,8 @@ function setupEventHandlers(mainWindow, configManager, windowManager, aiProvider
       }
 
       // Check if we need to show settings window due to no API keys
-      const apiKey = configManager.getApiKey();
       const provider = configManager.getAiProvider();
+      const apiKey = configManager.getApiKey(provider);
       if (!apiKey) {
         console.warn("No API key found, suggesting Settings window");
         // Only suggest settings if we're not using Ollama

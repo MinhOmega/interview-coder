@@ -1,5 +1,6 @@
 const AnthropicFoundry = require("@anthropic-ai/foundry-sdk");
 const EventEmitter = require("events");
+const { getAzureOutputTokenLimit } = require("./provider-output-options");
 const { compressForAzure, needsCompression } = require("./image-compressor");
 
 // Azure Foundry Claude models
@@ -193,7 +194,14 @@ async function formatMessagesForClaude(messages) {
  * @param {string} systemPrompt - Optional system prompt
  * @returns {Promise} Response or streaming emitter
  */
-async function generateWithAzureFoundry(client, messages, model, streaming = false, systemPrompt = null) {
+async function generateWithAzureFoundry(
+  client,
+  messages,
+  model,
+  streaming = false,
+  systemPrompt = null,
+  maxOutputTokens = 4096,
+) {
   try {
     // Check if messages is an array of parts (screenshot mode) or proper messages
     let properMessages = messages;
@@ -225,7 +233,7 @@ async function generateWithAzureFoundry(client, messages, model, streaming = fal
     const params = {
       model: model,
       messages: claudeMessages,
-      max_tokens: Math.min(4096, modelInfo.maxTokens),
+      max_tokens: getAzureOutputTokenLimit(maxOutputTokens, modelInfo.maxTokens),
       temperature: 0.7,
     };
 

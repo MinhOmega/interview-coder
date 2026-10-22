@@ -29,7 +29,7 @@ function setupHotReload(mainWindow, modelSelectorWindow) {
       path.join(__dirname, "../model-selector.html"),
     ],
     {
-      ignored: /(^|[\/\\])\../,
+      ignored: /(^|[/\\])\../,
       persistent: true,
     },
   );
@@ -51,7 +51,7 @@ function setupHotReload(mainWindow, modelSelectorWindow) {
     [path.join(__dirname, "..", "main.js"), path.join(__dirname, "**", "*.js")],
     {
       ignored: [
-        /(^|[\/\\])\../,
+        /(^|[/\\])\../,
         path.join(__dirname, "dev-config.js"), // Don't watch this file
       ],
       persistent: true,

@@ -3,6 +3,7 @@ const { IPC_CHANNELS } = require("./constants");
 const { isLinux, isMac } = require("./config");
 const log = require("electron-log");
 const hotkeyManager = require("./hotkey-manager");
+const { guardNavigation } = require("./navigation-guard");
 const { ipcMain } = require("electron");
 
 let mainWindow;
@@ -53,6 +54,7 @@ function createMainWindow() {
       type: "panel",
     });
 
+    guardNavigation(mainWindow.webContents);
     mainWindow.loadFile("index.html");
     mainWindow.setContentProtection(true);
 
@@ -111,6 +113,7 @@ function createModelSelectionWindow() {
     },
   });
 
+  guardNavigation(modelListWindow.webContents);
   modelListWindow.loadFile("model-selector.html");
 
   modelListWindow.on("closed", () => {

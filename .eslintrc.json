@@ -1,0 +1,19 @@
+{
+  "env": {
+    "browser": true,
+    "commonjs": true,
+    "es2022": true,
+    "node": true
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": "latest"
+  },
+  "ignorePatterns": ["dist/", "node_modules/"],
+  "rules": {
+    "no-unused-vars": "off",
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "no-inner-declarations": "off",
+    "no-constant-condition": "off"
+  }
+}

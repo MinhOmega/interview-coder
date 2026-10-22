@@ -188,10 +188,11 @@ async function fetchGeminiModels() {
         ) {
           window.selectModelCard("gemini", window.currentSettings.currentModel);
         } else {
-          // Select a default model - prefer gemini-2.0-flash if available
+          // Select a current low-latency model by default.
           const defaultModel =
-            geminiModels.find((model) => model.name.includes("gemini-2.0-flash")) ||
-            geminiModels.find((model) => model.name.includes("gemini-pro"));
+            geminiModels.find((model) => model.name.includes("gemini-2.5-flash")) ||
+            geminiModels.find((model) => model.name.includes("flash")) ||
+            geminiModels[0];
 
           if (defaultModel) {
             const modelId = defaultModel.name.replace("models/", "");
